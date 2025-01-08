@@ -26,7 +26,7 @@ sleep 2 && echo " Ок. Образ wg-easy скачен"
 
 # Получение переменной ip адреса хоста для конфига контейнера wg-easy
 sleep 2 && echo "Получение ip сервера"
-server_ip=$(curl -s ifconfig.me)
+server_ip=$(hostname -I | awk '{print $1}')
 sleep 2 && echo " Ок. $server_ip"
 
 # Функция для проверки пароля

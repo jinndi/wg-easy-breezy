@@ -4,30 +4,30 @@
 sleep 1 && echo "Обновление пакетов"
 apt update >/dev/null 2>&1
 apt upgrade -y >/dev/null 2>&1
-sleep 2 && echo " Ок. Пакеты обновлены"
+sleep 1 && echo " Ок. Пакеты обновлены"
 
 # Установка Docker'а если не устанолен
-sleep 2 && echo "Проверяем наличие установленного Docker"
+sleep 1 && echo "Проверяем наличие установленного Docker"
 if command -v docker > /dev/null 2>&1; then
-	sleep 2 && echo " Ок. Docker был ранее установлен"
+	sleep 1 && echo " Ок. Docker был ранее установлен"
 else
-    sleep 2 && echo "Устанавливаем Docker"
+    sleep 1 && echo "Устанавливаем Docker"
     apt install docker.io -y >/dev/null 2>&1
-    sleep 2 && echo " Ок. Docker успешно установлен"
+    sleep 1 && echo " Ок. Docker успешно установлен"
 fi
 usermod -a -G docker "$USER"
 
 # Загрузка образа wg-easy
-sleep 2 && echo "Скачиваем образ wg-easy"
+sleep 1 && echo "Скачиваем образ wg-easy"
 docker stop wg-easy >/dev/null 2>&1
 docker rm wg-easy >/dev/null 2>&1
 docker pull ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
-sleep 2 && echo " Ок. Образ wg-easy скачен"
+sleep 1 && echo " Ок. Образ wg-easy скачен"
 
 # Получение переменной ip адреса хоста для конфига контейнера wg-easy
-sleep 2 && echo "Получение ip сервера"
+sleep 1 && echo "Получение ip сервера"
 server_ip=$(hostname -I | awk '{print $1}')
-sleep 2 && echo " Ок. $server_ip"
+sleep 1 && echo " Ок. $server_ip"
 
 # Функция для проверки пароля
 check_password() {
@@ -120,17 +120,17 @@ echo "Введите диапазон адресов клиентов (Enter, е
 read -e -i "$default_value" def_address
 # Если пользователь ничего не ввёл (просто нажал Enter), используем значение по умолчанию
 def_address=${def_address:-$default_value}
-sleep 2 & echo "Используется диапазон адресов для клиентов: $def_address"
+sleep 1 & echo "Используется диапазон адресов для клиентов: $def_address"
 
 # Сохраняем  конфиги
-sleep 2 && echo "Сохраняем конфиги в домашней директории"
+sleep 1 && echo "Сохраняем конфиги в домашней директории"
 cd || exit
 
 # Сохраняем  конфиг на запуск wg
 cat <<RUN_CONFIG > "run-wg"
 #!/bin/sh
 
-sleep 2 && echo "-run-wg: Запускаем контейнер wg-easy"
+sleep 1 && echo "-run-wg: Запускаем контейнер wg-easy"
 
 docker run --detach \
   --name wg-easy \
@@ -154,14 +154,14 @@ docker run --detach \
   --restart unless-stopped \
   ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
 
-sleep 2 && echo "-run-wg: Ok. 🎉 wg-easy запущен http://$server_ip:$port"
+sleep 1 && echo "-run-wg: Ok. 🎉 wg-easy запущен http://$server_ip:$port"
 RUN_CONFIG
 
 # Сохраняем  конфиг на остановку wg
 cat <<STOP_CONFIG > "stop-wg"
 #!/bin/sh
 
-sleep 2 && echo "-stop-wg: Останавливаем контейнер wg-easy"
+sleep 1 && echo "-stop-wg: Останавливаем контейнер wg-easy"
 
 if docker stop wg-easy >/dev/null 2>&1; then
     echo "-stop-wg: Контейнер wg-easy успешно остановлен"
@@ -177,20 +177,20 @@ else
     exit 1
 fi
 
-sleep 2 && echo "-stop-wg: Ok. wg-easy контейнер остановлен"
+sleep 1 && echo "-stop-wg: Ok. wg-easy контейнер остановлен"
 STOP_CONFIG
 
 # Сохраняем  конфиг на перезапуск wg
 cat <<RERUN_CONFIG > "rerun-wg"
 #!/bin/sh
 
-sleep 2 && echo "-rerun-wg: Перезапускаем wg-easy контейнер"
+sleep 1 && echo "-rerun-wg: Перезапускаем wg-easy контейнер"
 sh stop-wg
 sh run-wg
-sleep 2 && echo "-rerun-wg: Ok. wg-easy контейнер перезапущен"
+sleep 1 && echo "-rerun-wg: Ok. wg-easy контейнер перезапущен"
 RERUN_CONFIG
 
-sleep 2 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохранены"
+sleep 1 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохранены"
 
 # Запуск контейнер wg-easy
 sh run-wg

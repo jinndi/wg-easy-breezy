@@ -1,0 +1,1 @@
+# easy-wg-bash

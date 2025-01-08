@@ -1,4 +1,4 @@
-# wg-easy-bash
+# 🇼​​​​​🇬​​​​​-🇪​​​​​🇦​​​​​🇸​​​​​🇾​​​​​-🇧​​​​​🇦​​​​​🇸​​​​​🇭​​​​​
 
 ### bash-крипт развертывания wg-easy (https://github.com/wg-easy/wg-easy)
 
@@ -10,4 +10,9 @@
 ```
 curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/wg-easy-bash -o wg-easy-bash && bash wg-easy-bash
 ```
-3. На этом все. 
+По завершении работы скрипта вы получите ссылку на WEB UI wg-easy а также 3 файлика в домашней дирректории хоста, переходим в нее командой ``` cd ``` 
+и используем по необходимости через sh для ранее настроенного wg-easy сервиса в докер контейнере:
+
+#### `sh run-wg`  - запустить 
+#### `sh stop-wg` - остановить
+#### `sh rerun-wg` - перезапусить (sh stop-wg + sh run-wg)

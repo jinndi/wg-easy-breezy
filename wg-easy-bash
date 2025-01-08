@@ -2,8 +2,8 @@
 
 # Обновление библиотек
 sleep 1 && echo "Обновление пакетов"
-apt update &>/dev/null
-apt upgrade -y &>/dev/null
+apt update >/dev/null 2>&1
+apt upgrade -y >/dev/null 2>&1
 sleep 2 && echo " Ок. Пакеты обновлены"
 
 # Установка Docker'а если не устанолен
@@ -12,16 +12,16 @@ if command -v docker > /dev/null 2>&1; then
 	sleep 2 && echo " Ок. Docker был ранее установлен"
 else
     sleep 2 && echo "Устанавливаем Docker"
-    apt install docker.io -y &>/dev/null
+    apt install docker.io -y >/dev/null 2>&1
     sleep 2 && echo " Ок. Docker успешно установлен"
 fi
 usermod -a -G docker "$USER"
 
 # Загрузка образа wg-easy
 sleep 2 && echo "Скачиваем образ wg-easy"
-docker stop wg-easy &>/dev/null
-docker rm wg-easy &>/dev/null
-docker pull ghcr.io/wg-easy/wg-easy &>/dev/null
+docker stop wg-easy >/dev/null 2>&1
+docker rm wg-easy >/dev/null 2>&1
+docker pull ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
 sleep 2 && echo " Ок. Образ wg-easy скачен"
 
 # Получение переменной ip адреса хоста для конфига контейнера wg-easy
@@ -152,7 +152,7 @@ docker run --detach \
   --sysctl 'net.ipv4.conf.all.src_valid_mark=1' \
   --sysctl 'net.ipv4.ip_forward=1' \
   --restart unless-stopped \
-  ghcr.io/wg-easy/wg-easy
+  ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
 
 sleep 2 && echo "-run-wg: Ok. 🎉 wg-easy запущен http://$server_ip:$port"
 RUN_CONFIG
@@ -162,8 +162,21 @@ cat <<STOP_CONFIG > "stop-wg"
 #!/bin/sh
 
 sleep 2 && echo "-stop-wg: Останавливаем контейнер wg-easy"
-docker stop wg-easy &>/dev/null
-docker rm wg-easy &>/dev/null
+
+if docker stop wg-easy >/dev/null 2>&1; then
+    echo "-stop-wg: Контейнер wg-easy успешно остановлен"
+else
+    echo "-stop-wg: Не удалось остановить контейнер wg-easy"
+    exit 1
+fi
+
+if docker rm wg-easy >/dev/null 2>&1; then
+    echo "-stop-wg: Контейнер wg-easy успешно удалён"
+else
+    echo "-stop-wg: Не удалось удалить контейнер wg-easy"
+    exit 1
+fi
+
 sleep 2 && echo "-stop-wg: Ok. wg-easy контейнер остановлен"
 STOP_CONFIG
 
@@ -172,7 +185,8 @@ cat <<RERUN_CONFIG > "rerun-wg"
 #!/bin/sh
 
 sleep 2 && echo "-rerun-wg: Перезапускаем wg-easy контейнер"
-sh stop-wg && sh run-wg
+sh stop-wg
+sh run-wg
 sleep 2 && echo "-rerun-wg: Ok. wg-easy контейнер перезапущен"
 RERUN_CONFIG
 

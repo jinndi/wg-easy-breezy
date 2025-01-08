@@ -1,4 +1,4 @@
-# easy-wg-bash
+# wg-easy-bash
 
 ## bash-крипт развертывания easy-wg (https://github.com/wg-easy/wg-easy)
 
@@ -8,7 +8,7 @@
 
 2. Скопировать и вставить в консоль следующие команды и следовать инстукциям.
 ```
-curl -fsSL https://raw.githubusercontent.com/jinndi/easy-wg-bash/refs/heads/main/easy-wg-bash -o easy-wg-bash
-bash easy-wg-bash
+curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/wg-easy-bash -o wg-easy-bash
+bash wg-easy-bash
 ```
 3. На этом все. 

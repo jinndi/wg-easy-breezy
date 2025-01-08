@@ -169,9 +169,9 @@ sh stop-amnezia-wg && sh run-amnezia-wg
 sleep 2 && echo "-rerun-amnezia-wg: Ok. amnezia-wg-easy контейнер перезапущен"
 RERUN_CONFIG
 
-sleep 2 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохранены"
+sleep 2 && echo " Ок. Конфиги run-amnezia-wg, stop-amnezia-wg и rerun-amnezia-wg сохранены"
 
-# Запуск контейнер wg-easy
+# Запуск контейнер amnezia-wg-easy
 sh run-amnezia-wg
 
 $SHELL

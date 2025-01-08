@@ -163,7 +163,7 @@ cat <<RERUN_CONFIG > "rerun-wg"
 #!/bin/sh
 
 sleep 2 && echo "-rerun-wg: Перезапускаем wg-easy контейнер"
-sh stop_wg && sh run_wg
+sh stop-wg && sh run-wg
 sleep 2 && echo "-rerun-wg: Ok. wg-easy контейнер перезапущен"
 RERUN_CONFIG
 

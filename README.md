@@ -1,6 +1,6 @@
 # wg-easy-bash
 
-## bash-крипт развертывания easy-wg (https://github.com/wg-easy/wg-easy)
+### bash-крипт развертывания wg-easy (https://github.com/wg-easy/wg-easy)
 
 Все что нужно сделать, это: 
 

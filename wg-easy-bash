@@ -122,7 +122,7 @@ cd || exit
 cat <<RUN_CONFIG > "run-wg"
 #!/bin/sh
 
-sleep 2 && echo "-run_wg: Запускаем контейнер wg-easy"
+sleep 2 && echo "-run-wg: Запускаем контейнер wg-easy"
 
 docker run --detach \
   --name wg-easy \
@@ -143,28 +143,28 @@ docker run --detach \
   --sysctl 'net.ipv4.conf.all.src_valid_mark=1' \
   --sysctl 'net.ipv4.ip_forward=1' \
   --restart unless-stopped \
-  ghcr.io/wg-easy/wg-easy &>/dev/null
+  ghcr.io/wg-easy/wg-easy
 
-sleep 2 && echo "-run_wg: Ok. 🎉 wg-easy запущен http://$server_ip:$port"
+sleep 2 && echo "-run-wg: Ok. 🎉 wg-easy запущен http://$server_ip:$port"
 RUN_CONFIG
 
 # Сохраняем  конфиг на остановку wg
 cat <<STOP_CONFIG > "stop-wg"
 #!/bin/sh
 
-sleep 2 && echo "-stop_wg: Останавливаем контейнер wg-easy"
+sleep 2 && echo "-stop-wg: Останавливаем контейнер wg-easy"
 docker stop wg-easy &>/dev/null
 docker rm wg-easy &>/dev/null
-sleep 2 && echo "-stop_wg: Ok. wg-easy контейнер остановлен"
+sleep 2 && echo "-stop-wg: Ok. wg-easy контейнер остановлен"
 STOP_CONFIG
 
 # Сохраняем  конфиг на перезапуск wg
 cat <<RERUN_CONFIG > "rerun-wg"
 #!/bin/sh
 
-sleep 2 && echo "-rerun_wg: Перезапускаем wg-easy контейнер"
+sleep 2 && echo "-rerun-wg: Перезапускаем wg-easy контейнер"
 sh stop_wg && sh run_wg
-sleep 2 && echo "-rerun_wg: Ok. wg-easy контейнер перезапущен"
+sleep 2 && echo "-rerun-wg: Ok. wg-easy контейнер перезапущен"
 RERUN_CONFIG
 
 sleep 2 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохранены"

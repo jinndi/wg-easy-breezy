@@ -6,9 +6,8 @@
 
 1. Купить wps сервер, подключиться по ssh
 
-2. Скопировать и вставить в консоль следующие команды и следовать инстукциям.
+2. Скопировать и вставить в консоль следующую команду и следовать инстукциям.
 ```
-curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/wg-easy-bash -o wg-easy-bash
-bash wg-easy-bash
+curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/wg-easy-bash -o wg-easy-bash && bash wg-easy-bash
 ```
 3. На этом все. 

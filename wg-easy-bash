@@ -139,10 +139,10 @@ docker run --detach \
   --env PASSWORD_HASH=$password_hash \
   --env PORT="$port" \
   --env WG_PORT="$wg_port" \
-  --env WG_MTU=1400 \
+  --env WG_MTU=1420 \
   --env WG_PERSISTENT_KEEPALIVE=25 \
   --env WG_DEFAULT_ADDRESS="$def_address" \
-  --env WG_DEFAULT_DNS=1.1.1.1,1.0.0.1 \
+  --env WG_DEFAULT_DNS=1.1.1.1,1.0.0.1,8.8.8.8,8.8.4.4 \
   --env UI_TRAFFIC_STATS=true \
   --volume ~/.wg-easy:/etc/wireguard \
   --publish "$wg_port:$wg_port/udp" \

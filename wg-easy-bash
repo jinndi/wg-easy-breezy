@@ -154,6 +154,7 @@ docker run --detach \
   --sysctl 'net.ipv4.conf.all.src_valid_mark=1' \
   --sysctl 'net.ipv4.ip_forward=1' \
   --restart unless-stopped \
+  --network wg-easy \
   ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
 
 sleep 1 && echo "-run-wg: Ok. 🎉 wg-easy запущен http://$server_ip:$port"
@@ -194,7 +195,11 @@ RERUN_CONFIG
 
 sleep 1 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохранены"
 
-# Запуск контейнер wg-easy
+sleep 1 && echo "Создаем docker сеть 'wg-easy'"
+docker network create wg-easy >/dev/null 2>&1
+leep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
+
+# Запуск контейнера wg-easy
 sh run-wg
 
 $SHELL

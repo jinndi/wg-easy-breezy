@@ -214,6 +214,7 @@ services:
 networks:
   wg-easy:
     driver: bridge
+    name: wg-easy
 NGINX_PM
 
 

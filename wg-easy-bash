@@ -13,9 +13,10 @@ if command -v docker > /dev/null 2>&1; then
 	sleep 1 && echo " Ок. Docker был ранее установлен"
 else
     sleep 1 && echo "Устанавливаем Docker"
-    apt install docker.io -y >/dev/null 2>&1
+    apt install docker.io docker-compose -y >/dev/null 2>&1
     sleep 1 && echo " Ок. Docker успешно установлен"
 fi
+service docker start >/dev/null 2>&1
 usermod -a -G docker "$USER"
 
 # Загрузка образа wg-easy

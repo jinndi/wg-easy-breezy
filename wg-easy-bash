@@ -197,7 +197,7 @@ sleep 1 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохран�
 
 sleep 1 && echo "Создаем docker сеть 'wg-easy'"
 docker network create wg-easy >/dev/null 2>&1
-leep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
+sleep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
 
 # Запуск контейнера wg-easy
 sh run-wg

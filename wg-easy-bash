@@ -193,6 +193,30 @@ sh run-wg
 sleep 1 && echo "-rerun-wg: Ok. wg-easy контейнер перезапущен"
 RERUN_CONFIG
 
+# Сохраняем конфиг docker-compose для запуска Nginx Proxy Manager 
+cat <<NGINX_PM > "nginx-proxy.yml"
+version: '3.8'
+services:
+  app:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx-proxy-man
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - wg-easy
+
+networks:
+  wg-easy:
+    driver: bridge
+NGINX_PM
+
+
 sleep 1 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохранены"
 
 sleep 1 && echo "Создаем docker сеть 'wg-easy'"

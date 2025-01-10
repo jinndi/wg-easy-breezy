@@ -320,11 +320,14 @@ if [[ -n "$domain" ]]; then
     port="443"
 fi
 sleep 1 && echo "Разрешаем порты 22/tcp 80/tcp, $port/tcp, $port/upd, $wg_port/upd через файрвол ufw"
+
+ufw allow ssh,80/tcp,443,81/tcp
+
 ufw allow ssh >/dev/null 2>&1
 ufw allow "80/tcp" >/dev/null 2>&1
 ufw allow "$port/tcp" >/dev/null 2>&1
-ufw allow "$port/upd" >/dev/null 2>&1
-ufw allow "$wg_port/upd" >/dev/null 2>&1
+ufw allow "$port/udp" >/dev/null 2>&1
+ufw allow "$wg_port/udp" >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Порты разрешены"
 

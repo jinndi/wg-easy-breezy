@@ -297,10 +297,9 @@ sleep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
 # Разрешение портов через файрвол ufw
 if [[ -n "$domain" ]]; then
     port="443"
-    ufw allow "443/upd" >/dev/null 2>&1
 fi
-sleep 1 && echo "Разрешаем порты 80:80, $port/tcp, $wg_port/upd через файрвол ufw"
-for rule in "80/tcp" "$port/tcp" "$wg_port/udp"; do
+sleep 1 && echo "Разрешаем порты 80:80, $port, $wg_port через файрвол ufw"
+for rule in "80" "$port" "$wg_port"; do
     ufw allow "$rule" >/dev/null 2>&1
 done
 ufw reload >/dev/null 2>&1

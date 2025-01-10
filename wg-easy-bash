@@ -274,7 +274,6 @@ CADDY_SERVICES
 cat <<CADDY_FILE > "Caddyfile"
 $domain {
   tls $email
-  redir https://$domain{uri}
   reverse_proxy wg-easy:$port
 }
 CADDY_FILE

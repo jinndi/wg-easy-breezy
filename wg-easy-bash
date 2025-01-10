@@ -4,7 +4,7 @@
 sleep 1 && echo "Обновление пакетов"
 apt update >/dev/null 2>&1
 apt upgrade -y >/dev/null 2>&1
-apt install apparmor apparmor-utils -y >/dev/null 2>&1
+apt install ufw apparmor apparmor-utils -y >/dev/null 2>&1
 sleep 1 && echo " Ок. Пакеты обновлены"
 
 # Установка Docker'а если не устанолен

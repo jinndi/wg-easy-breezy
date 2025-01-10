@@ -203,7 +203,7 @@ services:
       - $PWD/.wg-easy:/etc/wireguard
     ports:
       - $wg_port:$wg_port/udp
-    $wg_easy_tcp_port
+      $wg_easy_tcp_port
     restart: unless-stopped
     cap_add:
       - NET_ADMIN

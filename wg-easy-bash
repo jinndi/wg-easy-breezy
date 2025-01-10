@@ -124,11 +124,15 @@ while true; do
         continue
     fi
 
-    # Проверка пароля
+    # Проверка и обработка пароля
     if check_password "$password"; then
-        # Создание хеша пароля
+        # Запрашиваем хеша пароля
         output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
-        password_hash=$(echo "$output_wgpw" | cut -d '=' -f2 | tr -d '\r')
+        # Извлекаем хеша пароля
+        password_hash=$(echo "$output_wgpw" | sed -E "s/^PASSWORD_HASH=''(.*)'$/\1/") | tr -d '\r')
+        # Добавляем $ перед каждым $
+        password_hash="${password_hash//\$/\$\$}"
+
         sleep 1 && echo " Ok. Пароль принят"
         break
     else

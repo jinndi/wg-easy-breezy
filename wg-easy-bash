@@ -299,7 +299,8 @@ sleep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
 if [[ -n "$domain" ]]; then
     port="443"
 fi
-sleep 1 && echo "Разрешаем порты 80/tcp, $port/tcp, $port/upd, $wg_port/upd через файрвол ufw"
+sleep 1 && echo "Разрешаем порты 22/tcp 80/tcp, $port/tcp, $port/upd, $wg_port/upd через файрвол ufw"
+ufw allow ssh >/dev/null 2>&1
 ufw allow "80/tcp" >/dev/null 2>&1
 ufw allow "$port/tcp" >/dev/null 2>&1
 ufw allow "$port/upd" >/dev/null 2>&1
@@ -308,11 +309,11 @@ ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Порты разрешены"
 
 # Запрет определения туннеля (двусторонний пинг)
-#sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
+sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
 # Проверяем, существует ли уже строка в /etc/sysctl.conf, если нет то добавляем
-#grep -qxF 'net.ipv4.icmp_echo_ignore_all=1' /etc/sysctl.conf || echo 'net.ipv4.icmp_echo_ignore_all=1' | tee -a /etc/sysctl.conf >/dev/null 2>&1
-#sysctl -p >/dev/null 2>&1
-#sleep 1 && echo " Ок. Запрет установлен"
+grep -qxF 'net.ipv4.icmp_echo_ignore_all=1' /etc/sysctl.conf || echo 'net.ipv4.icmp_echo_ignore_all=1' | tee -a /etc/sysctl.conf >/dev/null 2>&1
+sysctl -p >/dev/null 2>&1
+sleep 1 && echo " Ок. Запрет установлен"
 
 # Запуск wg-easy
 ./run-wg

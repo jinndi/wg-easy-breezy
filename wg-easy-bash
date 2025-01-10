@@ -261,7 +261,7 @@ cat <<RUN_CONFIG > "run-wg"
 #!/bin/sh
 echo "run-wg: Запускаем wg-easy"
 docker-compose -f wg.yml up -d
-echo "run-wg: Ok. 🎉 wg-easy запущен $link_ui
+echo "run-wg: Ok. 🎉 wg-easy запущен $link_ui"
 RUN_CONFIG
 
 # Сохраняем  конфиг на остановку wg

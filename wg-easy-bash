@@ -220,7 +220,7 @@ link_ui="http://$wg_host:$port"
 # Если доменное имя задано
 if [[ -n "$domain" ]]; then
 # добавляем сервис Caddy в wg.yml
-cat <<CADDY_SERVICES > "wg.yml"
+cat <<CADDY_SERVICES >> "wg.yml"
   caddy:
     image: caddy
     restart: unless-stopped
@@ -303,6 +303,6 @@ sysctl -p 2>&1
 sleep 1 && echo " Ок. Запрет установлен"
 
 # Запуск wg-easy
-run-wg
+./run-wg
 
 $SHELL

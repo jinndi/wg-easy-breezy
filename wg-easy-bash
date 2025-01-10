@@ -14,7 +14,7 @@ rm -rf /root/.wg-easy /root/caddy_data /root/caddy_config >/dev/null 2>&1
 sleep 1 && echo "Установка необходимых пакетов"
 apt install docker.io docker-compose ufw apparmor apparmor-utils -y >/dev/null 2>&1
 usermod -a -G docker "$USER"
-ufw enable >/dev/null 2>&1
+ufw enable -y >/dev/null 2>&1
 service docker start >/dev/null 2>&1
 echo " Ок. Пакеты установлены"
 

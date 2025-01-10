@@ -296,15 +296,15 @@ if [[ -n "$domain" ]]; then
 fi
 sleep 1 && echo "Разрешаем порты $port/tcp, $wg_port/upd через файрвол ufw"
 for rule in "$port/tcp" "$wg_port/udp"; do
-    ufw allow "$rule" 2>&1
+    ufw allow "$rule" >/dev/null 2>&1
 done
-ufw reload 2>&1
+ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Порты разрешены"
 
 # Запрет определения туннеля (двусторонний пинг)
 sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
-echo "net.ipv4.icmp_echo_ignore_all=1" | tee -a /etc/sysctl.conf 2>&1
-sysctl -p 2>&1
+echo "net.ipv4.icmp_echo_ignore_all=1" | tee -a /etc/sysctl.conf >/dev/null 2>&1
+sysctl -p >/dev/null 2>&1
 sleep 1 && echo " Ок. Запрет установлен"
 
 # Запуск wg-easy

@@ -203,7 +203,7 @@ services:
       - $PWD/.wg-easy:/etc/wireguard
     ports:
       - $wg_port:$wg_port/udp
-    $wg_easy_tcp_port
+     $wg_easy_tcp_port
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -225,6 +225,7 @@ if [[ -n "$domain" ]]; then
 cat <<CADDY_SERVICES >> "wg.yml"
   caddy:
     image: caddy
+    container_name: caddy
     restart: unless-stopped
     ports:
       - 443:443
@@ -238,7 +239,9 @@ cat <<CADDY_SERVICES >> "wg.yml"
 
 volumes:
   caddy_data:
+    name: caddy_data
   caddy_config:
+    name: caddy_config
 CADDY_SERVICES
 
 # добавляем Caddyfile файл для настройки reverse_proxy и редиректа на https

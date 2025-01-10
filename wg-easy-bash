@@ -6,6 +6,10 @@ apt update >/dev/null 2>&1
 apt upgrade -y >/dev/null 2>&1
 echo " Ок. Пакеты обновлены"
 
+# Очистка предыдущих установок
+rm -f /root/wg-easy-bash /root/wg.yml /root/run-wg /root/stop-wg /root/rerun-wg /root/Caddyfile >/dev/null 2>&1
+rm -rf /root/.wg-easy /root/caddy_data /root/caddy_config >/dev/null 2>&1
+
 # Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов"
 apt install docker.io docker-compose ufw apparmor apparmor-utils -y >/dev/null 2>&1

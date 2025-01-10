@@ -101,7 +101,7 @@ while true; do
     # Проверка имени
     if check_domain "$domain"; then
         # Переопределяем wg_host
-        wg_host=$((domain))
+        wg_host="$domain"
         sleep 1 && echo " Ок. Домен для WireGuard: $wg_host"
         # Загрузка образа caddy
         sleep 1 && echo "Загрузка образа caddy"

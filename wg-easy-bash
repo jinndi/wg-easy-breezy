@@ -7,7 +7,8 @@ apt upgrade -y >/dev/null 2>&1
 echo " Ок. Пакеты обновлены"
 
 # Очистка предыдущих установок
-rm -f /root/wg-easy-bash /root/wg.yml /root/run-wg /root/stop-wg /root/rerun-wg /root/Caddyfile >/dev/null 2>&1
+rm -f /root/wg-easy-bash /root/wg.yml /root/Caddyfile >/dev/null 2>&1
+rm -f /root/run-wg /root/stop-wg /root/rerun-wg >/dev/null 2>&1
 rm -rf /root/.wg-easy >/dev/null 2>&1
 
 # Установка необходимых пакетов и запуск служб
@@ -39,6 +40,20 @@ check_domain() {
     # Если строка не является доменом
     if [[ ! $domain =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
         sleep 1 && echo " Ошибка: Это не домен: $domain"
+        return 1
+    fi
+
+    return 0
+}
+
+
+# Функция для проверки адреса email
+check_email() {
+    local email="$1"
+
+    # Если строка не является доменом
+    if [[ ! $email =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        sleep 1 && echo " Ошибка: Некорректный email: $domain"
         return 1
     fi
 
@@ -113,6 +128,23 @@ while true; do
         echo "Попробуйте снова"
     fi
 done
+
+# Цикл ввода email для полученя SSL сертификата, если ранее указан домен 
+if [[ -n "$domain" ]]; then
+  while true; do
+     sleep 1 && echo "Введите email для получения SSL сертификата домена $domain:"
+     read email
+
+      # Проверка ввода
+      if check_email "$email"; then
+          echo " Ок. Email для получения SSL сертификата: $email"
+          break
+      else
+          echo "Попробуйте снова"
+      fi
+  done
+fi
+
 
 # Цикл для ввода пароля
 while true; do
@@ -251,6 +283,7 @@ CADDY_SERVICES
 # добавляем Caddyfile файл для настройки reverse_proxy и редиректа на https
 cat <<CADDY_FILE > "Caddyfile"
 $domain {
+  tls $email
   redir https://$domain{uri}
   reverse_proxy wg-easy:$port
 }

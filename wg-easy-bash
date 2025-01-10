@@ -211,11 +211,6 @@ cd || exit
 cat <<WG_YML > "wg.yml"
 version: "3.8"
 
-networks:
-  wg-easy:
-    driver: bridge
-    name: wg-easy
-
 services:
   wg-easy:
     environment:

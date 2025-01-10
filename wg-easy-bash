@@ -14,6 +14,7 @@ rm -rf /root/.wg-easy /root/caddy_data /root/caddy_config >/dev/null 2>&1
 sleep 1 && echo "Установка необходимых пакетов"
 apt install docker.io docker-compose ufw apparmor apparmor-utils -y >/dev/null 2>&1
 usermod -a -G docker "$USER"
+ufw enable >/dev/null 2>&1
 service docker start >/dev/null 2>&1
 echo " Ок. Пакеты установлены"
 
@@ -227,6 +228,8 @@ cat <<CADDY_SERVICES >> "wg.yml"
     image: caddy
     container_name: caddy
     restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
     ports:
       - 80:80
       - 443:443
@@ -294,9 +297,10 @@ sleep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
 # Разрешение портов через файрвол ufw
 if [[ -n "$domain" ]]; then
     port="443"
+    ufw allow "443/upd" >/dev/null 2>&1
 fi
-sleep 1 && echo "Разрешаем порты $port/tcp, $wg_port/upd через файрвол ufw"
-for rule in "80:80" "$port/tcp" "$wg_port/udp"; do
+sleep 1 && echo "Разрешаем порты 80:80, $port/tcp, $wg_port/upd через файрвол ufw"
+for rule in "80/tcp" "$port/tcp" "$wg_port/udp"; do
     ufw allow "$rule" >/dev/null 2>&1
 done
 ufw reload >/dev/null 2>&1

@@ -1,39 +1,43 @@
 #!/bin/bash
 
 # Обновление библиотек
-sleep 1 && echo "Обновление пакетов"
+echo "Обновление пакетов"
 apt update >/dev/null 2>&1
 apt upgrade -y >/dev/null 2>&1
-sleep 1 && echo " Ок. Пакеты обновлены"
+echo " Ок. Пакеты обновлены"
 
-# Установка необходимых пакетов
+# Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов"
 apt install docker.io docker-compose ufw apparmor apparmor-utils -y >/dev/null 2>&1
 usermod -a -G docker "$USER"
 service docker start >/dev/null 2>&1
-sleep 1 && echo " Ок. Пакеты установлены"
+echo " Ок. Пакеты установлены"
 
 # Загрузка образа wg-easy
-sleep 1 && echo "Скачиваем образ wg-easy"
-docker stop wg-easy >/dev/null 2>&1
-docker rm wg-easy >/dev/null 2>&1
+sleep 1 && echo "Загрузка образ wg-easy"
+# Проверка наличия файла wg.yml
+if [[ -e "wg.yml" ]]; then
+    # Останавливаем wg сервисы
+    docker-compose -f wg.yml down --remove-orphans 2>&1
+fi
 docker pull ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
-sleep 1 && echo " Ок. Образ wg-easy скачен"
+echo " Ок. Образ wg-easy загружен"
 
-# Получение переменной ip адреса хоста для конфига контейнера wg-easy
-sleep 1 && echo "Получение ip сервера"
+# Получение переменных ip адреса хоста для конфига контейнера wg-easy
 wg_host=$(hostname -I | awk '{print $1}')
-sleep 1 && echo " Ок. $wg_host"
+server_ip=$((wg_host))
 
 # Функция для проверки имени домена
 check_domain() {
-	local domain="$1"
-	# Если строка не является доменом
-	if [[ ! $input =~ "^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$" ]]; then
-		echo " Ошибка: Это не домен: $domain"
-		return 1
-	fi
-	return 0
+    local domain="$1"
+
+    # Если строка не является доменом
+    if [[ ! $input =~ "^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$" ]]; then
+        sleep 1 && echo " Ошибка: Это не домен: $domain"
+        return 1
+    fi
+
+    return 0
 }
 
 # Функция для проверки пароля
@@ -42,23 +46,22 @@ check_password() {
 
     # Проверка длины пароля (минимум 6 символов)
     if [ "${#password}" -lt 6 ]; then
-        echo " Ошибка: Пароль должен быть не короче 6 символов"
+        sleep 1 && echo " Ошибка: Пароль должен быть не короче 6 символов"
         return 1
     fi
 
     # Проверка наличия хотя бы одной буквы
     if ! echo "$password" | grep -q '[a-zA-Z]'; then
-        echo " Ошибка: Пароль должен содержать хотя бы одну букву"
+        sleep 1 && echo " Ошибка: Пароль должен содержать хотя бы одну букву"
         return 1
     fi
 
     # Проверка наличия хотя бы одной цифры
     if ! echo "$password" | grep -q '[0-9]'; then
-        echo " Ошибка: Пароль должен содержать хотя бы одну цифру"
+        sleep 1 && echo " Ошибка: Пароль должен содержать хотя бы одну цифру"
         return 1
     fi
 
-    # Если все проверки пройдены
     return 0
 }
 
@@ -68,13 +71,13 @@ check_port() {
 
     # Проверка, является ли порт числом
     if ! [[ "$wg_port" =~ ^[0-9]+$ ]]; then
-        echo " Ошибка: Порт должен быть числом"
+        sleep 1 && echo " Ошибка: Порт должен быть числом"
         return 1
     fi
 
     # Проверка диапазона порта (49152–65534)
-    if [ "$wg_port" -lt 49152 ] || [ "$wg_port" -gt 65534 ]; then
-        echo " Ошибка: Порт должен быть в диапазоне от 49152 до 65534"
+    if [ "$wg_port" -lt 1000 ] || [ "$wg_port" -gt 65534 ]; then
+        sleep 1 && echo " Ошибка: Порт должен быть в диапазоне от 49152 до 65534"
         return 1
     fi
 
@@ -83,7 +86,7 @@ check_port() {
 
 # Цикл для ввода имени домена
 while true; do
-   echo "Введите домен, например mydomen.com, который указывает по A записи на ip выше, если его нет просто нажмите Enter:"
+   sleep 1 && echo "Введите домен, например mydomain.com, который указывает по A записи на ip $server_ip, если его нет просто нажмите Enter:"
    read domain
 
     # Проверка на пустой ввод
@@ -94,8 +97,12 @@ while true; do
     # Проверка имени
     if check_domain "$domain"; then
         # Переопределяем wg_host
-	wg_host=$((domain))
-        echo " Ок. Домен для WireGuard: $wg_host"
+        wg_host=$((domain))
+        sleep 1 && echo " Ок. Домен для WireGuard: $wg_host"
+        # Загрузка образа caddy
+        sleep 1 && echo "Загрузка образа caddy"
+        docker pull caddy >/dev/null 2>&1
+        echo " Ок. Образ caddy загружен"
         break
     else
         echo "Попробуйте снова"
@@ -104,21 +111,21 @@ done
 
 # Цикл для ввода пароля
 while true; do
-    echo "Введите сложный пароль для веб интерфейса wg-easy:"
+    sleep 1 && echo "Введите сложный пароль для веб интерфейса:"
     read -rs password
 
     # Проверка на пустой ввод
     if [ -z "$password" ]; then
-        echo " Ошибка: Пароль не может быть пустым"
+        sleep 1 && echo " Ошибка: Пароль не может быть пустым"
         continue
     fi
 
     # Проверка пароля
     if check_password "$password"; then
         # Создание хеша пароля
-	output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
-	password_hash=$(echo "$output_wgpw" | cut -d '=' -f2 | tr -d '\r')
-        echo " Ok. Пароль принят"
+        output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
+        password_hash=$(echo "$output_wgpw" | cut -d '=' -f2 | tr -d '\r')
+        sleep 1 && echo " Ok. Пароль принят"
         break
     else
         echo "Попробуйте снова"
@@ -127,7 +134,7 @@ done
 
 # Цикл для ввода порта
 while true; do
-    echo "Введите порт (от 49152 до 65534):"
+    sleep 1 && echo "Введите порт (от 1000 до 65534):"
     read wg_port
 
     # Проверка порта
@@ -144,113 +151,154 @@ while true; do
 done
 
 # Ввод диапазона адресов для клиентов wg
-default_value="10.8.0.x"
-echo "Введите диапазон адресов клиентов (Enter, если не знаете зачем):"
+default_value="10.0.0.x"
+sleep 1 && echo "Введите диапазон адресов клиентов (Enter, если не знаете зачем):"
 read -e -i "$default_value" def_address
 # Если пользователь ничего не ввёл (просто нажал Enter), используем значение по умолчанию
 def_address=${def_address:-$default_value}
-sleep 1 & echo "Используется диапазон адресов для клиентов: $def_address"
+sleep 1 & echo "Используем диапазон адресов для клиентов: $def_address"
+
+# Задаем значение для wg_easy_tcp_port
+wg_easy_tcp_port="\r"
+if [[ -n "$domain" ]]; then
+   wg_easy_tcp_port=" - $port:$port/tcp"
+fi
 
 # Сохраняем  конфиги
 sleep 1 && echo "Сохраняем конфиги в домашней директории"
 cd || exit
 
 # Сохраняем  конфиг на запуск wg
-cat <<RUN_CONFIG > "run-wg"
-#!/bin/sh
-
-sleep 1 && echo "-run-wg: Запускаем контейнер wg-easy"
-
-docker run --detach \
-  --name wg-easy \
-  --env LANG=ru \
-  --env WG_HOST="$wg_host" \
-  --env PASSWORD_HASH=$password_hash \
-  --env PORT="$port" \
-  --env WG_PORT="$wg_port" \
-  --env WG_MTU=1420 \
-  --env WG_PERSISTENT_KEEPALIVE=25 \
-  --env WG_DEFAULT_ADDRESS="$def_address" \
-  --env WG_DEFAULT_DNS=1.1.1.1,1.0.0.1,8.8.8.8,8.8.4.4 \
-  --env UI_TRAFFIC_STATS=true \
-  --volume ~/.wg-easy:/etc/wireguard \
-  --publish "$wg_port:$wg_port/udp" \
-  --publish "$port:$port/tcp" \
-  --cap-add NET_ADMIN \
-  --cap-add SYS_MODULE \
-  --sysctl 'net.ipv4.conf.all.src_valid_mark=1' \
-  --sysctl 'net.ipv4.ip_forward=1' \
-  --restart unless-stopped \
-  --network wg-easy \
-  ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
-
-sleep 1 && echo "-run-wg: Ok. 🎉 wg-easy запущен http://$server_ip:$port"
-RUN_CONFIG
-
-# Сохраняем  конфиг на остановку wg
-cat <<STOP_CONFIG > "stop-wg"
-#!/bin/sh
-
-sleep 1 && echo "-stop-wg: Останавливаем контейнер wg-easy"
-
-if docker stop wg-easy >/dev/null 2>&1; then
-    echo "-stop-wg: Контейнер wg-easy успешно остановлен"
-else
-    echo "-stop-wg: Не удалось остановить контейнер wg-easy"
-    exit 1
-fi
-
-if docker rm wg-easy >/dev/null 2>&1; then
-    echo "-stop-wg: Контейнер wg-easy успешно удалён"
-else
-    echo "-stop-wg: Не удалось удалить контейнер wg-easy"
-    exit 1
-fi
-
-sleep 1 && echo "-stop-wg: Ok. wg-easy контейнер остановлен"
-STOP_CONFIG
-
-# Сохраняем  конфиг на перезапуск wg
-cat <<RERUN_CONFIG > "rerun-wg"
-#!/bin/sh
-
-sleep 1 && echo "-rerun-wg: Перезапускаем wg-easy контейнер"
-sh stop-wg
-sh run-wg
-sleep 1 && echo "-rerun-wg: Ok. wg-easy контейнер перезапущен"
-RERUN_CONFIG
-
-# Сохраняем конфиг docker-compose для запуска Nginx Proxy Manager 
-cat <<NGINX_PM > "nginx-proxy.yml"
-version: '3.8'
-services:
-  app:
-    image: 'jc21/nginx-proxy-manager:latest'
-    container_name: nginx-proxy-man
-    restart: unless-stopped
-    ports:
-      - '443:443'
-      - '81:81'
-    volumes:
-      - ./data:/data
-      - ./letsencrypt:/etc/letsencrypt
-    networks:
-      - wg-easy
+cat <<WG_YML > "wg.yml"
+version: "3.8"
 
 networks:
   wg-easy:
     driver: bridge
     name: wg-easy
-NGINX_PM
 
+services:
+  wg-easy:
+    environment:
+      - LANG=ru \
+      - WG_HOST=$wg_host
+      - PASSWORD_HASH=$password_hash
+      - PORT=$port
+      - WG_PORT=$wg_port
+      - WG_MTU=1420
+      - WG_PERSISTENT_KEEPALIVE=25 \
+      - WG_DEFAULT_ADDRESS=$def_address
+      - WG_DEFAULT_DNS=1.1.1.1,8.8.8.8
+      - UI_TRAFFIC_STATS=true
+    image: ghcr.io/wg-easy/wg-easy
+    container_name: wg-easy
+    hostname: wg-easy
+    volumes:
+      - $PWD/.wg-easy:/etc/wireguard
+    ports:
+      - $wg_port:$wg_port/udp
+      $wg_easy_tcp_port
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    networks:
+      - wg-easy
 
-sleep 1 && echo " Ок. Конфиги run-wg, stop-wg и rerun-wg сохранены"
+WG_YML
 
+# Cсылка на WEB UI по умолчанию
+link_ui="http://$wg_host:$port"
+
+# Если доменное имя задано
+if [[ -n "$domain" ]]; then
+# добавляем сервис Caddy в wg.yml
+cat <<CADDY_SERVICES > "wg.yml"
+  caddy:
+    image: caddy
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - $PWD/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - wg-easy
+
+volumes:
+  caddy_data:
+  caddy_config:
+CADDY_SERVICES
+
+# добавляем Caddyfile файл для настройки reverse_proxy и редиректа на https
+cat <<CADDY_FILE > "Caddyfile"
+$domain {
+  redir https://$domain{uri}
+  reverse_proxy wg-easy:$port
+}
+CADDY_FILE
+
+# переопределяем link_ui
+link_ui="https://$wg_host"
+fi
+
+# Сохраняем  конфиг на запуск wg
+cat <<RUN_CONFIG > "run-wg"
+#!/bin/sh
+echo "run-wg: Запускаем wg-easy"
+docker-compose -f wg.yml up -d
+echo "run-wg: Ok. 🎉 wg-easy запущен $link_ui
+RUN_CONFIG
+
+# Сохраняем  конфиг на остановку wg
+cat <<STOP_CONFIG > "stop-wg"
+#!/bin/sh
+echo "stop-wg: Останавливаем wg-easy"
+docker-compose -f wg.yml down --remove-orphans
+echo "stop-wg: Ok. wg-easy остановлен"
+STOP_CONFIG
+
+# Сохраняем  конфиг на перезапуск wg
+cat <<RERUN_CONFIG > "rerun-wg"
+#!/bin/sh
+echo "rerun-wg: Перезапускаем wg-easy"
+stop-wg && run-wg
+echo "rerun-wg: Ok. wg-easy перезапущен"
+RERUN_CONFIG
+
+# Даём права на запуск конфигов управления docker-compose
+chmod +x run-wg stop-wg rerun-wg
+
+sleep 1 && echo " Ок. Конфиги сохранены"
+
+# Создание docker сети 'wg-easy'
 sleep 1 && echo "Создаем docker сеть 'wg-easy'"
 docker network create wg-easy >/dev/null 2>&1
 sleep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
 
-# Запуск контейнера wg-easy
-sh run-wg
+# Разрешение портов через файрвол ufw
+if [[ -n "$domain" ]]; then
+    port="443"
+fi
+sleep 1 && echo "Разрешаем порты $port/tcp, $wg_port/upd через файрвол ufw"
+for rule in "$port/tcp" "$wg_port/udp"; do
+    ufw allow "$rule" 2>&1
+done
+ufw reload 2>&1
+sleep 1 && echo " Ок. Порты разрешены"
+
+# Запрет определения туннеля (двусторонний пинг)
+sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
+echo "net.ipv4.icmp_echo_ignore_all=1" | tee -a /etc/sysctl.conf 2>&1
+sysctl -p 2>&1
+sleep 1 && echo " Ок. Запрет установлен"
+
+# Запуск wg-easy
+run-wg
 
 $SHELL

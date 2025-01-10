@@ -210,8 +210,6 @@ cd || exit
 
 # Сохраняем  конфиг на запуск wg
 cat <<WG_YML > "wg.yml"
-version: "3.8"
-
 services:
   wg-easy:
     environment:

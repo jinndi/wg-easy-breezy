@@ -36,7 +36,7 @@ check_domain() {
     local domain="$1"
 
     # Если строка не является доменом
-    if [[ ! $domain =~ "^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$" ]]; then
+    if [[ ! $domain =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
         sleep 1 && echo " Ошибка: Это не домен: $domain"
         return 1
     fi

@@ -280,7 +280,8 @@ STOP_CONFIG
 cat <<RERUN_CONFIG > "rerun-wg"
 #!/bin/sh
 echo "rerun-wg: Перезапускаем wg-easy"
-stop-wg && run-wg
+./stop-wg 
+./run-wg
 echo "rerun-wg: Ok. wg-easy перезапущен"
 RERUN_CONFIG
 

@@ -8,11 +8,11 @@ echo " Ок. Пакеты обновлены"
 
 # Очистка предыдущих установок
 rm -f /root/wg-easy-bash /root/wg.yml /root/run-wg /root/stop-wg /root/rerun-wg /root/Caddyfile >/dev/null 2>&1
-rm -rf /root/.wg-easy /root/caddy_data /root/caddy_config >/dev/null 2>&1
+rm -rf /root/.wg-easy >/dev/null 2>&1
 
 # Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов"
-apt install docker.io docker-compose ufw apparmor apparmor-utils -y >/dev/null 2>&1
+apt install docker.io docker-compose ufw apparmor apparmor-utils nano -y >/dev/null 2>&1
 usermod -a -G docker "$USER"
 ufw --force enable >/dev/null 2>&1
 service docker start >/dev/null 2>&1
@@ -311,7 +311,7 @@ sleep 1 && echo " Ок. Порты разрешены"
 # Запрет определения туннеля (двусторонний пинг)
 sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
 # Проверяем, существует ли уже строка в /etc/sysctl.conf, если нет то добавляем
-grep -qxF 'net.ipv4.icmp_echo_ignore_all=1' /etc/sysctl.conf || echo 'net.ipv4.icmp_echo_ignore_all=1' | tee -a /etc/sysctl.conf >/dev/null 2>&1
+grep -qxF 'net.ipv4.icmp_echo_ignore_all = 1' /etc/sysctl.conf || echo 'net.ipv4.icmp_echo_ignore_all = 1' | tee -a /etc/sysctl.conf >/dev/null 2>&1
 sysctl -p >/dev/null 2>&1
 sleep 1 && echo " Ок. Запрет установлен"
 

@@ -18,7 +18,7 @@ service docker start >/dev/null 2>&1
 echo " Ок. Пакеты установлены"
 
 # Загрузка образа wg-easy
-sleep 1 && echo "Загрузка образ wg-easy"
+sleep 1 && echo "Загрузка образа wg-easy"
 # Проверка наличия файла wg.yml
 if [[ -e "wg.yml" ]]; then
     # Останавливаем wg сервисы
@@ -129,7 +129,7 @@ while true; do
         # Запрашиваем хеша пароля
         output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
         # Извлекаем хеша пароля
-        password_hash=$(echo "$output_wgpw" | sed -E "s/^PASSWORD_HASH=''(.*)'$/\1/") | tr -d '\r')
+        password_hash=$(echo "$output_wgpw" | sed -E "s/^PASSWORD_HASH=''(.*)'$/\1/" | tr -d '\r')
         # Добавляем $ перед каждым $
         password_hash="${password_hash//\$/\$\$}"
 

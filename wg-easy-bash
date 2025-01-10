@@ -228,6 +228,7 @@ cat <<CADDY_SERVICES >> "wg.yml"
     container_name: caddy
     restart: unless-stopped
     ports:
+      - 80:80
       - 443:443
       - 443:443/udp
     volumes:
@@ -295,7 +296,7 @@ if [[ -n "$domain" ]]; then
     port="443"
 fi
 sleep 1 && echo "Разрешаем порты $port/tcp, $wg_port/upd через файрвол ufw"
-for rule in "$port/tcp" "$wg_port/udp"; do
+for rule in "80:80" "$port/tcp" "$wg_port/udp"; do
     ufw allow "$rule" >/dev/null 2>&1
 done
 ufw reload >/dev/null 2>&1

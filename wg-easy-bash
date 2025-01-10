@@ -4,20 +4,14 @@
 sleep 1 && echo "Обновление пакетов"
 apt update >/dev/null 2>&1
 apt upgrade -y >/dev/null 2>&1
-apt install ufw apparmor apparmor-utils -y >/dev/null 2>&1
 sleep 1 && echo " Ок. Пакеты обновлены"
 
-# Установка Docker'а если не устанолен
-sleep 1 && echo "Проверяем наличие установленного Docker"
-if command -v docker > /dev/null 2>&1; then
-	sleep 1 && echo " Ок. Docker был ранее установлен"
-else
-    sleep 1 && echo "Устанавливаем Docker"
-    apt install docker.io docker-compose -y >/dev/null 2>&1
-    sleep 1 && echo " Ок. Docker успешно установлен"
-fi
-service docker start >/dev/null 2>&1
+# Установка необходимых пакетов
+sleep 1 && echo "Установка необходимых пакетов"
+apt install docker.io docker-compose ufw apparmor apparmor-utils -y >/dev/null 2>&1
 usermod -a -G docker "$USER"
+service docker start >/dev/null 2>&1
+sleep 1 && echo " Ок. Пакеты установлены"
 
 # Загрузка образа wg-easy
 sleep 1 && echo "Скачиваем образ wg-easy"
@@ -28,8 +22,19 @@ sleep 1 && echo " Ок. Образ wg-easy скачен"
 
 # Получение переменной ip адреса хоста для конфига контейнера wg-easy
 sleep 1 && echo "Получение ip сервера"
-server_ip=$(hostname -I | awk '{print $1}')
-sleep 1 && echo " Ок. $server_ip"
+wg_host=$(hostname -I | awk '{print $1}')
+sleep 1 && echo " Ок. $wg_host"
+
+# Функция для проверки имени домена
+check_domain() {
+	local domain="$1"
+	# Если строка не является доменом
+	if [[ ! $input =~ "^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$" ]]; then
+		echo " Ошибка: Это не домен: $domain"
+		return 1
+	fi
+	return 0
+}
 
 # Функция для проверки пароля
 check_password() {
@@ -76,6 +81,27 @@ check_port() {
     return 0
 }
 
+# Цикл для ввода имени домена
+while true; do
+   echo "Введите домен, например mydomen.com, который указывает по A записи на ip выше, если его нет просто нажмите Enter:"
+   read domain
+
+    # Проверка на пустой ввод
+    if [ -z "$domain" ]; then
+        break
+    fi
+
+    # Проверка имени
+    if check_domain "$domain"; then
+        # Переопределяем wg_host
+	wg_host=$((domain))
+        echo " Ок. Домен для WireGuard: $wg_host"
+        break
+    else
+        echo "Попробуйте снова"
+    fi
+done
+
 # Цикл для ввода пароля
 while true; do
     echo "Введите сложный пароль для веб интерфейса wg-easy:"
@@ -95,7 +121,7 @@ while true; do
         echo " Ok. Пароль принят"
         break
     else
-        echo " No. Попробуйте снова"
+        echo "Попробуйте снова"
     fi
 done
 
@@ -110,9 +136,10 @@ while true; do
         port=$((wg_port + 1))
         echo " Ок. Порт для WireGuard: $wg_port"
         echo " Ок. Порт для веб интерфейста: $port"
+        sleep 1
         break
     else
-        echo " No. Попробуйте снова"
+        echo "Попробуйте снова"
     fi
 done
 
@@ -137,7 +164,7 @@ sleep 1 && echo "-run-wg: Запускаем контейнер wg-easy"
 docker run --detach \
   --name wg-easy \
   --env LANG=ru \
-  --env WG_HOST="$server_ip" \
+  --env WG_HOST="$wg_host" \
   --env PASSWORD_HASH=$password_hash \
   --env PORT="$port" \
   --env WG_PORT="$wg_port" \

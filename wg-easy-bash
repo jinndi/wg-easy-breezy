@@ -13,9 +13,10 @@ rm -rf /root/.wg-easy >/dev/null 2>&1
 
 # Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов"
-apt install docker.io docker-compose ufw apparmor apparmor-utils nano -y >/dev/null 2>&1
-usermod -a -G docker "$USER"
+apt install ufw apparmor apparmor-utils nano -y >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
+curl -sSL https://get.docker.com | sh >/dev/null 2>&1
+usermod -a -G docker "$USER"
 service docker start >/dev/null 2>&1
 echo " Ок. Пакеты установлены"
 
@@ -288,7 +289,7 @@ fi
 cat <<RUN_CONFIG > "run-wg"
 #!/bin/sh
 echo "run-wg: Запускаем wg-easy"
-docker-compose -f wg.yml up -d
+docker compose -f wg.yml up -d
 echo "run-wg: Ok. 🎉 wg-easy запущен $link_ui"
 RUN_CONFIG
 
@@ -296,7 +297,7 @@ RUN_CONFIG
 cat <<STOP_CONFIG > "stop-wg"
 #!/bin/sh
 echo "stop-wg: Останавливаем wg-easy"
-docker-compose -f wg.yml down --remove-orphans
+docker compose -f wg.yml down --remove-orphans
 echo "stop-wg: Ok. wg-easy остановлен"
 STOP_CONFIG
 
@@ -313,11 +314,6 @@ RERUN_CONFIG
 chmod +x run-wg stop-wg rerun-wg
 
 sleep 1 && echo " Ок. Конфиги сохранены"
-
-# Создание docker сети 'wg-easy'
-sleep 1 && echo "Создаем docker сеть 'wg-easy'"
-docker network create wg-easy >/dev/null 2>&1
-sleep 1 && echo " Ок. Docker сеть 'wg-easy' создана"
 
 # Разрешение портов через файрвол ufw
 if [[ -n "$domain" ]]; then

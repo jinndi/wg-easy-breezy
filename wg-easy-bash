@@ -19,6 +19,7 @@ rm -rf /root/.wg-easy >/dev/null 2>&1
 sleep 1 && echo "Установка необходимых пакетов"
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
 apt install ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
+ufw allow ssh >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
 curl -sSL https://get.docker.com | sh >/dev/null 2>&1
 usermod -a -G docker "$USER"
@@ -310,12 +311,11 @@ chmod +x run-wg stop-wg rerun-wg
 sleep 1 && echo " Ок. Конфиги сохранены"
 
 # Разрешение портов через файрвол ufw
-sleep 1 && echo "Разрешаем порты 22/tcp, $port/tcp, $port/upd, $wg_port/upd, запрещаем 80/tcp через файрвол ufw"
+sleep 1 && echo "Разрешаем порты $port/tcp, $port/upd, $wg_port/upd, запрещаем 80/tcp через файрвол ufw"
 if [[ -n "$domain" ]]; then
     port="443"
     ufw allow "$port/udp" >/dev/null 2>&1
 fi
-ufw allow ssh >/dev/null 2>&1
 ufw allow "$port/tcp" >/dev/null 2>&1
 ufw allow "$wg_port/udp" >/dev/null 2>&1
 ufw deny "80/tcp" >/dev/null 2>&1

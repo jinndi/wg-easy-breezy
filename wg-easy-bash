@@ -7,6 +7,10 @@ apt upgrade -y >/dev/null 2>&1
 echo " Ок. Пакеты обновлены"
 
 # Очистка предыдущих установок
+if [[ -e "wg.yml" ]]; then
+    # Останавливаем wg сервисы
+    docker compose -f wg.yml down --remove-orphans 2>&1
+fi
 rm -f /root/wg-easy-bash /root/wg.yml /root/Caddyfile >/dev/null 2>&1
 rm -f /root/run-wg /root/stop-wg /root/rerun-wg >/dev/null 2>&1
 rm -rf /root/.wg-easy >/dev/null 2>&1
@@ -22,11 +26,6 @@ echo " Ок. Пакеты установлены"
 
 # Загрузка образа wg-easy
 sleep 1 && echo "Загрузка образа wg-easy"
-# Проверка наличия файла wg.yml
-if [[ -e "wg.yml" ]]; then
-    # Останавливаем wg сервисы
-    docker-compose -f wg.yml down --remove-orphans 2>&1
-fi
 docker pull ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
 echo " Ок. Образ wg-easy загружен"
 

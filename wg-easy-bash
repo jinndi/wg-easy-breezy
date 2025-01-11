@@ -19,7 +19,7 @@ rm -rf /root/.wg-easy >/dev/null 2>&1
 sleep 1 && echo "Установка необходимых пакетов"
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
 apt install ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
-ufw allow ssh >/dev/null 2>&1
+ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
 curl -sSL https://get.docker.com | sh >/dev/null 2>&1
 usermod -a -G docker "$USER"

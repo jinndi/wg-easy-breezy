@@ -69,7 +69,7 @@ server_ip=$(hostname -I | awk '{print $1}')
 # Генерация конфига shadowsocks-rust-config.json
 sleep 1 && echo "Генерация конфига"
 password="$(openssl rand -base64 32)"
-cat <<CONFIG >> "$PWD/shadowsocks-rust-config.json"
+cat <<CONFIG >> /root/shadowsocks-rust-config.json
 {
     "server": "$server_ip",
     "server_port": $port,
@@ -94,6 +94,6 @@ docker run --name ssserver-rust \
   -v /root/shadowsocks-rust-config.json:/etc/shadowsocks-rust/config.json \
   -dit ghcr.io/shadowsocks/ssserver-rust:latest
 sleep 1 && echo "🎉 Ура! Shadowsocks настроен, ниже конфигурация"
-cat "$PWD/shadowsocks-rust-config.json"
+cat /root/shadowsocks-rust-config.json
 
 

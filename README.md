@@ -29,7 +29,7 @@
 1. [wg-easy](https://github.com/wg-easy/wg-easy)
 2. [caddy](https://github.com/caddyserver/caddy)
 3. [VDS для VPN](https://just.hosting/?ref=231025)
-4. [Регистрато доменов](https://www.namecheap.com)
+4. [Регистратот доменов](https://www.namecheap.com)
 
 ```
 curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/wg-easy-bash -o wg-easy-bash && bash wg-easy-bash

@@ -12,11 +12,11 @@
 
 После завершения работы скрипта вы получите ссылку на WEB UI а также будет создано по пути /root папка '.wg-easy' - для конфига WG, docker-compose файл 'wg.yml', файл 'Caddyfile' (если указано доменное имя) и три sh скрипта - 'run-wg', 'stop-wg', 'rerun-wg' для управления docker compose 'wg.yml':
 
-#### `./run-wg` - запустить (можно открыть и отредактировать другие необходимые параметры wg-easy)
+`./run-wg` - запустить (можно открыть и отредактировать другие необходимые параметры wg-easy)\n
 
-#### `./stop-wg` - остановить
+`./stop-wg` - остановить
 
-#### `./rerun-wg` - перезапусить (sh stop-wg + sh run-wg)
+`./rerun-wg` - перезапусить (sh stop-wg + sh run-wg)
 
 ## Установка:
 
@@ -24,15 +24,14 @@
 
 2. Скопировать и вставить в консоль следующую команду:
 
-
-## Ссылки:
-1. [wg-easy](https://github.com/wg-easy/wg-easy)
-2. [caddy](https://github.com/caddyserver/caddy)
-3. [VDS для VPN](https://just.hosting/?ref=231025)
-4. [Регистратот доменов](https://www.namecheap.com)
-
 ```
 curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/wg-easy-bash -o wg-easy-bash && bash wg-easy-bash
 ```
 
 3. Cледовать инстукциям на экране
+
+## Ссылки:
+1. [Github wg-easy](https://github.com/wg-easy/wg-easy)
+2. [Github caddy](https://github.com/caddyserver/caddy)
+3. [Дешевые и качественные VDS](https://just.hosting/?ref=231025)
+4. [Лучший регистратор доменов](https://www.namecheap.com)

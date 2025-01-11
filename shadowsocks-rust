@@ -89,8 +89,8 @@ sleep 1 && echo " Ок. Портам выданы разрешения"
 sleep 1 && echo "Запускаем docker контейнер ssserver-rust"
 docker run --name ssserver-rust \
   --restart always \
-  -p "$port:$port/tcp" \
-  -p "$port:$port/udp" \
+  -p "$port:8388/tcp" \
+  -p "$port:8388/udp" \
   -v /root/shadowsocks-rust-config.json:/etc/shadowsocks-rust/config.json \
   -dit ghcr.io/shadowsocks/ssserver-rust:latest
 sleep 1 && echo "🎉 Ура! Shadowsocks настроен, ниже конфигурация"

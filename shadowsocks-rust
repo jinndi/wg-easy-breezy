@@ -63,10 +63,20 @@ while true; do
     fi
 done
 
+# Получение переменных ip адреса сервера для конфига shadowsocks-rust-config.json
+server_ip=$(hostname -I | awk '{print $1}')
+
 # Генерация конфига shadowsocks-rust-config.json
 sleep 1 && echo "Генерация конфига"
 password="$(openssl rand -base64 32)"
-echo '{\"server\":\"0.0.0.0\",\"server_port\":$port,\"password\":\"$password\",\"method\":\"aes-256-gcm\"}' > "$PWD/shadowsocks-rust-config.json"
+cat <<CONFIG >> "$PWD/shadowsocks-rust-config.json"
+{
+    "server": "server_ip",
+    "server_port": $port,
+    "password": "$password",
+    "method": "aes-256-gcm"
+}
+CONFIG
 sleep 1 && echo " Ок. Конфиг сгененирован"
 
 # Разрешение порта через файрвол ufw

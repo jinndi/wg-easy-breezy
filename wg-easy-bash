@@ -9,7 +9,7 @@ echo " Ок. Пакеты обновлены"
 # Очистка предыдущих установок
 if [[ -e "wg.yml" ]]; then
     # Останавливаем wg сервисы
-    docker compose -f wg.yml down --remove-orphans 2>&1
+    docker compose -f wg.yml down --remove-orphans >/dev/null 2>&1
 fi
 rm -f /root/wg-easy-bash /root/wg.yml /root/Caddyfile >/dev/null 2>&1
 rm -f /root/run-wg /root/stop-wg /root/rerun-wg >/dev/null 2>&1

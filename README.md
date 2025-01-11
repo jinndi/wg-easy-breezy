@@ -2,11 +2,6 @@
 
 # bash-cкрипт развертывания wg-easy + caddy (если есть домен)
 
-
-## Ссылки:
-1. wg-easy: https://github.com/wg-easy/wg-easy
-2. caddy: https://github.com/caddyserver/caddy
-
 ## Возможности:
 
 1. Задание доменного иммени с последующей настройкой Caddy веб сервера как реверс прокси с автопродляемым SSL сертификатом (необходимо купленное настроенное доменное имя с `A` записью на ip вашего сервера), если доменного имени нет, то будет просто испльзован ip адрес сервера.
@@ -15,7 +10,7 @@
 4. Задание ip диапазона для клиентов
 5. Запрет определения туннеля (двусторонний пинг) через /etc/sysctl.conf
 
-После завершения работы скрипта вы получите ссылку на WEB UI а также будет создано по пути /root папка '.wg-easy' - для конфигов WG, docker-compose файл 'wg.yml', файл 'Caddyfile' (если указано доменное имя) и три sh скрипта - 'run-wg', 'stop-wg', 'rerun-wg' для управления docker-compose 'wg.yml':
+После завершения работы скрипта вы получите ссылку на WEB UI а также будет создано по пути /root папка '.wg-easy' - для конфига WG, docker-compose файл 'wg.yml', файл 'Caddyfile' (если указано доменное имя) и три sh скрипта - 'run-wg', 'stop-wg', 'rerun-wg' для управления docker compose 'wg.yml':
 
 #### `./run-wg` - запустить (можно открыть и отредактировать другие необходимые параметры wg-easy)
 
@@ -28,6 +23,13 @@
 1. Купить wps сервер c ОС Linux (Ubuntu 20.04+ либо Debian 11+), подключиться по ssh (как root пользователь)
 
 2. Скопировать и вставить в консоль следующую команду:
+
+
+## Ссылки:
+1. [wg-easy](https://github.com/wg-easy/wg-easy)
+2. [caddy](https://github.com/caddyserver/caddy)
+3. [VDS для VPN](https://just.hosting/?ref=231025)
+4. [Регистрато доменов](https://www.namecheap.com)
 
 ```
 curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/wg-easy-bash -o wg-easy-bash && bash wg-easy-bash

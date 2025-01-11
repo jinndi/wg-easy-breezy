@@ -323,6 +323,7 @@ sleep 1 && echo " Ок. Порты разрешены"
 
 # Запрет определения туннеля (двусторонний пинг)
 sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
+grep -q "^net/ipv4/icmp_echo_ignore_all" /etc/ufw/sysctl.conf || echo "net/ipv4/icmp_echo_ignore_all=1" | sudo tee -a /etc/ufw/sysctl.conf >/dev/null 2>&1
 sed -i 's|^net/ipv4/icmp_echo_ignore_all.*|net/ipv4/icmp_echo_ignore_all=1|' /etc/ufw/sysctl.conf >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Запрет установлен"

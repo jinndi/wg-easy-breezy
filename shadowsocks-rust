@@ -71,7 +71,7 @@ sleep 1 && echo "Генерация конфига"
 password="$(openssl rand -base64 32)"
 cat <<CONFIG >> "$PWD/shadowsocks-rust-config.json"
 {
-    "server": "server_ip",
+    "server": "$server_ip",
     "server_port": $port,
     "password": "$password",
     "method": "aes-256-gcm"

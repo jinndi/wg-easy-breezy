@@ -252,7 +252,6 @@ cat <<CADDY_SERVICES >> "wg.yml"
     cap_add:
       - NET_ADMIN
     ports:
-      - 80:80
       - 443:443
       - 443:443/udp
     volumes:

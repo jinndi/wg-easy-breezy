@@ -46,7 +46,6 @@ check_domain() {
     return 0
 }
 
-
 # Функция для проверки адреса email
 check_email() {
     local email="$1"
@@ -95,7 +94,7 @@ check_port() {
         return 1
     fi
 
-    # Проверка диапазона порта (49152–65534)
+    # Проверка диапазона порта (1000–65534)
     if [ "$wg_port" -lt 1000 ] || [ "$wg_port" -gt 65534 ]; then
         sleep 1 && echo " Ошибка: Порт должен быть в диапазоне от 49152 до 65534"
         return 1
@@ -144,7 +143,6 @@ if [[ -n "$domain" ]]; then
       fi
   done
 fi
-
 
 # Цикл для ввода пароля
 while true; do
@@ -198,8 +196,8 @@ def_address=${def_address:-$default_value}
 sleep 1 & echo "Используем диапазон адресов для клиентов: $def_address"
 
 # Задаем значение для wg_easy_tcp_port
-wg_easy_tcp_port="\r"
-if [[ -n "$domain" ]]; then
+wg_easy_tcp_port=""
+if [[ -z "$domain" ]]; then
    wg_easy_tcp_port=" - $port:$port/tcp"
 fi
 
@@ -312,14 +310,14 @@ chmod +x run-wg stop-wg rerun-wg
 sleep 1 && echo " Ок. Конфиги сохранены"
 
 # Разрешение портов через файрвол ufw
+sleep 1 && echo "Разрешаем порты 22/tcp 80/tcp, $port/tcp, $port/upd, $wg_port/upd через файрвол ufw"
 if [[ -n "$domain" ]]; then
     port="443"
+    ufw allow "80/tcp" >/dev/null 2>&1
+    ufw allow "$port/udp" >/dev/null 2>&1
 fi
-sleep 1 && echo "Разрешаем порты 22/tcp 80/tcp, $port/tcp, $port/upd, $wg_port/upd через файрвол ufw"
 ufw allow ssh >/dev/null 2>&1
-ufw allow "80/tcp" >/dev/null 2>&1
 ufw allow "$port/tcp" >/dev/null 2>&1
-ufw allow "$port/udp" >/dev/null 2>&1
 ufw allow "$wg_port/udp" >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Порты разрешены"
@@ -327,7 +325,7 @@ sleep 1 && echo " Ок. Порты разрешены"
 # Запрет определения туннеля (двусторонний пинг)
 sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
 # Проверяем, существует ли уже строка в /etc/sysctl.conf, если нет то добавляем
-grep -qxF 'net.ipv4.icmp_echo_ignore_all = 1' /etc/sysctl.conf || echo 'net.ipv4.icmp_echo_ignore_all = 1' | tee -a /etc/sysctl.conf >/dev/null 2>&1
+grep -qxF 'net.ipv4.icmp_echo_ignore_all=1' /etc/sysctl.conf || echo 'net.ipv4.icmp_echo_ignore_all=1' | tee -a /etc/sysctl.conf >/dev/null 2>&1
 sysctl -p >/dev/null 2>&1
 sleep 1 && echo " Ок. Запрет установлен"
 

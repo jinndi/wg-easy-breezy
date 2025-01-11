@@ -54,7 +54,6 @@ while true; do
 
     # Проверка порта
     if check_port "$port"; then
-        # Увеличиваем порт на 1
         echo " Ок. Порт для Shadowsocks: $port"
         sleep 1
         break
@@ -71,7 +70,7 @@ sleep 1 && echo "Генерация конфига"
 password="$(openssl rand -base64 32)"
 cat <<CONFIG >> /root/shadowsocks-rust-config.json
 {
-    "server": "$server_ip",
+    "server": "0.0.0.0",
     "server_port": $port,
     "password": "$password",
     "method": "aes-256-gcm"
@@ -83,6 +82,7 @@ sleep 1 && echo " Ок. Конфиг сгененирован"
 sleep 1 && echo "Разрешаем порты $port/tcp $port/upd через файрвол ufw"
 ufw allow "$port/tcp" >/dev/null 2>&1
 ufw allow "$port/udp" >/dev/null 2>&1
+ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Портам выданы разрешения"
 
 # Запуск контейнера

@@ -310,16 +310,16 @@ chmod +x run-wg stop-wg rerun-wg
 sleep 1 && echo " Ок. Конфиги сохранены"
 
 # Разрешение портов через файрвол ufw
-sleep 1 && echo "Разрешаем порты 22/tcp 80/tcp, $port/tcp, $port/upd, $wg_port/upd через файрвол ufw"
+sleep 1 && echo "Разрешаем порты 22/tcp, $port/tcp, $port/upd, $wg_port/upd, запрещаем 80/tcp через файрвол ufw"
 if [[ -n "$domain" ]]; then
     port="443"
-    ufw allow "80/tcp" >/dev/null 2>&1
     ufw allow "$port/udp" >/dev/null 2>&1
 fi
 ufw allow ssh >/dev/null 2>&1
 ufw allow "$port/tcp" >/dev/null 2>&1
 ufw allow "$wg_port/udp" >/dev/null 2>&1
-sleep 1 && echo " Ок. Порты разрешены"
+ufw deny "80/tcp" >/dev/null 2>&1
+sleep 1 && echo " Ок. Портам выданы разрешения"
 
 # Запрет определения туннеля (двусторонний пинг)
 sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"

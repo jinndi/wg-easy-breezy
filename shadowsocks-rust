@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Обновление библиотек
+echo "Обновление пакетов"
+apt update >/dev/null 2>&1
+apt upgrade -y >/dev/null 2>&1
+echo " Ок. Пакеты обновлены"
+
+cd || exit
+
+# Очистка предыдущих установок
+if [[ -e "shadowsocks-rust-config.json" ]]; then
+    # Останавливаем и удаляем ssserver-rust контейнер
+    docker stop ssserver-rust  >/dev/null 2>&1
+    docker rm ssserver-rust  >/dev/null 2>&1
+    rm -f shadowsocks-rust-config.json >/dev/null 2>&1
+fi
+rm -f shadowsocks-rust >/dev/null 2>&1
+
+# Установка необходимых пакетов и запуск служб
+sleep 1 && echo "Установка необходимых пакетов"
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
+apt install docker ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
+ufw allow 22 >/dev/null 2>&1
+ufw --force enable >/dev/null 2>&1
+curl -sSL https://get.docker.com | sh >/dev/null 2>&1
+usermod -a -G docker "$USER"
+service docker start >/dev/null 2>&1
+echo " Ок. Пакеты установлены"
+
+# Функция для проверки порта
+check_port() {
+    local port="$1"
+
+    # Проверка, является ли порт числом
+    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
+        sleep 1 && echo " Ошибка: Порт должен быть числом"
+        return 1
+    fi
+
+    # Проверка диапазона порта (1000–65534)
+    if [ "$port" -lt 1000 ] || [ "$port" -gt 65535 ]; then
+        sleep 1 && echo " Ошибка: Порт должен быть в диапазоне от 49152 до 65535"
+        return 1
+    fi
+
+    return 0
+}
+
+# Цикл для ввода порта
+while true; do
+    sleep 1 && echo "Введите порт (от 1000 до 65534):"
+    read port
+
+    # Проверка порта
+    if check_port "$port"; then
+        # Увеличиваем порт на 1
+        echo " Ок. Порт для Shadowsocks: $port"
+        sleep 1
+        break
+    else
+        echo "Попробуйте снова"
+    fi
+done
+
+# Генерация конфига shadowsocks-rust-config.json
+sleep 1 && echo "Генерация конфига"
+password="$(openssl rand -base64 32)"
+echo '{\"server\":\"0.0.0.0\",\"server_port\":8388,\"password\":\"$password\",\"method\":\"aes-256-gcm\"}' > "$PWD/shadowsocks-rust-config.json"
+sleep 1 && echo " Ок. Конфиг сгененирован"
+
+# Разрешение порта через файрвол ufw
+sleep 1 && echo "Разрешаем порты $port/tcp $port/upd через файрвол ufw"
+ufw allow "$port/tcp" >/dev/null 2>&1
+ufw allow "$port/udp" >/dev/null 2>&1
+sleep 1 && echo " Ок. Портам выданы разрешения"
+
+# Запуск контейнера
+sleep 1 && echo "Запускаем docker контейнер ssserver-rust"
+docker run --name ssserver-rust \
+  --restart always \
+  -p 8388:8388/tcp \
+  -p 8388:8388/udp \
+  -v /root/shadowsocks-rust-config.json:/etc/shadowsocks-rust/config.json \
+  -dit ghcr.io/shadowsocks/ssserver-rust:latest
+sleep 1 && echo "🎉 Ура! Shadowsocks настроен, ниже конфигурация"
+cat "$PWD/shadowsocks-rust-config.json"
+
+

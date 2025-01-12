@@ -16,7 +16,7 @@ rm -f shadowsocks-rust shadowsocks-rust-config.json run-ss stop-ss rerun-ss >/de
 # Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов..."
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
-apt install openssl ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
+apt install pwgen ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
 echo "y" | ufw reset >/dev/null 2>&1
 ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
@@ -101,7 +101,7 @@ done
 # Генерация конфига shadowsocks-rust-config.json
 sleep 1 && echo "Генерация конфигов shadowsocks-rust-config.json, run-ss, stop-ss, rerun-ss"
 # Конфиг shadowsocks-rust-config.json
-password="$(openssl rand -base64 32)"
+password="$(pwgen 31 1 | base64)"
 cat >/root/shadowsocks-rust-config.json <<CONFIG
 {
   "server":"0.0.0.0",

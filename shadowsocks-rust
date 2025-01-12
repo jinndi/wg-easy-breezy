@@ -11,13 +11,13 @@ cd || exit
 # Очистка предыдущих установок
 docker stop ssserver-rust  >/dev/null 2>&1
 docker rm ssserver-rust  >/dev/null 2>&1
-rm -f shadowsocks-rust-config.json >/dev/null 2>&1
-rm -f shadowsocks-rust >/dev/null 2>&1
+rm -f shadowsocks-rust shadowsocks-rust-config.json run-ss stop-ss rerun-ss >/dev/null 2>&1
 
 # Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов..."
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
 apt install openssl ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
+echo "y" | ufw reset
 ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
 echo " Ок. Пакеты установлены"
@@ -61,7 +61,7 @@ net.ipv4.tcp_wmem = 4096 65536 67108864
 net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_congestion_control = hybla
 SYSCTL_CONF
-sysctl -p /etc/sysctl.d/00-shadowsocks.conf
+sysctl -p /etc/sysctl.d/00-shadowsocks.conf >/dev/null 2>&1
 sleep 1 && echo " Ок. Оптимизация выполнена"
 
 # Функция для проверки порта

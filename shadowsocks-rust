@@ -9,12 +9,9 @@ echo " Ок. Пакеты обновлены"
 cd || exit
 
 # Очистка предыдущих установок
-if [[ -e "shadowsocks-rust-config.json" ]]; then
-    # Останавливаем и удаляем ssserver-rust контейнер
-    docker stop ssserver-rust  >/dev/null 2>&1
-    docker rm ssserver-rust  >/dev/null 2>&1
-    rm -f shadowsocks-rust-config.json >/dev/null 2>&1
-fi
+docker stop ssserver-rust  >/dev/null 2>&1
+docker rm ssserver-rust  >/dev/null 2>&1
+rm -f shadowsocks-rust-config.json >/dev/null 2>&1
 rm -f shadowsocks-rust >/dev/null 2>&1
 
 # Установка необходимых пакетов и запуск служб

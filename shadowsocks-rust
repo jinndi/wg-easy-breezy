@@ -104,11 +104,11 @@ sleep 1 && echo "Генерация конфигов shadowsocks-rust-config.jso
 password="$(openssl rand -base64 32)"
 cat >/root/shadowsocks-rust-config.json <<CONFIG
 {
-  "server": "0.0.0.0",
-  "server_port": $port,
-  "method": "aes-256-gcm",
-  "password": "${password}",
-  "mode": "tcp_and_udp"
+  "server":"0.0.0.0",
+  "server_port":$port,
+  "mode":"udp_only",
+  "method":"2022-blake3-aes-256-gcm",
+  "password":"${password}"
 }
 CONFIG
 
@@ -118,7 +118,6 @@ cat <<RUN_CONFIG > "run-ss"
 echo "run-ss: Запускаем ssserver-rust"
 docker run --name ssserver-rust \
   --restart always \
-  -p "${port}:8388/tcp" \
   -p "${port}:8388/udp" \
   -v /root/shadowsocks-rust-config.json:/etc/shadowsocks-rust/config.json \
   -dit ghcr.io/shadowsocks/ssserver-rust:latest
@@ -149,7 +148,6 @@ chmod +x run-ss stop-ss rerun-ss
 
 # Разрешение порта через файрвол ufw
 sleep 1 && echo "Разрешаем порты $port/tcp $port/upd через файрвол ufw"
-ufw allow "$port/tcp" >/dev/null 2>&1
 ufw allow "$port/udp" >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Портам выданы разрешения"
@@ -165,10 +163,10 @@ sleep 1 && echo " Ок. Загружено"
 # Получение переменных ip адреса сервера
 server_ip=$(hostname -I | awk '{print $1}')
 
-# Вывод данных для подключения
-echo "------------------------------------"
-echo "Данные для подключения:"
+# Вывод данных для подключения по shadowsocks
+echo "-------------------------------------------------------"
+echo "Данные для подключения shadowsocks:"
 echo "IP сервера: $server_ip"
 echo "Порт: $port"
 echo "Пароль: $password"
-echo "Шифрование: aes-256-gcm"
+echo "-------------------------------------------------------"

@@ -237,6 +237,8 @@ services:
     sysctls:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
+    networks:
+      - wg_network
 
 WG_YML
 
@@ -260,14 +262,18 @@ cat <<CADDY_SERVICES >> "wg.yml"
       - $PWD/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - wg_network
 
 volumes:
   caddy_data:
     name: caddy_data
   caddy_config:
     name: caddy_config
-CADDY_SERVICES
 
+CADDY_SERVICES
+# Если доменное имя задано
+if [[ -n "$domain" ]]; then
 # добавляем Caddyfile файл для настройки reverse_proxy и редиректа на https
 cat <<CADDY_FILE > "Caddyfile"
 $domain {
@@ -279,6 +285,13 @@ CADDY_FILE
 # переопределяем link_ui
 link_ui="https://$wg_host"
 fi
+
+# добавляем сеть wg_network в wg.yml
+cat <<WG_NETWORK >> "wg.yml"
+networks:
+  wg_network:
+    driver: bridge
+WG_NETWORK
 
 # Сохраняем  конфиг на запуск wg
 cat <<RUN_CONFIG > "run-wg"

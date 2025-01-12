@@ -17,7 +17,7 @@ rm -f shadowsocks-rust shadowsocks-rust-config.json run-ss stop-ss rerun-ss >/de
 sleep 1 && echo "Установка необходимых пакетов..."
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
 apt install openssl ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
-echo "y" | ufw reset
+echo "y" | ufw reset >/dev/null 2>&1
 ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
 echo " Ок. Пакеты установлены"

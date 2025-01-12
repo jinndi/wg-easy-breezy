@@ -147,7 +147,7 @@ sleep 1 && echo " Ок. Конфиги сгененированы"
 chmod +x run-ss stop-ss rerun-ss
 
 # Разрешение порта через файрвол ufw
-sleep 1 && echo "Разрешаем порты $port/tcp $port/upd через файрвол ufw"
+sleep 1 && echo "Разрешаем порт $port/upd через файрвол ufw"
 ufw allow "$port/udp" >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Портам выданы разрешения"

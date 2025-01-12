@@ -388,7 +388,7 @@ cat <<SHADOWSOCKS_CONFIG > "shadowsocks-tunnel.json"
             "mode":"udp_only",
             "protocol":"tunnel",
             "forward_address":"wg-easy",
-            "forward_port":"$wg_port",
+            "forward_port":$wg_port,
             "local_address":"127.0.0.1",
             "local_port":888
         }

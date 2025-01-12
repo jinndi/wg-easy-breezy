@@ -329,7 +329,7 @@ cat <<SHADOWSOCKS_SERVICES >> "wg.yml"
     container_name: shadowsocks
     restart: always
     ports:
-      - 888:$ss_port/upd
+      - 888:$ss_port/udp
     volumes:
       - $PWD/shadowsocks-tunnel.json:/etc/shadowsocks-rust/config.json
     networks:

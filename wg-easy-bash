@@ -41,9 +41,30 @@ check_domain() {
 
     # Если строка не является доменом
     if [[ ! $domain =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
-        sleep 1 && echo " Ошибка: Это не домен: $domain"
         return 1
     fi
+
+    return 0
+}
+
+# Функция для проверки IPv4 адреса
+check_IPv4() {
+    local ip="$1"
+
+    # Проверка на формат IPv4
+    if [[ ! $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        sleep 1 && echo "Ошибка: Это не IPv4: $input"
+        return 1
+    fi
+
+    # Проверка на диапазон для каждого октета IP
+    IFS='.' read -r -a octets <<< "$ip"
+    for octet in "${octets[@]}"; do
+        if ((octet < 0 || octet > 255)); then
+            sleep 1 && echo "Ошибка: Неверный IPv4 адрес (не все октеты в пределах 0-255): $ip"
+            return 1
+        fi
+    done
 
     return 0
 }
@@ -88,17 +109,17 @@ check_password() {
 
 # Функция для проверки порта
 check_port() {
-    local wg_port="$1"
+    local port="$1"
 
     # Проверка, является ли порт числом
-    if ! [[ "$wg_port" =~ ^[0-9]+$ ]]; then
+    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
         sleep 1 && echo " Ошибка: Порт должен быть числом"
         return 1
     fi
 
     # Проверка диапазона порта (1000–65534)
-    if [ "$wg_port" -lt 1000 ] || [ "$wg_port" -gt 65534 ]; then
-        sleep 1 && echo " Ошибка: Порт должен быть в диапазоне от 49152 до 65534"
+    if [ "$port" -lt 1000 ] || [ "$port" -gt 65534 ]; then
+        sleep 1 && echo " Ошибка: Порт должен быть в диапазоне от 1000 до 65534"
         return 1
     fi
 
@@ -120,12 +141,9 @@ while true; do
         # Переопределяем wg_host
         wg_host="$domain"
         sleep 1 && echo " Ок. Домен для WireGuard: $wg_host"
-        # Загрузка образа caddy
-        sleep 1 && echo "Загрузка образа caddy"
-        docker pull caddy >/dev/null 2>&1
-        echo " Ок. Образ caddy загружен"
         break
     else
+        sleep 1 && echo " Ошибка: Это не домен: $domain"
         echo "Попробуйте снова"
     fi
 done
@@ -146,7 +164,7 @@ if [[ -n "$domain" ]]; then
   done
 fi
 
-# Цикл для ввода пароля
+# Цикл для ввода пароля wg
 while true; do
     sleep 1 && echo "Введите сложный пароль для веб интерфейса:"
     read -rs password
@@ -171,7 +189,7 @@ while true; do
     fi
 done
 
-# Цикл для ввода порта
+# Цикл для ввода порта  wg
 while true; do
     sleep 1 && echo "Введите порт (от 1000 до 65534):"
     read wg_port
@@ -197,6 +215,58 @@ read -e -i "$default_value" def_address
 def_address=${def_address:-$default_value}
 sleep 1 & echo "Используем диапазон адресов для клиентов: $def_address"
 
+# Цикл для ввода IPv4 адреса shadowsocks
+while true; do
+   sleep 1 && echo "Введите IP адрес shadowsocks сервера, если его нет нажмите Enter:"
+   read ss_ip
+
+    # Проверка на пустой ввод
+    if [ -z "$ss_ip" ]; then
+        break
+    fi
+
+    # Проверка IPv4
+    if check_IPv4 "$ss_ip"; then
+        sleep 1 && echo " Ок. IPv4 shadowsocks: $ss_ip"
+        break
+    else
+        sleep 1 && echo " Ошибка: Это не IPv4: $ss_ip"
+        echo "Попробуйте снова"
+    fi
+done
+
+# Цикл для ввода порта shadowsocks
+if [[ -n "$ss_ip" ]]; then
+    while true; do
+        sleep 1 && echo "Введите порт shadowsocks сервера $ss_ip:"
+        read ss_port
+    
+        # Проверка порта
+        if check_port "$ss_port"; then
+            sleep 1 && echo " Ок. Порт от shadowsocks сервера $ss_ip: $ss_port"
+            break
+        else
+            echo "Попробуйте снова"
+        fi
+    done
+fi
+
+# Ввод пароля shadowsocks сервера:
+if [[ -n "$ss_ip" ]]; then
+    while true; do
+        sleep 1 && echo "Вставьте пароль shadowsocks сервера $ss_ip:"
+        read -rs ss_password
+
+        # Проверка на пустой ввод
+        if [ -z "$ss_password" ]; then
+            sleep 1 && echo " Ошибка: Пароль не может быть пустым"
+            continue
+        fi
+        sleep 1 && echo " Ok. Пароль shadowsocks сервера $ss_ip принят"
+        break
+    done
+fi
+
 # Задаем значение для wg_easy_tcp_port
 wg_easy_tcp_port=""
 if [[ -z "$domain" ]]; then
@@ -217,7 +287,7 @@ services:
       - PASSWORD_HASH=$password_hash
       - PORT=$port
       - WG_PORT=$wg_port
-      - WG_MTU=1420
+      - WG_MTU=1384    # Не увеличивать если устанавливали shadowsocks
       - WG_PERSISTENT_KEEPALIVE=25
       - WG_DEFAULT_ADDRESS=$def_address
       - WG_DEFAULT_DNS=1.1.1.1,8.8.8.8
@@ -242,8 +312,23 @@ services:
 
 WG_YML
 
-# Cсылка на WEB UI по умолчанию
-link_ui="http://$wg_host:$port"
+# Если ip адрес shadowsocks сервера указан:
+if [[ -n "$ss_ip" ]]; then
+# добавляем сервис shadowsocks в wg.yml
+cat <<SHADOWSOCKS_SERVICES >> "wg.yml"
+  shadowsocks:
+    image: ghcr.io/shadowsocks/sslocal-rust:latest
+    container_name: shadowsocks
+    restart: always
+    ports:
+      - 888:$ss_port/upd
+    volumes:
+      - $PWD/shadowsocks-tunnel.json:/etc/shadowsocks-rust/config.json
+    networks:
+      - wg_network
+
+SHADOWSOCKS_SERVICES
+fi
 
 # Если доменное имя задано
 if [[ -n "$domain" ]]; then
@@ -272,6 +357,40 @@ volumes:
     name: caddy_config
 
 CADDY_SERVICES
+
+# добавляем сеть wg_network в wg.yml
+cat <<WG_NETWORK >> "wg.yml"
+networks:
+  wg_network:
+    driver: bridge
+WG_NETWORK
+
+# Если ip адрес shadowsocks сервера указан:
+if [[ -n "$ss_ip" ]]; then
+# добавляем shadowsocks-tunnel.json файл для настройки тунеля на wg
+cat <<SHADOWSOCKS_CONFIG > "shadowsocks-tunnel.json"
+{
+    "server":"$ss_ip",
+    "server_port":$ss_port,
+    "password":"$ss_password",
+    "method":"2022-blake3-aes-256-gcm",
+    "locals": [
+        {
+            "mode":"udp_only",
+            "protocol":"tunnel",
+            "forward_address":"wg-easy",
+            "forward_port":"$wg_port",
+            "local_address":"127.0.0.1",
+            "local_port":888
+        }
+    ]
+}
+SHADOWSOCKS_CONFIG
+fi
+
+# Cсылка на WEB UI по умолчанию
+link_ui="http://$wg_host:$port"
+
 # Если доменное имя задано
 if [[ -n "$domain" ]]; then
 # добавляем Caddyfile файл для настройки reverse_proxy и редиректа на https
@@ -281,17 +400,9 @@ $domain {
   reverse_proxy wg-easy:$port
 }
 CADDY_FILE
-
 # переопределяем link_ui
 link_ui="https://$wg_host"
 fi
-
-# добавляем сеть wg_network в wg.yml
-cat <<WG_NETWORK >> "wg.yml"
-networks:
-  wg_network:
-    driver: bridge
-WG_NETWORK
 
 # Сохраняем  конфиг на запуск wg
 cat <<RUN_CONFIG > "run-wg"

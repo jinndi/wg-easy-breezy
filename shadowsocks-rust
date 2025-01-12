@@ -177,6 +177,7 @@ sleep 1 && echo " Ок. Загружено"
 server_ip=$(hostname -I | awk '{print $1}')
 
 # Вывод данных для подключения
+echo "------------------------------------"
 echo "Данные для подключения:"
 echo "Протокол: shadowsocks"
 echo "IP сервера: $server_ip"

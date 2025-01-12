@@ -18,15 +18,56 @@ fi
 rm -f shadowsocks-rust >/dev/null 2>&1
 
 # Установка необходимых пакетов и запуск служб
-sleep 1 && echo "Установка необходимых пакетов"
+sleep 1 && echo "Установка необходимых пакетов..."
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
-apt install docker ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
+apt install openssl ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
 ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
-curl -sSL https://get.docker.com | sh >/dev/null 2>&1
-usermod -a -G docker "$USER"
-service docker start >/dev/null 2>&1
 echo " Ок. Пакеты установлены"
+sleep 1 && echo "Проверяем установку Docker"
+if ! command -v docker &> /dev/null; then
+  sleep 1 && echo "Docker не установлен. Устанавливаем..."
+  curl -sSL https://get.docker.com | sh >/dev/null 2>&1
+  echo "Установка завершена"
+else
+  sleep 1 && echo "Docker уже установлен"
+fi
+usermod -a -G docker "$USER"
+curl -sSL https://get.docker.com | sh >/dev/null 2>&1
+service docker start >/dev/null 2>&1
+
+# Конфиги для оптимизации сервера Shadowsocks в Linux
+sleep 1 && echo "Оптимизация сервера Shadowsocks в Linux"
+cat >/etc/security/limits.conf <<LIMITS
+root soft nofile 51200
+root hard nofile 51200
+LIMITS
+ulimit -n 51200
+cat >/etc/sysctl.d/00-shadowsocks.conf <<SYSCTL_CONF
+fs.file-max = 51200
+
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.netdev_max_backlog = 250000
+net.core.somaxconn = 4096
+
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 0
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_keepalive_time = 1200
+net.ipv4.ip_local_port_range = 10000 65000
+net.ipv4.tcp_max_syn_backlog = 8192
+net.ipv4.tcp_max_tw_buckets = 5000
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_mem = 25600 51200 102400
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_congestion_control = hybla
+SYSCTL_CONF
+sysctl -p /etc/sysctl.d/00-shadowsocks.conf
+sleep 1 && echo " Ок. Оптимизация выполнена"
 
 # Функция для проверки порта
 check_port() {
@@ -62,21 +103,62 @@ while true; do
     fi
 done
 
-# Получение переменных ip адреса сервера для конфига shadowsocks-rust-config.json
-server_ip=$(hostname -I | awk '{print $1}')
-
 # Генерация конфига shadowsocks-rust-config.json
-sleep 1 && echo "Генерация конфига"
+sleep 1 && echo "Генерация конфигов shadowsocks-rust-config.json, run-ss, stop-ss, rerun-ss"
+# Конфиг shadowsocks-rust-config.json
 password="$(openssl rand -base64 32)"
-cat <<CONFIG >> /root/shadowsocks-rust-config.json
+cat >/root/shadowsocks-rust-config.json <<CONFIG
 {
-    "server": "0.0.0.0",
-    "server_port": $port,
-    "password": "$password",
-    "method": "aes-256-gcm"
+  "udp_timeout": 300,
+  "udp_max_associations": 512,
+  "mode": "tcp_and_udp",
+  "fast_open": true,
+  "timeout": 300,
+  "servers": [
+    {
+      "server": "0.0.0.0",
+      "server_port": $port,
+      "method": "aes-256-gcm",
+      "password": "${password}"
+    },
+  ]
 }
 CONFIG
-sleep 1 && echo " Ок. Конфиг сгененирован"
+
+# Конфиг на запуск
+cat <<RUN_CONFIG > "run-ss"
+#!/bin/sh
+echo "run-ss: Запускаем ssserver-rust"
+docker run --name ssserver-rust \
+  --restart always \
+  -p "${port}:8388/tcp" \
+  -p "${port}:8388/udp" \
+  -v /root/shadowsocks-rust-config.json:/etc/shadowsocks-rust/config.json \
+  -dit ghcr.io/shadowsocks/ssserver-rust:latest
+echo "run-ss: 🎉 Shadowsocks сервер ssserver-rust запущен!"
+RUN_CONFIG
+
+# Конфиг на на остановку
+cat <<STOP_CONFIG > "stop-wg"
+#!/bin/sh
+echo "stop-ss: Останавливаем ssserver-rust"
+docker stop ssserver-rust
+docker rm ssserver-rust
+echo "stop-ss: Ok. ssserver-rust остановлен"
+STOP_CONFIG
+
+# Конфиг на перезапуск wg
+cat <<RERUN_CONFIG > "rerun-wg"
+#!/bin/sh
+echo "rerun-ss: Перезапускаем ssserver-rust"
+./stop-ss 
+./run-ss
+echo "rerun-ss: Ok. ssserver-rust перезапущен"
+RERUN_CONFIG
+sleep 1 && echo " Ок. Конфиги сгененированы"
+
+# Даём права на запуск конфигов управления docker-compose
+chmod +x run-ss stop-ss rerun-ss
 
 # Разрешение порта через файрвол ufw
 sleep 1 && echo "Разрешаем порты $port/tcp $port/upd через файрвол ufw"
@@ -85,15 +167,21 @@ ufw allow "$port/udp" >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Портам выданы разрешения"
 
-# Запуск контейнера
-sleep 1 && echo "Запускаем docker контейнер ssserver-rust"
-docker run --name ssserver-rust \
-  --restart always \
-  -p "$port:8388/tcp" \
-  -p "$port:8388/udp" \
-  -v /root/shadowsocks-rust-config.json:/etc/shadowsocks-rust/config.json \
-  -dit ghcr.io/shadowsocks/ssserver-rust:latest
-sleep 1 && echo "🎉 Ура! Shadowsocks настроен, ниже конфигурация"
-cat /root/shadowsocks-rust-config.json
+# Загрузка контейнера ssserver-rust
+sleep 1 && echo "Загружаем docker контейнер ssserver-rust"
+docker pull ghcr.io/shadowsocks/ssserver-rust:latest >/dev/null 2>&1
+sleep 1 && echo " Ок. Загружено"
 
+# Запуск контейнера ssserver-rust
+./run-ss
 
+# Получение переменных ip адреса сервера
+server_ip=$(hostname -I | awk '{print $1}')
+
+# Вывод данных для подключения
+echo "Данные для подключения:"
+echo "Протокол: shadowsocks"
+echo "IP сервера: $server_ip"
+echo "Порт: $port"
+echo "Пароль: $password"
+echo "Шифрование: aes-256-gcm"

@@ -21,10 +21,18 @@ curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.
 apt install ufw apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
 ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
-curl -sSL https://get.docker.com | sh >/dev/null 2>&1
+echo " Ок. Пакеты установлены"
+
+sleep 1 && echo "Проверяем установку Docker"
+if ! docker compose version &> /dev/null; then
+  sleep 1 && echo "Docker compose не установлен. Устанавливаем"
+  curl -sSL https://get.docker.com | sh >/dev/null 2>&1
+  echo "Установка Docker завершена"
+else
+  sleep 1 && echo "Docker уже установлен"
+fi
 usermod -a -G docker "$USER"
 service docker start >/dev/null 2>&1
-echo " Ок. Пакеты установлены"
 
 # Загрузка образа wg-easy
 sleep 1 && echo "Загрузка образа wg-easy"

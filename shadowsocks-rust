@@ -137,7 +137,7 @@ echo "run-ss: 🎉 Shadowsocks сервер ssserver-rust запущен!"
 RUN_CONFIG
 
 # Конфиг на на остановку
-cat <<STOP_CONFIG > "stop-wg"
+cat <<STOP_CONFIG > "stop-ss"
 #!/bin/sh
 echo "stop-ss: Останавливаем ssserver-rust"
 docker stop ssserver-rust
@@ -146,7 +146,7 @@ echo "stop-ss: Ok. ssserver-rust остановлен"
 STOP_CONFIG
 
 # Конфиг на перезапуск wg
-cat <<RERUN_CONFIG > "rerun-wg"
+cat <<RERUN_CONFIG > "rerun-ss"
 #!/bin/sh
 echo "rerun-ss: Перезапускаем ssserver-rust"
 ./stop-ss 

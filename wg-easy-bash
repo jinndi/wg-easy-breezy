@@ -357,6 +357,7 @@ volumes:
     name: caddy_config
 
 CADDY_SERVICES
+fi
 
 # добавляем сеть wg_network в wg.yml
 cat <<WG_NETWORK >> "wg.yml"

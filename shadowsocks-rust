@@ -135,9 +135,9 @@ Wants=network.target
 [Service]
 ExecStart=/sbin/ssserver -c /etc/shadowsocks-rust/config.json
 Restart=on-failure
-User=nobody
-Group=nobody
-LimitNOFILE=4096
+User=shadowsocks
+Group=shadowsocks
+LimitNOFILE=51200
 
 [Install]
 WantedBy=multi-user.target

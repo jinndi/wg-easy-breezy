@@ -138,6 +138,8 @@ Restart=on-failure
 User=shadowsocks
 Group=shadowsocks
 LimitNOFILE=51200
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target

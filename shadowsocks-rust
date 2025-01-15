@@ -190,7 +190,7 @@ run-ss
 # Вывод данных для подключения по shadowsocks
 echo "-------------------------------------------------------"
 echo "Данные для подключения shadowsocks:"
-echo "IP сервера: $(hostname -I | awk '{print $1}')
+echo "IP сервера: $(hostname -I | awk '{print $1}')"
 echo "Порт: $port"
 echo "Пароль: $password"
 echo "-------------------------------------------------------"

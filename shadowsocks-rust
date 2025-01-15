@@ -8,6 +8,7 @@ rm -rf /etc/shadowsocks-rust/config.json >/dev/null 2>&1
 rm -f /etc/systemd/system/ssserver.service >/dev/null 2>&1
 rm -f /sbin/sslocal /sbin/ssserver /sbin/ssmanager /sbin/ssurl >/dev/null 2>&1
 rm -f /sbin/run-ss /sbin/stop-ss /sbin/rerun-ss /sbin/status-ss >/dev/null 2>&1
+userdel shadowsocks >/dev/null 2>&1
 
 # Обновление библиотек
 echo "Обновление пакетов"
@@ -183,6 +184,11 @@ ufw allow "$port/tcp" >/dev/null 2>&1
 ufw allow "$port/udp" >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Портам выданы разрешения"
+
+# Добавляем отдельного пользователя shadowsocks для запуска службы
+sleep 1 && echo "Добавляем пользователя 'shadowsocks' для запуска службы"
+useradd --system --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin shadowsocks >/dev/null 2>&1
+sleep 1 && echo " Ок. Пользователя shadowsocks добавлен"
 
 # Запуск контейнера ssserver-rust
 systemctl daemon-reload

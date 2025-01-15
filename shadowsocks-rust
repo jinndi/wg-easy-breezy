@@ -3,7 +3,8 @@
 # Очистка предыдущих установок
 cd /root || exit
 stop-ss >/dev/null 2>&1
-rm -f shadowsocks-rust
+systemctl disable ssserver >/dev/null 2>&1
+rm -f shadowsocks-rust >/dev/null 2>&1
 rm -rf /etc/shadowsocks-rust/config.json >/dev/null 2>&1
 rm -f /etc/systemd/system/ssserver.service >/dev/null 2>&1
 rm -f /sbin/sslocal /sbin/ssserver /sbin/ssmanager /sbin/ssurl >/dev/null 2>&1

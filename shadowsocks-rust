@@ -146,17 +146,31 @@ CONFIG_SUSTEMD
 # Конфиг на запуск
 cat <<RUN_CONFIG > "/sbin/run-ss"
 #!/bin/sh
-echo "run-ss: Запускаем sserver"
-systemctl start ssserver
-echo "run-ss: 🎉 ssserver запущен!"
+if systemctl is-active --quiet ssserver; then
+    echo "Служба ssserver работает."
+else
+    echo "run-ss: Запускаем ssserver"
+    systemctl start ssserver
+    if systemctl is-active --quiet ssserver; then
+        echo "run-ss: 🎉 ssserver запущен!"
+    else
+        echo "run-ss: Ошибка запуска службы! Введите status-ss для просмотра статуса"
+    fi
+fi
 RUN_CONFIG
 
 # Конфиг на на остановку
 cat <<STOP_CONFIG > "/sbin/stop-ss"
 #!/bin/sh
-echo "stop-ss: Останавливаем ssserver"
-systemctl stop ssserver
-echo "stop-ss: Ok. ssserver остановлен!"
+if systemctl is-active --quiet ssserver; then
+    echo "stop-ss: Останавливаем ssserver"
+    systemctl stop ssserver
+    if ! systemctl is-active --quiet ssserver; then
+        echo "stop-ss: Ok. ssserver остановлен!"
+    fi
+else
+    echo "run-ss: ssserver не был запущен!"
+fi
 STOP_CONFIG
 
 # Конфиг на перезапуск
@@ -164,7 +178,11 @@ cat <<RERUN_CONFIG > "/sbin/rerun-ss"
 #!/bin/sh
 echo "rerun-ss: Перезапускаем ssserver"
 systemctl restart ssserver
-echo "rerun-ss: Ok. ssserver перезапущен!"
+if systemctl is-active --quiet ssserver; then
+    echo "rerun-ss: Ok. ssserver перезапущен!"
+else
+    echo "rerun-ss: Ошибка перезапуска ssserver! Введите status-ss для просмотра статуса"
+fi
 RERUN_CONFIG
 
 # Конфиг на получение статуса сервера

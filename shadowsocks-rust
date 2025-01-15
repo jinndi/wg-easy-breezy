@@ -107,7 +107,7 @@ done
 # Генерация конфигов
 sleep 1 && echo "Генерация конфигов"
 # Конфиг shadowsocks (/etc/shadowsocks-rust/config.json)
-mkdir /etc/shadowsocks-rust
+mkdir -p /etc/shadowsocks-rust >/dev/null 2>&1
 password=$(ssservice genkey -m "aes-256-gcm")
 cat >/etc/shadowsocks-rust/config.json <<CONFIG
 {

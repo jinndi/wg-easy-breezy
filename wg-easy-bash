@@ -417,7 +417,7 @@ ExecStart=/sbin/sslocal -s "$ss_ip:$ss_port" \
 -m "aes-256-gcm" \
 -U \
 --protocol tun \
---outbound-bind-interface $def_interface \
+--outbound-bind-interface "$def_interface" \
 --tun-interface-name shadowsocks \
 --tun-interface-address "10.255.0.1/24" \
 --timeout 300 \

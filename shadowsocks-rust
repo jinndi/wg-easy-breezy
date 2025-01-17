@@ -75,9 +75,9 @@ check_port() {
         return 1
     fi
 
-    # Проверка диапазона порта (до 65535)
-    if [ "$port" -gt 65535 ]; then
-        sleep 1 && echo " Ошибка: Порт должен быть не больше 65535"
+    # Проверка диапазона порта (1–65534)
+    if [ "$port" -lt 1 ] || [ "$port" -gt 65534 ]; then
+        sleep 1 && echo " Ошибка: Порт должен быть в диапазоне от 1 до 65534"
         return 1
     fi
 
@@ -92,7 +92,7 @@ check_port() {
 
 # Цикл для ввода порта
 while true; do
-    sleep 1 && echo "Введите порт shadowsocks (до 65535):"
+    sleep 1 && echo "Введите порт shadowsocks (1-65534):"
     read port
 
     # Проверка порта

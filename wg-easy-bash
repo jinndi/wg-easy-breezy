@@ -300,22 +300,6 @@ fi
 # получем название интерфейса по умолчанию (eth0)
 dinf="$(ip route | grep default | awk '{print $5}')"
 
-# Создание macvlan docker сетей
-sleep 1 && echo "Создаем macvlan сети для docker"
-if [[ -n "$ss_ip" ]]; then
-docker network create -d macvlan \
-  --subnet="10.200.0.1/24" \
-  --gateway="10.200.0.1" \
-  -o parent=sstun \
-  ss_network >/dev/null 2>&1
-fi
-docker network create -d macvlan \
-  --subnet="10.201.0.1/24" \
-  --gateway="10.201.0.1" \
-  -o parent=$dinf \
-  wg_network >/dev/null 2>&1
-sleep 1 && echo " Ок. Сети созданы"
-
 # Сохраняем  конфиги
 sleep 1 && echo "Сохраняем конфиги в домашней директории"
 # Задаем значение для wg_easy_tcp_port
@@ -548,6 +532,22 @@ systemctl enable --now tun2socks >/dev/null 2>&1
         echo " Ошибка. туннель tun2socks не запущен! Введите 'journalctl -u tun2socks -n 20' для справки"
     fi
 fi
+
+# Создание macvlan docker сетей
+sleep 1 && echo "Создаем macvlan сети для docker"
+if [[ -n "$ss_ip" ]]; then
+docker network create -d macvlan \
+  --subnet="10.200.0.0/24" \
+  --gateway="10.200.0.1" \
+  -o parent=sstun \
+  ss_network >/dev/null 2>&1
+fi
+docker network create -d macvlan \
+  --subnet="10.201.0.0/24" \
+  --gateway="10.201.0.1" \
+  -o parent=$dinf \
+  wg_network >/dev/null 2>&1
+sleep 1 && echo " Ок. Сети созданы"
 
 # Запускаем wg-easy
 ./run-wg

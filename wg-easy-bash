@@ -9,7 +9,10 @@ fi
 rm -f /root/wg-easy-bash /root/wg.yml /root/Caddyfile >/dev/null 2>&1
 rm -f /root/run-wg /root/stop-wg /root/rerun-wg >/dev/null 2>&1
 rm -rf /root/.wg-easy >/dev/null 2>&1
-
+systemctl stop sslocal >/dev/null 2>&1
+systemctl disable sslocal >/dev/null 2>&1
+rm -f /etc/systemd/system/sslocal.service >/dev/null 2>&1
+rm -f /sbin/sslocal /sbin/ssserver /sbin/ssmanager /sbin/ssurl >/dev/null 2>&1
 
 # Обновление библиотек
 echo "Обновление пакетов"

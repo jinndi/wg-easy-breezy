@@ -416,7 +416,7 @@ User=root
 ExecStartPre=-ip tuntap add mode tun dev sstun
 ExecStartPre=ip addr add 10.255.0.1/24 dev sstun
 ExecStartPre=ip link set dev sstun up
-ExecStart=tun2socks -device tun://sstun -proxy ss://chacha20-ietf-poly1305:${ss_ip}@${ss_password}:${ss_port}
+ExecStart=tun2socks -device tun://sstun -proxy ss://chacha20-ietf-poly1305:${ss_password}@${ss_ip}:${ss_port}
 ExecStartPost=bash -c 'mip=$(ip r l | grep "default via" | cut -f3 -d" "); lip=$(ip a l $dinf | awk '/inet /{ print $2 }' | cut -f1 -d"/"); ip r del default dev $dinf; ip r add default via $mip dev $dinf metric 200; ip rule add from $lip table lip; ip r add default via $lip dev $dinf table lip; ip r add ${ss_ip}/32 via $mip dev $dinf'
 ExecStartPost=ip r add default dev sstun metric 50
 ExecStopPost=-ip r flush table lip
@@ -523,6 +523,19 @@ fi
 # Применяем изменения
 sudo sysctl -p >/dev/null 2>&1
 sleep 1 && echo " Ок. Форвардинг включен"
+
+# Активация и запуск shasowsocks туннель сервиса tun2socks
+if [[ -n "$ss_ip" ]]; then
+# активируем и запускаем сервис туннеля shadowsocks tun2socks
+sleep 1 && echo "Активируем и запускаем сервис туннеля shadowsocks"
+systemctl daemon-reload >/dev/null 2>&1
+systemctl enable --now tun2socks >/dev/null 2>&1
+    if systemctl is-active --quiet tun2socks; then
+        echo " Ok. создан и запущен сервис туннеля tun2socks!"
+    else
+        echo " Ошибка. туннель tun2socks не запущен! Введите 'journalctl -u tun2socks -n 20' для справки"
+    fi
+fi
 
 # Создание macvlan docker сетей
 sleep 1 && echo "Создаем macvlan сети для docker"

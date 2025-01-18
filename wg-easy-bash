@@ -380,7 +380,7 @@ NETWORKS
 # Если ip адрес shadowsocks сервера указан:
 if [[ -n "$ss_ip" ]]; then
 # получем название интерфейса по умолчанию (eth0)
-def_interface="$(ip route | grep default | awk '{print $5}')"
+def_inf="$(ip route | grep default | awk '{print $5}')"
 # добавляем sslocal.service файл для работы туннеля shadowsocks
 cat <<SHADOWSOCKS_SERVICE > "/etc/systemd/system/sslocal.service"
 [Unit]

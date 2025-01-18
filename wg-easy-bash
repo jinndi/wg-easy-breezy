@@ -496,6 +496,13 @@ ufw allow "$wg_port/udp" >/dev/null 2>&1
 ufw deny "80/tcp" >/dev/null 2>&1
 sleep 1 && echo " Ок. Портам выданы разрешения"
 
+# Запрет определения туннеля (двусторонний пинг)
+sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
+grep -q "^net/ipv4/icmp_echo_ignore_all" /etc/ufw/sysctl.conf || echo "net/ipv4/icmp_echo_ignore_all=1" | sudo tee -a /etc/ufw/sysctl.conf >/dev/null 2>&1
+sed -i 's|^net/ipv4/icmp_echo_ignore_all.*|net/ipv4/icmp_echo_ignore_all=1|' /etc/ufw/sysctl.conf >/dev/null 2>&1
+ufw reload >/dev/null 2>&1
+sleep 1 && echo " Ок. Запрет установлен"
+
 sleep 1 && echo "Включаем форвардинг в /etc/sysctl.conf"
 # Проверяем, существует ли строка, начинающаяся с net.ipv4.ip_forward
 if grep -q '^net.ipv4.ip_forward' /etc/sysctl.conf; then
@@ -516,19 +523,6 @@ fi
 # Применяем изменения
 sudo sysctl -p >/dev/null 2>&1
 sleep 1 && echo " Ок. Форвардинг включен"
-
-# Активация и запуск shasowsocks туннель сервиса tun2socks
-if [[ -n "$ss_ip" ]]; then
-# активируем и запускаем сервис туннеля shadowsocks tun2socks
-sleep 1 && echo "Активируем и запускаем сервис туннеля shadowsocks"
-systemctl daemon-reload >/dev/null 2>&1
-systemctl enable --now tun2socks >/dev/null 2>&1
-    if systemctl is-active --quiet tun2socks; then
-        echo " Ok. создан и запущен сервис туннеля tun2socks!"
-    else
-        echo " Ошибка. туннель tun2socks не запущен! Введите 'journalctl -u tun2socks -n 20' для справки"
-    fi
-fi
 
 # Создание macvlan docker сетей
 sleep 1 && echo "Создаем macvlan сети для docker"

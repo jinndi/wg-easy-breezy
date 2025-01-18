@@ -335,25 +335,10 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
-WG_YML
-
-# Если ip адрес shadowsocks сервера указан:
-if [[ -n "$ss_ip" ]]; then
-# то устанавливаем сеть ss_network
-cat <<SS_NETWORK >> "wg.yml"
-    networks:
-      ss_network:
-        ipv4_address: 10.255.0.22
-
-SS_NETWORK
-else
-# иначе устанавливаем сеть wg_network
-cat <<SS_NETWORK >> "wg.yml"
     networks:
       wg_network:
 
-SS_NETWORK
-fi
+WG_YML
 
 # Если доменное имя задано
 if [[ -n "$domain" ]]; then
@@ -390,12 +375,6 @@ networks:
   wg_network:
     driver: bridge
 
-  ss_network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 10.255.0.0/24
-          gateway: 10.255.0.1
 NETWORKS
 
 # Если ip адрес shadowsocks сервера указан:
@@ -417,7 +396,7 @@ ExecStart=/sbin/sslocal -s "$ss_ip:$ss_port" \
 -m "aes-256-gcm" \
 -U \
 --protocol tun \
---outbound-bind-interface eth0 \
+--outbound-bind-interface $def_inf \
 --tun-interface-name shadowsocks \
 --tun-interface-address "10.255.0.1/24" \
 --timeout 300 \

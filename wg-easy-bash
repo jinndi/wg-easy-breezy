@@ -9,10 +9,7 @@ fi
 rm -f /root/wg-easy-bash /root/wg.yml /root/Caddyfile >/dev/null 2>&1
 rm -f /root/run-wg /root/stop-wg /root/rerun-wg >/dev/null 2>&1
 rm -rf /root/.wg-easy >/dev/null 2>&1
-systemctl stop ssserver >/dev/null 2>&1
-systemctl disable ssserver >/dev/null 2>&1
-rm -f /etc/systemd/system/sslocal.service >/dev/null 2>&1
-rm -f /sbin/sslocal /sbin/ssserver /sbin/ssmanager /sbin/ssurl >/dev/null 2>&1
+
 
 # Обновление библиотек
 echo "Обновление пакетов"
@@ -401,7 +398,7 @@ NETWORKS
 # Если ip адрес shadowsocks сервера указан:
 if [[ -n "$ss_ip" ]]; then
 # получем название интерфейса по умолчанию (eth0)
-def_interface=ip route | grep default | awk '{print $5}'
+def_interface="$(ip route | grep default | awk '{print $5}')"
 # добавляем sslocal.service файл для работы туннеля shadowsocks
 cat <<SHADOWSOCKS_SERVICE > "/etc/systemd/system/sslocal.service"
 [Unit]
@@ -417,18 +414,31 @@ ExecStart=/sbin/sslocal -s "$ss_ip:$ss_port" \
 -m "aes-256-gcm" \
 -U \
 --protocol tun \
---outbound-bind-interface "$def_interface" \
+--outbound-bind-interface eth0 \
 --tun-interface-name shadowsocks \
 --tun-interface-address "10.255.0.1/24" \
 --timeout 300 \
 --udp-timeout 300 \
 --udp-max-associations 512
+ExecStartPost=bash -c 'MIP=$(ip r l |grep "default via" | cut -f3 -d" "); LIP=$(ip a l eth0 | awk \'/inet /{ print $2 }\' | cut -f1 -d"/"); ip r del default dev eth0; ip r add default via $MIP dev eth0 metric 200; ip rule add from $LIP table lip; ip r add default via $MIP dev eth0 table lip; ip r add ${ss_ip}/32 via $MIP dev eth0'
+ExecStartPost=ip r add default dev shadowsocks metric 50
+ExecStopPost=-ip r flush table lip
+ExecStopPost=-ip rule delete table lip
+ExecStopPost=-ip r del ${ss_ip}/32 dev eth0
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 SHADOWSOCKS_SERVICE
 fi
+
+# добавляем sslocal.service файл для работы туннеля shadowsocks
+cat <<SHADOWSOCKS_SERVICE > "/etc/iproute2/rt_tables"
+
+SHADOWSOCKS_SERVICE
+
+# Добавляем таблицу для маршрутизации в конец /etc/iproute2/rt_tables
+grep -q "^20\s\+lip$" /etc/iproute2/rt_tables || echo "20 lip" | sudo tee -a /etc/iproute2/rt_tables >/dev/null 2>&1
 
 # Cсылка на WEB UI по умолчанию
 link_ui="http://$wg_host:$port"
@@ -493,6 +503,27 @@ grep -q "^net/ipv4/icmp_echo_ignore_all" /etc/ufw/sysctl.conf || echo "net/ipv4/
 sed -i 's|^net/ipv4/icmp_echo_ignore_all.*|net/ipv4/icmp_echo_ignore_all=1|' /etc/ufw/sysctl.conf >/dev/null 2>&1
 ufw reload >/dev/null 2>&1
 sleep 1 && echo " Ок. Запрет установлен"
+
+sleep 1 && echo "Включаем форвардинг в /etc/sysctl.conf"
+# Проверяем, существует ли строка, начинающаяся с net.ipv4.ip_forward
+if grep -q '^net.ipv4.ip_forward' /etc/sysctl.conf; then
+    # Если строка существует, заменяем ее на net.ipv4.ip_forward=1
+    sed -i 's/^net\.ip\.v4\.ip_forward.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf >/dev/null 2>&1
+else
+    # Если строка не существует, добавляем ее в конец файла
+    echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf >/dev/null 2>&1
+fi
+# Проверяем, существует ли строка, начинающаяся с net.ipv6.conf.all.forwarding
+if grep -q '^net.ipv6.conf.all.forwarding' /etc/sysctl.conf; then
+    # Если строка существует, заменяем ее на net.ipv6.conf.all.forwarding=1
+    sed -i 's/^net\.ipv6\.conf\.all\.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf >/dev/null 2>&1
+else
+    # Если строка не существует, добавляем ее в конец файла
+    echo 'net.ipv6.conf.all.forwarding=1' | sudo tee -a /etc/sysctl.conf >/dev/null 2>&1
+fi
+# Применяем изменения
+sudo sysctl -p >/dev/null 2>&1
+sleep 1 && echo " Ок. Форвардинг включен"
 
 # Активация и запуск shasowsocks туннель сервиса
 if [[ -n "$ss_ip" ]]; then

@@ -9,10 +9,9 @@ fi
 rm -f /root/wg-easy-bash /root/wg.yml /root/Caddyfile >/dev/null 2>&1
 rm -f /root/run-wg /root/stop-wg /root/rerun-wg >/dev/null 2>&1
 rm -rf /root/.wg-easy >/dev/null 2>&1
-systemctl stop sslocal >/dev/null 2>&1
-systemctl disable sslocal >/dev/null 2>&1
-rm -f /etc/systemd/system/sslocal.service >/dev/null 2>&1
-rm -f /sbin/sslocal /sbin/ssserver /sbin/ssmanager /sbin/ssurl >/dev/null 2>&1
+systemctl stop tun2socks >/dev/null 2>&1
+systemctl disable tun2socks >/dev/null 2>&1
+rm -f /usr/local/bin/tun2socks >/dev/null 2>&1
 
 # Обновление библиотек
 echo "Обновление пакетов"
@@ -23,7 +22,7 @@ echo " Ок. Пакеты обновлены"
 # Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов"
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
-apt install ufw xz-utils lsof apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
+apt install ufw wget unzip lsof apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
 echo "y" | ufw reset >/dev/null 2>&1
 ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
@@ -289,13 +288,33 @@ fi
 
 # Если ip адрес shadowsocks сервера указан:
 if [[ -n "$ss_ip" ]]; then
-# устанавливаем shadowsocks-rust
-sleep 1 && echo "Загружаем shadowsocks-rust v1.22.0"
-wget https://github.com/shadowsocks/shadowsocks-rust/releases/download/v1.22.0/shadowsocks-v1.22.0.x86_64-unknown-linux-gnu.tar.xz -P /opt/ >/dev/null 2>&1
-tar xf /opt/shadowsocks-*-linux-gnu.tar.xz -C /sbin/ --owner=root --group=root >/dev/null 2>&1
-rm /opt/shadowsocks-*-unknown-linux-gnu.tar.xz >/dev/null 2>&1
+# устанавливаем tun2socks
+sleep 1 && echo "Загружаем tun2socks"
+wget https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-linux-amd64.zip >/dev/null 2>&1
+unzip tun2socks-linux-amd64.zip >/dev/null 2>&1
+mv tun2socks-linux-amd64 /usr/local/bin/tun2socks >/dev/null 2>&1
+chmod +x /usr/local/bin/tun2socks >/dev/null 2>&1
 sleep 1 && echo " Ок. Загружено"
 fi
+
+# получем название интерфейса по умолчанию (eth0)
+dinf="$(ip route | grep default | awk '{print $5}')"
+
+# Создание macvlan docker сетей
+sleep 1 && echo "Создаем macvlan сети для docker"
+if [[ -n "$ss_ip" ]]; then
+docker network create -d macvlan \
+  --subnet="10.200.0.1/24" \
+  --gateway="10.200.0.1" \
+  -o parent=sstun \
+  ss_network >/dev/null 2>&1
+fi
+docker network create -d macvlan \
+  --subnet="10.201.0.1/24" \
+  --gateway="10.201.0.1" \
+  -o parent=$dinf \
+  wg_network >/dev/null 2>&1
+sleep 1 && echo " Ок. Сети созданы"
 
 # Сохраняем  конфиги
 sleep 1 && echo "Сохраняем конфиги в домашней директории"
@@ -335,8 +354,25 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
-
 WG_YML
+
+# Если ip адрес shadowsocks сервера указан:
+if [[ -n "$ss_ip" ]]; then
+# то устанавливаем macvlan сеть ss_network
+cat <<SS_NETWORK_WG >> "wg.yml"
+    networks:
+      ss_network:
+        ipv4_address: 10.200.0.2
+
+SS_NETWORK_WG
+else
+# иначе устанавливаем macvlan сеть wg_network
+cat <<WG_NETWORK_WG >> "wg.yml"
+    networks:
+      wg_network:
+
+WG_NETWORK_WG
+fi
 
 # Если доменное имя задано
 if [[ -n "$domain" ]]; then
@@ -355,6 +391,8 @@ cat <<CADDY_SERVICES >> "wg.yml"
       - $PWD/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - wg_network
 
 volumes:
   caddy_data:
@@ -365,36 +403,46 @@ volumes:
 CADDY_SERVICES
 fi
 
+# добавляем перечень созданных сетей в wg.yml
+cat <<NETWORKS >> "wg.yml"
+networks:
+  wg_network:
+    external: true
+
+  ss_network:
+    external: true
+NETWORKS
+
 # Если ip адрес shadowsocks сервера указан:
 if [[ -n "$ss_ip" ]]; then
-# получем название интерфейса по умолчанию (eth0)
-def_inf="$(ip route | grep default | awk '{print $5}')"
-# добавляем sslocal.service файл для работы туннеля shadowsocks
-cat <<SHADOWSOCKS_SERVICE > "/etc/systemd/system/sslocal.service"
+# дабавляем службу Tun2Socks
+cat <<TUN2SOCKS_SERVICE > "/etc/systemd/system/tun2socks.service"
 [Unit]
-Description=Shadowsocks-rust sslocal
-Documentation=https://github.com/shadowsocks/shadowsocks/wiki
+Description=Tun2Socks
+Documentation=https://github.com/xjasonlyu/tun2socks
 After=network.target
-Wants=network.target
 
 [Service]
+Type=simple
 User=root
-ExecStart=/sbin/sslocal -s "$ss_ip:$ss_port" \
--k "$ss_password" \
--m "aes-256-gcm" \
--U \
---protocol tun \
---outbound-bind-interface $def_inf \
---tun-interface-name shadowsocks \
---tun-interface-address "10.255.0.1/24" \
---timeout 300 \
---udp-timeout 300 \
---udp-max-associations 512
-Restart=on-failure
+ExecStartPre=ip tuntap add mode tun dev sstun
+ExecStartPre=ip addr add 10.255.0.1/24 dev sstun
+ExecStartPre=ip link set dev sstun up
+ExecStart=tun2socks -device tun://sstun -proxy ss://chacha20-ietf-poly1305:${ss_ip}@${ss_password}:${ss_port}
+ExecStartPost=bash -c 'mip=$(ip r l | grep "default via" | cut -f3 -d" "); lip=$(ip a l $dinf | awk \'/inet /{ print $2 }\' | cut -f1 -d"/"); ip r del default dev $dinf; ip r add default via $mip dev $dinf metric 200; ip rule add from $lip table lip; ip r add default via $lip dev $dinf table lip; ip r add ${ss_ip}/32 via $mip dev $dinf'
+ExecStartPost=ip r add default dev sstun metric 50
+ExecStopPost=-ip r flush table lip
+ExecStopPost=-ip rule delete table lip
+ExecStopPost=-ip link set dev sstun down
+ExecStopPost=-ip link del dev sstun
+ExecStopPost=-ip r del ${ss_ip}/32 dev $dinf
 
 [Install]
 WantedBy=multi-user.target
-SHADOWSOCKS_SERVICE
+TUN2SOCKS_SERVICE
+
+# Добавляем таблицу для маршрутизации в конец /etc/iproute2/rt_tables
+grep -q "^20\s\+lip$" /etc/iproute2/rt_tables || echo "20 lip" | sudo tee -a /etc/iproute2/rt_tables >/dev/null 2>&1
 fi
 
 # Cсылка на WEB UI по умолчанию
@@ -402,13 +450,19 @@ link_ui="http://$wg_host:$port"
 
 # Если доменное имя задано
 if [[ -n "$domain" ]]; then
-# добавляем Caddyfile файл для настройки reverse_proxy и редиректа на https
+# устанавливаем адрес прокси wg-easy
+caddy_proxy_adress="wg-easy:$port"
+if [[ -n "$ss_ip" ]]; then
+    caddy_proxy_adress="10.200.0.2:$port"
+fi
+# добавляем Caddyfile файл для настройки reverse_proxy контейнера wg-easy
 cat <<CADDY_FILE > "Caddyfile"
 $domain {
   tls $email
-  reverse_proxy wg-easy:$port
+  reverse_proxy $caddy_proxy_adress
 }
 CADDY_FILE
+
 # переопределяем link_ui
 link_ui="https://$wg_host"
 fi
@@ -482,17 +536,16 @@ fi
 sudo sysctl -p >/dev/null 2>&1
 sleep 1 && echo " Ок. Форвардинг включен"
 
-# Активация и запуск shasowsocks туннель сервиса
+# Активация и запуск shasowsocks туннель сервиса tun2socks
 if [[ -n "$ss_ip" ]]; then
-# активируем и запускаем сервис туннеля shadowsocks
+# активируем и запускаем сервис туннеля shadowsocks tun2socks
 sleep 1 && echo "Активируем и запускаем сервис туннеля shadowsocks"
 systemctl daemon-reload >/dev/null 2>&1
-systemctl enable sslocal >/dev/null 2>&1
-systemctl start sslocal >/dev/null 2>&1
-    if systemctl is-active --quiet sslocal; then
-        echo " Ok. создан и запущен сервис туннеля shadowsocks!"
+systemctl enable --now tun2socks >/dev/null 2>&1
+    if systemctl is-active --quiet tun2socks; then
+        echo " Ok. создан и запущен сервис туннеля tun2socks!"
     else
-        echo " Ошибка. туннель shadowsocks не запущен! Введите 'journalctl -u sslocal -n 20' для справки"
+        echo " Ошибка. туннель tun2socks не запущен! Введите 'journalctl -u tun2socks -n 20' для справки"
     fi
 fi
 

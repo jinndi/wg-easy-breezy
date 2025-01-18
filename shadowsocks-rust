@@ -20,7 +20,7 @@ echo " Ок. Пакеты обновлены"
 # Установка необходимых пакетов и запуск служб
 sleep 1 && echo "Установка необходимых пакетов..."
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
-apt install ufw lsof xz-utils apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
+apt install ufw pwgen lsof xz-utils apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
 echo "y" | ufw reset >/dev/null 2>&1
 ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
@@ -109,7 +109,7 @@ done
 sleep 1 && echo "Генерация конфигов"
 # Конфиг shadowsocks (/etc/shadowsocks-rust/config.json)
 mkdir -p /etc/shadowsocks-rust >/dev/null 2>&1
-password=$(ssservice genkey -m "aes-256-gcm")
+password=$(pwgen 32 1)
 cat >/etc/shadowsocks-rust/config.json <<CONFIG
 {
   "server": "0.0.0.0",
@@ -117,8 +117,8 @@ cat >/etc/shadowsocks-rust/config.json <<CONFIG
   "ipv6_first": false,
   "ipv6_only": false,
   "mode": "tcp_and_udp",
-  "method": "aes-256-gcm",
-  "password": "${password}",
+  "method": "chacha20-ietf-poly1305",
+  "password": "$password",
   "timeout": 300,
   "udp_timeout": 300,
   "udp_max_associations": 512

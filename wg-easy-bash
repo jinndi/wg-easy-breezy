@@ -400,9 +400,9 @@ NETWORKS
 # Если ip адрес shadowsocks сервера указан:
 if [[ -n "$ss_ip" ]]; then
 # получаем IP-адрес шлюза по умолчанию
-
+MIP=$(ip r l | grep "default via" | cut -f3 -d" ")
 # получаем локальный IP-адреса интерфейса
-
+LIP=$(ip a l $dinf | awk '/inet /{ print $2 }' | cut -f1 -d"/")
 # дабавляем службу Tun2Socks
 cat <<TUN2SOCKS_SERVICE > "/etc/systemd/system/tun2socks.service"
 [Unit]
@@ -417,7 +417,11 @@ ExecStartPre=-ip tuntap add mode tun dev sstun
 ExecStartPre=ip addr add 10.255.0.1/24 dev sstun
 ExecStartPre=ip link set dev sstun up
 ExecStart=tun2socks -device tun://sstun -proxy ss://chacha20-ietf-poly1305:${ss_password}@${ss_ip}:${ss_port}
-ExecStartPost=bash -c 'MIP=$(ip r l | grep "default via" | cut -f3 -d" "); LIP=$(ip a l $dinf | awk \'/inet /{ print $2 }\' | cut -f1 -d"/"); ip r del default dev $dinf; ip r add default via $MIP dev $dinf metric 200; ip rule add from $LIP table lip; ip r add default via $MIP dev $dinf table lip; ip r add ${ss_ip}/32 via $MIP dev $dinf'
+ExecStartPost=ip r del default dev $dinf
+ExecStartPost=ip r add default via $MIP dev $dinf metric 200
+ExecStartPost=ip rule add from $LIP table lip
+ExecStartPost=ip r add default via $MIP dev $dinf table lip
+ExecStartPost=ip r add ${ss_ip}/32 via $MIP dev $dinf
 ExecStartPost=ip r add default dev sstun metric 50
 ExecStopPost=-ip r flush table lip
 ExecStopPost=-ip rule delete table lip

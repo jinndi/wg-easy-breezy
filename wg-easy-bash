@@ -27,6 +27,18 @@ ufw allow 22 >/dev/null 2>&1
 ufw --force enable >/dev/null 2>&1
 echo " Ок. Пакеты установлены"
 
+# Проверка установки и установка докера
+sleep 1 && echo "Проверяем установку Docker"
+if ! docker compose version &> /dev/null; then
+  sleep 1 && echo "Docker compose не установлен. Устанавливаем"
+  curl -sSL https://get.docker.com | sh >/dev/null 2>&1
+  echo "Установка Docker завершена"
+else
+  sleep 1 && echo "Docker уже установлен"
+fi
+usermod -a -G docker "$USER" >/dev/null 2>&1
+service docker start >/dev/null 2>&1
+
 # Получение переменных ip адреса хоста для конфига контейнера wg-easy
 wg_host=$(hostname -I | awk '{print $1}')
 server_ip="$wg_host"
@@ -485,18 +497,6 @@ systemctl enable --now tun2socks >/dev/null 2>&1
         echo " Ошибка. туннель tun2socks не запущен! Введите 'journalctl -u tun2socks -n 20' для справки"
     fi
 fi
-
-# Проверка установки и установка докера
-sleep 1 && echo "Проверяем установку Docker"
-if ! docker compose version &> /dev/null; then
-  sleep 1 && echo "Docker compose не установлен. Устанавливаем"
-  curl -sSL https://get.docker.com | sh >/dev/null 2>&1
-  echo "Установка Docker завершена"
-else
-  sleep 1 && echo "Docker уже установлен"
-fi
-usermod -a -G docker "$USER" >/dev/null 2>&1
-service docker start >/dev/null 2>&1
 
 # Загрузка образа wg-easy
 sleep 1 && echo "Загрузка образа wg-easy"

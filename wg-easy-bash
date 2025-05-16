@@ -662,8 +662,8 @@ ExecStartPre=-ip tuntap add mode tun dev ${tun2socks_device_name}
 ExecStartPre=ip addr add ${tun2socks_device_addr} dev ${tun2socks_device_name}
 ExecStartPre=ip link set dev ${tun2socks_device_name} up
 ExecStart=${path_tun2socks} -interface ${default_device_name} \
-                    -device ${tun2socks_device_name} \
-                    -proxy ss://aes-256-gcm:${ss_password}@${ss_ip}:${ss_port}
+-device ${tun2socks_device_name} \
+-proxy ss://aes-256-gcm:${ss_password}@${ss_ip}:${ss_port}
 ExecStopPost=-ip link set dev ${tun2socks_device_name} down
 ExecStopPost=-ip link del dev ${tun2socks_device_name}
 

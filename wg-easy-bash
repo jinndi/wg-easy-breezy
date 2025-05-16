@@ -103,22 +103,22 @@ EOF
 echomsg() {
   sleep 2; 
   echo
-  echo " 🟠 $1";
+  echo "🟠 $1";
 }
 # - об успехе
 echook() {
   echo
-  echo " 🟢 $1"
+  echo "🟢 $1"
 }
 # - об ошибке
 echoerr () {
   echo
-  echo " 🔴 $1"
+  echo "🔴 $1"
 }
 # - об ошибке с выходом из скрипта
 exiterr() {
   echo
-  echo " 🔴 Ошибка: $1" >&2
+  echo "🔴 Ошибка: $1" >&2
   exit 1
 }
 
@@ -233,7 +233,6 @@ install_pkgs() {
   # Установка зависимостей
   echomsg "Установка зависимостей ufw, curl, unzip, lsof, docker compose"
   apt install ufw curl unzip lsof -y
-  echook "Зависимости установлены"
 
   # Установка и запуск докера если ранее не установлен 
   if ! docker compose version &> /dev/null; then
@@ -241,14 +240,15 @@ install_pkgs() {
     curl -sSL https://get.docker.com | sh
     echook "docker установлен"
   fi
+  usermod -a -G docker "$USER"
+  systemctl restart docker
 
   # Спуллить образ wg-easy если его нет
   if ! docker image inspect "$wg_easy_image" > /dev/null 2>&1; then
     docker pull "$wg_easy_image"
   fi
 
-  usermod -a -G docker "$USER"
-  systemctl restart docker
+  echook "Зависимости установлены"
 }
 
 

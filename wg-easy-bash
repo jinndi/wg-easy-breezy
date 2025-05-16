@@ -940,6 +940,10 @@ select_menu_option() {
   show_header
   if is_all_ok_services; then
     echo "Статус: ✅ Все сервисы работают"
+    echo "Веб интерфейс: $link_ui"
+    if [[ "$is_shadowsocks" ]]; then
+      echo "Веб интерфейс (shadowsocks): $link_ui_ss"
+    fi
     echo "$select_option"
     echo "  1) Выключить"
   else

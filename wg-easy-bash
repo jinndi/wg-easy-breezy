@@ -680,7 +680,10 @@ allow_ports(){
   > "$path_save_ports"
 
   # Разрешаем порт ssh
-  local ssh_port=$(grep -E '^\s*Port\s+[0-9]+' /etc/ssh/sshd_config | head -1 | awk '{print $2}')
+  local ssh_port=""
+  if [[ -e "/etc/ssh/sshd_config" ]]; then
+    ssh_port=$(grep -E '^\s*Port\s+[0-9]+' /etc/ssh/sshd_config | head -1 | awk '{print $2}')
+  fi
   ufw allow "${ssh_port:-22}/tcp"
 
   for p in "${ports[@]}"; do

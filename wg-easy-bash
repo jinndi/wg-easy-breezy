@@ -88,37 +88,32 @@ is_shadowsocks=""
 # - шапка установщика
 show_header() {
 cat <<EOF
-
-WG-EASY-BASH
-Добро пожаловать в установщик!
-GitHub: https://github.com/jinndi/wg-easy-bash
-
+###################################################
+#                  WG-EASY-BASH                   #
+# GitHub: https://github.com/jinndi/wg-easy-bash  #
+###################################################
 EOF
 }
 # - стандартное через задержку
 echomsg() {
+  sleep 2; 
   echo
-  sleep 1; 
-  echo "➡️  $1";
-  echo
+  echo " ➡️  $1";
 }
 # - об успехе
 echook() {
   echo
-  echo "✅  $1"
-  echo
+  echo " ✅  $1"
 }
 # - об ошибке
 echoerr () {
   echo
-  echo "❌  $1"
-  echo
+  echo " ❌  $1"
 }
 # - об ошибке с выходом из скрипта
 exiterr() {
   echo
-  echo "❌ Ошибка: $1" >&2
-  echo
+  echo " ❌ Ошибка: $1" >&2
   exit 1
 }
 
@@ -929,23 +924,21 @@ remove_services() {
 
 select_menu_option() {
   local select_option="Выберите опцию:"
-  
+  show_header
   if is_all_ok_services; then
-    echo
     echo "Статус: ✅ Все сервисы работают"
     echo "$select_option"
-    echo "   1) Выключить"
+    echo "  1) Выключить"
   else
-    echo
     echo "Статус: ❌ Не активно"
     echo "$select_option"
-    echo "   1) Включить"
+    echo "  1) Включить"
   fi
-  echo "   2) Удалить"
-  echo "   3) Выход"
+  echo "  2) Удалить"
+  echo "  3) Выход"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-5]$ ]]; do
+  until [[ "$option" =~ ^[1-3]$ ]]; do
     echo "$option: неккоректное значение."
     read -rp "Опция: " option
   done

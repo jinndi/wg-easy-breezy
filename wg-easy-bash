@@ -99,19 +99,19 @@ EOF
 echomsg() {
   echo
   sleep 1; 
-  echo "➡️ $1";
+  echo "➡️  $1";
   echo
 }
 # - об успехе
 echook() {
   echo
-  echo "✅ $1"
+  echo "✅  $1"
   echo
 }
 # - об ошибке
 echoerr () {
   echo
-  echo "❌ $1"
+  echo "❌  $1"
   echo
 }
 # - об ошибке с выходом из скрипта
@@ -764,23 +764,31 @@ download_tun2socks() {
 
 # Функция проверки что все сервисы запущены и работают корректно
 is_all_ok_services() {
-  # если файл docker compose не существует то false
-  if ! [[ -e "$path_docker_compose_file" ]]; then
-    return  1
+  # если файл docker compose не существует — false
+  if [[ ! -e "$path_docker_compose_file" ]]; then
+    return 1
   fi
 
-  # контейнеры docker указанные в docker compose файле
-  for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
-    local status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container")
-    if [[ "$status" != "true 0" ]]; then
-      return  1
-    fi
-  done
+  # проверка наличия контейнеров
+  local containers
+  containers=$(docker compose -f "$path_docker_compose_file" ps -q)
+  if [[ -z "$containers" ]]; then
+    return 1
+  fi
 
-  # служба tun2socks если она существует 
+  # проверка каждого контейнера
+  while read -r container; do
+    local status
+    status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)
+    if [[ "$status" != "true 0" ]]; then
+      return 1
+    fi
+  done <<< "$containers"
+
+  # служба tun2socks, если есть
   if [[ -e "$path_tun2socks_service" ]]; then
     if ! systemctl is-active --quiet tun2socks; then
-      return  1
+      return 1
     fi
   fi
 
@@ -790,7 +798,7 @@ is_all_ok_services() {
 
 # Функция запуска всех сервисов и служб
 start_services() {
-  # Запускаем с автозапуском службу tun2socks если она существует
+  # Запускаем службу tun2socks если она существует
   if [[ -e "$path_tun2socks_service" ]]; then
     systemctl enable --now tun2socks
     if ! systemctl is-active --quiet tun2socks; then
@@ -800,23 +808,26 @@ start_services() {
 
   # Запускаем докер контейнеры
   docker compose -f "$path_docker_compose_file" up -d
+  local container status name
   for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
-    local status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container")
+    status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)
+    name=$(docker inspect -f '{{.Name}}' "$container" 2>/dev/null | sed 's|^/||')
     if [[ "$status" != "true 0" ]]; then
-      echoerr "Контейнер $container не работает! Наберите 'docker logs -f --tail 100 $container' для просмотра лога"
+      echoerr "Контейнер $name ($container) не работает! docker logs -f --tail 100 $name"
     fi
   done
 }
 
 # Функция остановки всех сервисов и служб
 stop_services() {
-  # Останавливаем и удаляем докер контейнеры
-  docker compose -f "$path_docker_compose_file" down --remove-orphans
-  for container in $(docker compose -f "$path_docker_compose_file" ps -a -q 2>/dev/null); do
-    if docker inspect "$container" >/dev/null 2>&1; then
-      echoerr "Контейнер $container не остановлен! Наберите 'docker logs -f --tail 100 $container' для просмотра лога"
-    fi
-  done
+  # Останавливаем и удаляем docker-контейнеры
+  if [[ -f "$path_docker_compose_file" ]]; then
+    docker compose -f "$path_docker_compose_file" down --remove-orphans || {
+      echoerr "Ошибка при остановке контейнеров через docker compose"
+    }
+  else
+    echoerr "Файл docker-compose не найден: $path_docker_compose_file"
+  fi
 
   # Останавливаем и выключаем службу tun2socks если она существует
   if [[ -e "$path_tun2socks_service" ]]; then
@@ -920,13 +931,13 @@ select_menu_option() {
   local select_option="Выберите опцию:"
   
   if is_all_ok_services; then
-    echo "Статус: ✅ Все сервисы работают"
     echo
+    echo "Статус: ✅ Все сервисы работают"
     echo "$select_option"
     echo "   1) Выключить"
   else
-    echo "Статус: ❌ Не активно"
     echo
+    echo "Статус: ❌ Не активно"
     echo "$select_option"
     echo "   1) Включить"
   fi

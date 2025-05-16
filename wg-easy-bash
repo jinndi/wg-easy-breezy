@@ -85,14 +85,14 @@ link_ui_ss=""
 show_header() {
 cat <<EOF
 
-🇼​​​​​🇬​​​​​-🇪​​​​​🇦​​​​​🇸​​​​​🇾​​​​​-🇧​​​​​🇦​​​​​🇸​​​​​🇭​​​​​
+WG-EASY-BASH
 Добро пожаловать в установщик!
 GitHub: https://github.com/jinndi/wg-easy-bash
 
 EOF
 }
 # - стандартное через задержку
-echomsg() { sleep 1; echo "$1"; }
+echomsg() { sleep 1; echo "➡️ $1"; }
 # - об успехе
 echook() { echo " ✅ $1"; }
 # - об ошибке
@@ -108,12 +108,14 @@ check_root() {
     exiterr "Этот установщик должен быть запущен от имени root. Попробуйте 'sudo bash $0'"
   fi
 }
+
 # - способ запуска скрипта через bash а не sh
 check_shell() {
   if readlink /proc/$$/exe | grep -q "dash"; then
     exiterr 'Этот установщик необходимо запускать с помощью «bash», а не «sh».'
   fi
 }
+
 # - вид дистрибутива ОС
 check_os() {
   if grep -qs "ubuntu" /etc/os-release; then
@@ -126,6 +128,7 @@ check_os() {
     exiterr "Этот установщик поддерживает только дистрибутивы Ubuntu и Debian!"
   fi
 }
+
 # - версия дистрибутива ОС
 check_os_ver() {
   if [[ "$os" == "ubuntu" && "$os_version" -lt 2004 ]]; then
@@ -135,12 +138,14 @@ check_os_ver() {
     exiterr "Для использования этого установщика требуется Debian 11 или более поздняя версия."
   fi
 }
+
 # - поддержка версии ядра
 check_kernel() {
   if [[ $(uname -r | cut -d "." -f 1) -eq 2 ]]; then
     exiterr "В системе установлено старое ядро, несовместимое с данным установщиком."
   fi
 }
+
 # - среда работы ОС
 check_container() {
   if systemd-detect-virt -cq 2>/dev/null; then
@@ -151,47 +156,47 @@ check_container() {
 
 # Функция удаления предыдущих установок (без докера)
 remove_install() {
-    local is_show_info="$1"
+  local is_show_info="$1"
 
-    if [[ -n "$is_show_info" ]]; then
-      echomsg "Удаляем предыдущую установку"
-    fi
+  if [[ -n "$is_show_info" ]]; then
+    echomsg "Удаляем предыдущую установку"
+  fi
 
-    # Остановка докер сервисов с удаление всех задействованных контейнеров и образов
-    if [[ -e "$path_docker_compose_file" ]]; then
-        docker compose -f "$path_docker_compose_file" down --remove-orphans --rmi all
-    fi
+  # Остановка докер сервисов с удаление всех задействованных контейнеров и образов
+  if [[ -e "$path_docker_compose_file" ]]; then
+      docker compose -f "$path_docker_compose_file" down --remove-orphans --rmi all
+  fi
 
-    # Остановка и удаление tun2socks службы
-    if [[ -e "$path_tun2socks_service" ]]; then
-        systemctl stop tun2socks
-        systemctl disable tun2socks
-        rm -f "$path_tun2socks_service"
-        systemctl daemon-reload
-    fi
+  # Остановка и удаление tun2socks службы
+  if [[ -e "$path_tun2socks_service" ]]; then
+    systemctl stop tun2socks
+    systemctl disable tun2socks
+    rm -f "$path_tun2socks_service"
+    systemctl daemon-reload
+  fi
 
-    # Удаление правил ранее заданных для портов (через файрвол ufw)
-    if [[ -f "$path_save_port" ]]; then
-      while read -r line; do
-        action=$(echo "$line" | cut -d' ' -f1)
-        rule=$(echo "$line" | cut -d' ' -f2)
-        ufw delete "$action" "$rule"
-      done < "$path_save_port"
-    fi
+  # Удаление правил ранее заданных для портов (через файрвол ufw)
+  if [[ -f "$path_save_port" ]]; then
+    while read -r line; do
+      action=$(echo "$line" | cut -d' ' -f1)
+      rule=$(echo "$line" | cut -d' ' -f2)
+      ufw delete "$action" "$rule"
+    done < "$path_save_port"
+  fi
 
-    # Удаление ссылки на скрипт управления
-    if [[ -L "$path_script_link" ]]; then
-      rm -f "$path_script_link"
-    fi
+  # Удаление ссылки на скрипт управления
+  if [[ -L "$path_script_link" ]]; then
+    rm -f "$path_script_link"
+  fi
 
-    # Удаление папки данных
-    if [[ -d "$path_data_dir" ]]; then
-      rm -rf "$path_data_dir"
-    fi
+  # Удаление папки данных
+  if [[ -d "$path_data_dir" ]]; then
+    rm -rf "$path_data_dir"
+  fi
 
-    if [[ -n "$is_show_info" ]]; then
-      echook "Файлы и службы/сервисы удалены"
-    fi
+  if [[ -n "$is_show_info" ]]; then
+    echook "Файлы и службы/сервисы удалены"
+  fi
 }
 
 
@@ -210,9 +215,9 @@ install_pkgs() {
 
   # Установка и запуск докера если ранее не установлен 
   if ! docker compose version &> /dev/null; then
-      echomsg "Установка docker"
-      curl -sSL https://get.docker.com | sh
-      echook "docker установлен"
+    echomsg "Установка docker"
+    curl -sSL https://get.docker.com | sh
+    echook "docker установлен"
   fi
   usermod -a -G docker "$USER"
   systemctl restart docker
@@ -223,90 +228,90 @@ install_pkgs() {
 
 # - имя домена
 check_domain() {
-    # Если строка не является доменом
-    if [[ ! "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
-        echoerr "Неккоректный адрес домена: $1"
-        return 1
-    fi
+  # Если строка не является доменом
+  if [[ ! "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
+    echoerr "Неккоректный адрес домена: $1"
+    return 1
+  fi
 
-    return 0
+  return 0
 }
 
 # - IPv4 адрес
 check_IPv4() {
-    # Проверка на формат IPv4
-    if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-        echoerr "Это не IPv4: $input"
-        return 1
+  # Проверка на формат IPv4
+  if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    echoerr "Это не IPv4: $input"
+    return 1
+  fi
+
+  # Проверка на диапазон для каждого октета IP
+  IFS='.' read -r -a octets <<< "$1"
+  for octet in "${octets[@]}"; do
+    if ((octet < 0 || octet > 255)); then
+      echoerr "Неверный IPv4 адрес (не все октеты в пределах 0-255): $1"
+      return 1
     fi
+  done
 
-    # Проверка на диапазон для каждого октета IP
-    IFS='.' read -r -a octets <<< "$1"
-    for octet in "${octets[@]}"; do
-        if ((octet < 0 || octet > 255)); then
-            echoerr "Неверный IPv4 адрес (не все октеты в пределах 0-255): $1"
-            return 1
-        fi
-    done
-
-    return 0
+  return 0
 }
 
 # - e-mail адрес
 check_email() {
-    # Если строка не является доменом
-    if [[ ! "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        echoerr "Некорректный email: $1"
-        return 1
-    fi
+  # Если строка не является доменом
+  if [[ ! "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+    echoerr "Некорректный email: $1"
+    return 1
+  fi
 
-    return 0
+  return 0
 }
 
 # - пароль
 check_password() {
-    # Проверка длины пароля (минимум 6 символов)
-    if [ "${#1}" -lt 6 ]; then
-        echoerr "Пароль должен быть не короче 6 символов"
-        return 1
-    fi
+  # Проверка длины пароля (минимум 6 символов)
+  if [ "${#1}" -lt 6 ]; then
+    echoerr "Пароль должен быть не короче 6 символов"
+    return 1
+  fi
 
-    # Проверка наличия хотя бы одной буквы
-    if ! echo "$1" | grep -q '[a-zA-Z]'; then
-        echoerr "Пароль должен содержать хотя бы одну букву"
-        return 1
-    fi
+  # Проверка наличия хотя бы одной буквы
+  if ! echo "$1" | grep -q '[a-zA-Z]'; then
+    echoerr "Пароль должен содержать хотя бы одну букву"
+    return 1
+  fi
 
-    # Проверка наличия хотя бы одной цифры
-    if ! echo "$1" | grep -q '[0-9]'; then
-        echoerr "Пароль должен содержать хотя бы одну цифру"
-        return 1
-    fi
+  # Проверка наличия хотя бы одной цифры
+  if ! echo "$1" | grep -q '[0-9]'; then
+    echoerr "Пароль должен содержать хотя бы одну цифру"
+    return 1
+  fi
 
-    return 0
+  return 0
 }
 
 # - порт
 check_port() {
-    # Проверка, является ли порт числом
-    if ! [[ "$1" =~ ^[0-9]+$ ]]; then
-        echoerr "Порт должен быть числом"
-        return 1
-    fi
+  # Проверка, является ли порт числом
+  if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+    echoerr "Порт должен быть числом"
+    return 1
+  fi
 
-    # Проверка диапазона порта (1–65534)
-    if [ "$1" -lt 1 ] || [ "$1" -gt 65534 ]; then
-        echoerr "Порт должен быть в диапазоне от 1 до 65534"
-        return 1
-    fi
+  # Проверка диапазона порта (1–65534)
+  if [ "$1" -lt 1 ] || [ "$1" -gt 65534 ]; then
+    echoerr "Порт должен быть в диапазоне от 1 до 65534"
+    return 1
+  fi
 
-    # Проверка, занят ли порт
-    if lsof -i :"$1" >/dev/null ; then
-        echoerr "Порт $1 уже занят"
-        return 1
-    fi
+  # Проверка, занят ли порт
+  if lsof -i :"$1" >/dev/null ; then
+    echoerr "Порт $1 уже занят"
+    return 1
+  fi
 
-    return 0
+  return 0
 }
 
 
@@ -314,184 +319,183 @@ check_port() {
 
 # - имя домена
 input_wg_host() {
-    # IP текущего сервера
-    wg_host=$(hostname -I | awk '{print $1}')
+  while true; do
+    echomsg "Введите домен, например mydomain.com, который указывает по A записи на IP $wg_host, если его нет просто нажмите Enter:"
+    read wg_host
 
-    while true; do
-        echomsg "Введите домен, например mydomain.com, который указывает по A записи на IP $wg_host, если его нет просто нажмите Enter:"
-        read wg_host
+    # Проверка на пустой ввод
+    if [ -z "$wg_host" ]; then
+      # IP текущего сервера
+      wg_host=$(hostname -I | awk '{print $1}')
+      echook "Используем в качестве хоста IP: $wg_host"
+      break
+    fi
 
-        # Проверка на пустой ввод
-        if [ -z "$wg_host" ]; then
-            echook "Используем в качестве хоста IP: $wg_host"
-            break
-        fi
-
-        # Проверка имени
-        if check_domain "$wg_host"; then
-            echook "Домен для wg-easy: $wg_host"
-            break
-        fi
-    done
+    # Проверка имени
+    if check_domain "$wg_host"; then
+      echook "Домен для wg-easy: $wg_host"
+      break
+    fi
+  done
 }
 
 # - e-mail для полученя SSL сертификата домена
 input_email() {
-    if check_domain "$wg_host"; then
-        while true; do
-            echomsg "Введите email для получения SSL сертификата домена $domain:"
-            read email
+  if check_domain "$wg_host"; then
+    while true; do
+      echomsg "Введите email для получения SSL сертификата домена $domain:"
+      read email
 
-            # Проверка ввода
-            if check_email "$email"; then
-                echook "Email для получения SSL сертификата: $email"
-                break
-            fi
-        done
-    fi
+      # Проверка ввода
+      if check_email "$email"; then
+        echook "Email для получения SSL сертификата: $email"
+        break
+      fi
+    done
+  fi
 }
 
 # - IPv4 адрес сервера shadowsocks
 input_ss_ip() {
-    while true; do
+  while true; do
     echomsg "Введите IP адрес shadowsocks сервера, если его нет нажмите Enter:"
     read ss_ip
 
-        # Проверка на пустой ввод
-        if [ -z "$ss_ip" ]; then
-            break
-        fi
+    # Проверка на пустой ввод
+    if [ -z "$ss_ip" ]; then
+      break
+    fi
 
-        # Проверка IPv4
-        if check_IPv4 "$ss_ip"; then
-            echook "IPv4 shadowsocks: $ss_ip"
-            break
-        fi
-    done
+    # Проверка IPv4
+    if check_IPv4 "$ss_ip"; then
+      echook "IPv4 shadowsocks: $ss_ip"
+      break
+    fi
+  done
 }
 
 # - порт shadowsocks сервера
 input_ss_port() {
-    if [[ -n "$ss_ip" ]]; then
-        while true; do
-            echomsg "Введите порт shadowsocks сервера $ss_ip:"
-            read ss_port
+  if [[ -n "$ss_ip" ]]; then
+    while true; do
+      echomsg "Введите порт shadowsocks сервера $ss_ip:"
+      read ss_port
 
-            # Проверка порта
-            if check_port "$ss_port"; then
-                echook "Порт от shadowsocks сервера $ss_ip: $ss_port"
-                break
-            fi
-        done
-    fi
+      # Проверка порта
+      if check_port "$ss_port"; then
+        echook "Порт от shadowsocks сервера $ss_ip: $ss_port"
+        break
+      fi
+    done
+  fi
 }
 
 # - пароль shadowsocks сервера
 input_ss_password() {
-    if [[ -n "$ss_ip" ]]; then
-        while true; do
-            echomsg "Пароль shadowsocks сервера $ss_ip:"
-            read -rs ss_password
+  if [[ -n "$ss_ip" ]]; then
+    while true; do
+      echomsg "Пароль shadowsocks сервера $ss_ip:"
+      read -rs ss_password
 
-            # Проверка на пустой ввод
-            if [ -z "$ss_password" ]; then
-                echoerr "Пароль не может быть пустым"
-                continue
-            fi
-            echook "Пароль shadowsocks сервера $ss_ip принят"
-            break
-        done
-    fi
+      # Проверка на пустой ввод
+      if [ -z "$ss_password" ]; then
+        echoerr "Пароль не может быть пустым"
+        continue
+      fi
+      echook "Пароль shadowsocks сервера $ss_ip принят"
+      break
+    done
+  fi
 }
 
 # - порт WireGuard сервера
 input_wg_port() {
-    while true; do
-        echomsg "Введите порт WireGuard (от 1 до 65534):"
-        read wg_port
+  while true; do
+    echomsg "Введите порт WireGuard (от 1 до 65534):"
+    read wg_port
 
-        # Увеличиваем порт на 1 (для UI интерфейса)
-        port=$((wg_port + 1))
+    # Увеличиваем порт на 1 (для UI интерфейса)
+    port=$((wg_port + 1))
 
-        # Проверка портов
-        if check_port "$wg_port" && check_port "$port"; then
-            echook "Порт для WireGuard: $wg_port"
-            echook "Порт для UI интерфейса wg-easy: $port"
-            # Cсылка на UI интерфейс wg-easy
-            link_ui="http://$wg_host:$port"
-            if check_domain "$wg_host"; then
-                link_ui="https://$wg_host/$handle_path_ui"
-            fi
-            break
-        fi
-    done
-
-    if [[ -n "$ss_ip" ]]; then
-        while true; do
-            echomsg "Введите порт WireGuard работающего через shadowsocks прокси (от 1 до 65534):"
-            read wg_port_ss
-
-            # Увеличиваем порт на 1 (для UI интерфейса)
-            port_ss=$((wg_port_ss + 1))
-
-            # Проверка портов
-            if check_port "$wg_port_ss" && check_port "$port_ss"; then
-                echook "Порт для WireGuard, shadowsocks прокси: $wg_port"
-                echook "Порт для UI интерфейса wg-easy, shadowsocks прокси: $port"
-                # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
-                link_ui_ss="http://$wg_host:$port_ss"
-                if check_domain "$wg_host"; then
-                    link_ui_ss="https://$wg_host/$handle_path_ui_ss"
-                fi
-                break
-            fi
-        done
+    # Проверка портов
+    if check_port "$wg_port" && check_port "$port"; then
+      echook "Порт для WireGuard: $wg_port"
+      echook "Порт для UI интерфейса wg-easy: $port"
+      # Cсылка на UI интерфейс wg-easy
+      link_ui="http://$wg_host:$port"
+      if check_domain "$wg_host"; then
+        link_ui="https://$wg_host/$handle_path_ui"
+      fi
+      break
     fi
+  done
+
+  if [[ -n "$ss_ip" ]]; then
+    while true; do
+      echomsg "Введите порт WireGuard работающего через shadowsocks прокси (от 1 до 65534):"
+      read wg_port_ss
+
+      # Увеличиваем порт на 1 (для UI интерфейса)
+      port_ss=$((wg_port_ss + 1))
+
+      # Проверка портов
+      if check_port "$wg_port_ss" && check_port "$port_ss"; then
+        echook "Порт для WireGuard, shadowsocks прокси: $wg_port"
+        echook "Порт для UI интерфейса wg-easy, shadowsocks прокси: $port"
+        # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
+        link_ui_ss="http://$wg_host:$port_ss"
+        if check_domain "$wg_host"; then
+          link_ui_ss="https://$wg_host/$handle_path_ui_ss"
+        fi
+        break
+      fi
+    done
+  fi
 }
 
 # - диапазон адресов для клиентов WireGuard
 input_default_address() {
-    local default_value="10.0.0.x"
-    local default_value_ss="10.1.0.x"
+  local default_value="10.0.0.x"
+  local default_value_ss="10.1.0.x"
 
-    echomsg "Диапазон адресов клиентов WireGuard (нажмите Enter, чтобы оставить по умолчанию):"
-    read -e -i "$default_value" default_address
-    default_address=${default_address:-$default_value}
-    echook "Используем диапазон адресов для клиентов: $default_address"
+  echomsg "Диапазон адресов клиентов WireGuard (нажмите Enter, чтобы оставить по умолчанию):"
+  read -e -i "$default_value" default_address
+  default_address=${default_address:-$default_value}
+  echook "Используем диапазон адресов для клиентов: $default_address"
 
-    if [[ -n "$ss_ip" ]]; then
-        echomsg "Диапазон адресов клиентов (WireGuard через shadowsocks прокси, нажмите Enter, чтобы оставить по умолчанию):"
-        read -e -i "$default_value_ss" default_address_ss
-        default_address_ss=${default_address_ss:-$default_value_ss}
-        echook "Используем диапазон адресов для клиентов (WireGuard через shadowsocks прокси): $default_address_ss"
-    fi
+  if [[ -n "$ss_ip" ]]; then
+    echomsg "Диапазон адресов клиентов (WireGuard через shadowsocks прокси, нажмите Enter, чтобы оставить по умолчанию):"
+    read -e -i "$default_value_ss" default_address_ss
+    default_address_ss=${default_address_ss:-$default_value_ss}
+    echook "Используем диапазон адресов для клиентов (WireGuard через shadowsocks прокси): $default_address_ss"
+  fi
 }
 
 # - пароль для входа в UI wg-easy
 input_ui_password() {
-    local password
+  local password
 
-    while true; do
-        echomsg "Введите сложный пароль для UI веб-интерфейса wg-easy:"
-        read -rs password
+  while true; do
+    echomsg "Введите сложный пароль для UI веб-интерфейса wg-easy:"
+    read -rs password
 
-        # Проверка на пустой ввод
-        if [ -z "$password" ]; then
-            echoerr "Пароль не может быть пустым"
-            continue
-        fi
+    # Проверка на пустой ввод
+    if [ -z "$password" ]; then
+      echoerr "Пароль не может быть пустым"
+      continue
+    fi
 
-        # Проверка и обработка пароля
-        if check_password "$password"; then
-            # Запрашиваем хеша пароля
-            output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
-            # Извлекаем и экранируем хеш пароля
-            password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
+    # Проверка и обработка пароля
+    if check_password "$password"; then
+      # Запрашиваем хеша пароля
+      output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
+      # Извлекаем и экранируем хеш пароля
+      password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
 
-            echook "Пароль принят"
-            break
-        fi
-    done
+      echook "Пароль принят"
+      break
+    fi
+  done
 }
 
 # Функция создания конфигов сервисов и служб
@@ -691,19 +695,19 @@ config_sysctl() {
   echomsg "Включаем форвардинг в /etc/sysctl.conf"
   # проверяем, существует ли строка, начинающаяся с net.ipv4.ip_forward
   if grep -q '^net.ipv4.ip_forward' /etc/sysctl.conf; then
-      # если строка существует, заменяем ее на net.ipv4.ip_forward=1
-      sed -i 's/^net\.ip\.v4\.ip_forward.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+    # если строка существует, заменяем ее на net.ipv4.ip_forward=1
+    sed -i 's/^net\.ip\.v4\.ip_forward.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf
   else
-      # если строка не существует, добавляем ее в конец файла
-      echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
+    # если строка не существует, добавляем ее в конец файла
+    echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
   fi
   # проверяем, существует ли строка, начинающаяся с net.ipv6.conf.all.forwarding
   if grep -q '^net.ipv6.conf.all.forwarding' /etc/sysctl.conf; then
-      # если строка существует, заменяем ее на net.ipv6.conf.all.forwarding=1
-      sed -i 's/^net\.ipv6\.conf\.all\.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
+    # если строка существует, заменяем ее на net.ipv6.conf.all.forwarding=1
+    sed -i 's/^net\.ipv6\.conf\.all\.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
   else
-      # если строка не существует, добавляем ее в конец файла
-      echo 'net.ipv6.conf.all.forwarding=1' | sudo tee -a /etc/sysctl.conf
+    # если строка не существует, добавляем ее в конец файла
+    echo 'net.ipv6.conf.all.forwarding=1' | sudo tee -a /etc/sysctl.conf
   fi
 
   # применяем изменения

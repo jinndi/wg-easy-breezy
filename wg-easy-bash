@@ -1,75 +1,250 @@
 #!/bin/bash
+#
+# https://github.com/jinndi/wg-easy-bash
+#
+# Copyright (c) 2025 Jinndi <alncores@gmail.ru>
+#
+# Released under the MIT License, see the accompanying file LICENSE
+# or https://opensource.org/licenses/MIT
 
-# Очистка предыдущих установок
-cd /root || exit
-if [[ -e "wg.yml" ]]; then
-    # Останавливаем wg сервисы
-    docker compose -f wg.yml down --remove-orphans >/dev/null 2>&1
-fi
-rm -f /root/wg-easy-bash /root/wg.yml /root/Caddyfile >/dev/null 2>&1
-rm -f /root/run-wg /root/stop-wg /root/rerun-wg >/dev/null 2>&1
-rm -rf /root/.wg-easy >/dev/null 2>&1
-systemctl stop tun2socks >/dev/null 2>&1
-systemctl disable tun2socks >/dev/null 2>&1
-rm -f /usr/local/bin/tun2socks >/dev/null 2>&1
+## Пути исполняемых файлов
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# Обновление библиотек
-echo "Обновление пакетов"
-apt update >/dev/null 2>&1
-apt upgrade -y >/dev/null 2>&1
-echo " Ок. Пакеты обновлены"
+## Пути файлов:
+# - папка в которую будет произведена установка
+path_data_dir="$HOME/.wg-easy"
+# - файл текущего скрипта
+path_script="$path_data_dir/wg-easy"
+# - ссылка на файл текущего скрипта
+path_script_link="/usr/bin/wg-easy"
+# - папка настроек wireguard
+path_data_wg_dir="$path_data_dir/wireguard"
+# - файл docker compose сервисов
+path_docker_compose_file="$path_data_dir/services.yml"
+# - файл настройки Caddy сервера
+path_caddyfile="$path_data_dir/caddy/Caddyfile"
+# - папка с данными  Caddy сервера
+path_caddy_data="$path_data_dir/caddy/data"
+# - папка с настройками Caddy сервера
+path_caddy_config="$path_data_dir/caddy/config"
+# - исполняемый файл shadowsocks прокси tun2socks
+path_tun2socks="$path_data_dir/tun2socks"
+# - файл настройки службы tun2socks
+path_tun2socks_service=/etc/systemd/system/tun2socks.service
+# - файл с портами которым выдали разрешения через ufw
+path_save_ports="$path_data_dir/.ufw_ports.txt"
 
-# Установка необходимых пакетов и запуск служб
-sleep 1 && echo "Установка необходимых пакетов"
-curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash >/dev/null 2>&1
-apt install ufw wget unzip lsof apparmor apparmor-utils speedtest nano htop neofetch -y >/dev/null 2>&1
-ufw allow 22 >/dev/null 2>&1
-ufw --force enable >/dev/null 2>&1
-echo " Ок. Пакеты установлены"
+## Интернет интерфейсы:
+# - по умолчанию (обычно eth0)
+default_device_name="$(ip route | grep default | awk '{print $5}')"
+# - shadowsocks прокси tun2socks
+tun2socks_device_name="sstun"
+tun2socks_device_addr="10.255.0.1/24"
 
-# Проверка установки и установка докера
-sleep 1 && echo "Проверяем установку Docker"
-if ! docker compose version &> /dev/null; then
-  sleep 1 && echo "Docker compose не установлен. Устанавливаем"
-  curl -sSL https://get.docker.com | sh >/dev/null 2>&1
-  echo "Установка Docker завершена"
-else
-  sleep 1 && echo "Docker уже установлен"
-fi
-usermod -a -G docker "$USER" >/dev/null 2>&1
-service docker start >/dev/null 2>&1
+## Пути в адресной строке браузера к UI интерфейсу (если указан домен):
+# - по умолчанию
+handle_path_ui="wg-easy"
+# - для WireGuard через shadowsocks
+handle_path_ui_ss="wg-easy-ss"
 
-# Получение переменных ip адреса хоста для конфига контейнера wg-easy
-wg_host=$(hostname -I | awk '{print $1}')
-server_ip="$wg_host"
+# DNS адреса по умолчанию для клиентов WireGuard (через запятую)
+default_dns=1.1.1.1,8.8.8.8
 
-# Функция для проверки имени домена
+## Объявление переменных задаваемых в процессе работы скрипта:
+# - доменное имя либо адрес IP-адрес хоста
+wg_host=""
+# - e-mail адрес необходимый для получения SSL сертификата домена
+email=""
+# - tcp порт доступа к UI интерфейсу wg-easy
+port=""
+# - tcp порт доступа к UI интерфейсу wg-easy, shadowsocks тунннель
+port_ss=""
+# - udp порт WireGuard
+wg_port=""
+# - udp порт WireGuard, shadowsocks тунннель
+wg_port_ss=""
+# - диапазон IP-адресов клиентов WireGuard
+default_address=""
+# - диапазон IP-адресов клиентов WireGuard, shadowsocks тунннель
+default_address_ss=""
+# - IP-адрес shadowsocks сервера
+ss_ip=""
+# - порт shadowsocks сервера
+ss_port=""
+# - пароль к подключению по shadowsocks
+ss_password=""
+# - хеш пароля от UI интерфейса/ов wg-easy
+password_hash=""
+# - ссылка на UI интерфейс wg-easy
+link_ui=""
+# - ссылка на UI интерфейс wg-easy, shadowsocks тунннель
+link_ui_ss=""
+
+## Функции вывода сообщений:
+# - шапка установщика
+show_header() {
+cat <<'EOF'
+
+🇼​​​​​🇬​​​​​-🇪​​​​​🇦​​​​​🇸​​​​​🇾​​​​​-🇧​​​​​🇦​​​​​🇸​​​​​🇭​​​​​
+Добро пожаловать в установщик!
+GitHub: https://github.com/jinndi/wg-easy-bash
+
+EOF
+}
+# - стандартное через задержку
+echomsg() { sleep 1; echo "$1"; }
+# - об успехе
+echook() { echo " ✅ $1"; }
+# - об ошибке
+echoerr () { echo " ❌ $1"; }
+# - об ошибке с выходом из скрипта
+exiterr() { echo "❌ Ошибка: $1" >&2; exit 1; }
+
+
+## Функции проверок возможности установки:
+# - рут права
+check_root() {
+  if [ "$(id -u)" != 0 ]; then
+    exiterr "Этот установщик должен быть запущен от имени root. Попробуйте 'sudo bash $0'"
+  fi
+}
+# - способ запуска скрипта через bash а не sh
+check_shell() {
+  if readlink /proc/$$/exe | grep -q "dash"; then
+    exiterr 'Этот установщик необходимо запускать с помощью «bash», а не «sh».'
+  fi
+}
+# - вид дистрибутива ОС
+check_os() {
+  if grep -qs "ubuntu" /etc/os-release; then
+    os="ubuntu"
+    os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
+  elif [[ -e /etc/debian_version ]]; then
+    os="debian"
+    os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
+  else
+    exiterr "Этот установщик поддерживает только дистрибутивы Ubuntu и Debian!"
+  fi
+}
+# - версия дистрибутива ОС
+check_os_ver() {
+  if [[ "$os" == "ubuntu" && "$os_version" -lt 2004 ]]; then
+    exiterr "Для использования этого установщика требуется Ubuntu 20.04 или более поздняя версия."
+  fi
+  if [[ "$os" == "debian" && "$os_version" -lt 11 ]]; then
+    exiterr "Для использования этого установщика требуется Debian 11 или более поздняя версия."
+  fi
+}
+# - поддержка версии ядра
+check_kernel() {
+  if [[ $(uname -r | cut -d "." -f 1) -eq 2 ]]; then
+    exiterr "В системе установлено старое ядро, несовместимое с данным установщиком."
+  fi
+}
+# - среда работы ОС
+check_container() {
+  if systemd-detect-virt -cq 2>/dev/null; then
+    exiterr "Эта система работает внутри контейнера, который не поддерживается данным установщиком."
+  fi
+}
+
+
+# Функция удаления предыдущих установок (без докера)
+remove_install() {
+    local is_show_info="$1"
+
+    if is_show_info; then
+      echomsg "Удаляем предыдущую установку"
+    fi
+
+    # Остановка докер сервисов с удаление всех задействованных контейнеров и образов
+    if [[ -e "$path_docker_compose_file" ]]; then
+        docker compose -f "$path_docker_compose_file" down --remove-orphans --rmi all
+    fi
+
+    # Остановка и удаление tun2socks службы
+    if [[ -e "$path_tun2socks_service" ]]; then
+        systemctl stop tun2socks
+        systemctl disable tun2socks
+        rm -f "$path_tun2socks_service"
+        systemctl daemon-reload
+    fi
+
+    # Удаление правил ранее заданных для портов (через файрвол ufw)
+    if [[ -f "$path_save_port" ]]; then
+      while read -r line; do
+        action=$(echo "$line" | cut -d' ' -f1)
+        rule=$(echo "$line" | cut -d' ' -f2)
+        ufw delete "$action" "$rule"
+      done < "$path_save_port"
+    fi
+
+    # Удаление ссылки на скрипт управления
+    if [[ -L "$path_script_link" ]]; then
+      rm -f "$path_script_link"
+    fi
+
+    # Удаление папки данных
+    if [[ -d "$path_data_dir" ]]; then
+      rm -rf "$path_data_dir"
+    fi
+
+    if is_show_info; then
+      echook "Файлы и службы/сервисы удалены"
+    fi
+}
+
+
+# Функция установки необходимых пакетов программ
+install_pkgs() {
+  # Обновление пакетов
+  echomsg "Обновление пакетов"
+  apt update
+  apt upgrade -y
+  echook "Пакеты обновлены"
+
+  # Установка зависимостей
+  echomsg "Установка зависимостей ufw, curl, unzip, lsof, docker compose"
+  apt install ufw curl unzip lsof -y
+  echook "Зависимости установлены"
+
+  # Установка и запуск докера если ранее не установлен 
+  if ! docker compose version &> /dev/null; then
+      echomsg "Установка docker"
+      curl -sSL https://get.docker.com | sh
+      echook "docker установлен"
+  fi
+  usermod -a -G docker "$USER"
+  systemctl restart docker
+}
+
+
+## Фунции проверок введенных данных пользователем:
+
+# - имя домена
 check_domain() {
-    local domain="$1"
-
     # Если строка не является доменом
-    if [[ ! $domain =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
+    if [[ ! "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
+        echoerr "Неккоректный адрес домена: $1"
         return 1
     fi
 
     return 0
 }
 
-# Функция для проверки IPv4 адреса
+# - IPv4 адрес
 check_IPv4() {
-    local ip="$1"
-
     # Проверка на формат IPv4
-    if [[ ! $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-        sleep 1 && echo "Ошибка: Это не IPv4: $input"
+    if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        echoerr "Это не IPv4: $input"
         return 1
     fi
 
     # Проверка на диапазон для каждого октета IP
-    IFS='.' read -r -a octets <<< "$ip"
+    IFS='.' read -r -a octets <<< "$1"
     for octet in "${octets[@]}"; do
         if ((octet < 0 || octet > 255)); then
-            sleep 1 && echo "Ошибка: Неверный IPv4 адрес (не все октеты в пределах 0-255): $ip"
+            echoerr "Неверный IPv4 адрес (не все октеты в пределах 0-255): $1"
             return 1
         fi
     done
@@ -77,219 +252,255 @@ check_IPv4() {
     return 0
 }
 
-# Функция для проверки адреса email
+# - e-mail адрес
 check_email() {
-    local email="$1"
-
     # Если строка не является доменом
-    if [[ ! $email =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        sleep 1 && echo " Ошибка: Некорректный email: $domain"
+    if [[ ! "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        echoerr "Некорректный email: $1"
         return 1
     fi
 
     return 0
 }
 
-# Функция для проверки пароля
+# - пароль
 check_password() {
-    local password="$1"
-
     # Проверка длины пароля (минимум 6 символов)
-    if [ "${#password}" -lt 6 ]; then
-        sleep 1 && echo " Ошибка: Пароль должен быть не короче 6 символов"
+    if [ "${#1}" -lt 6 ]; then
+        echoerr "Пароль должен быть не короче 6 символов"
         return 1
     fi
 
     # Проверка наличия хотя бы одной буквы
-    if ! echo "$password" | grep -q '[a-zA-Z]'; then
-        sleep 1 && echo " Ошибка: Пароль должен содержать хотя бы одну букву"
+    if ! echo "$1" | grep -q '[a-zA-Z]'; then
+        echoerr "Пароль должен содержать хотя бы одну букву"
         return 1
     fi
 
     # Проверка наличия хотя бы одной цифры
-    if ! echo "$password" | grep -q '[0-9]'; then
-        sleep 1 && echo " Ошибка: Пароль должен содержать хотя бы одну цифру"
+    if ! echo "$1" | grep -q '[0-9]'; then
+        echoerr "Пароль должен содержать хотя бы одну цифру"
         return 1
     fi
 
     return 0
 }
 
-# Функция для проверки порта
+# - порт
 check_port() {
-    local port="$1"
-
     # Проверка, является ли порт числом
-    if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-        sleep 1 && echo " Ошибка: Порт должен быть числом"
+    if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+        echoerr "Порт должен быть числом"
         return 1
     fi
 
     # Проверка диапазона порта (1–65534)
-    if [ "$port" -lt 1 ] || [ "$port" -gt 65534 ]; then
-        sleep 1 && echo " Ошибка: Порт должен быть в диапазоне от 1 до 65534"
+    if [ "$1" -lt 1 ] || [ "$1" -gt 65534 ]; then
+        echoerr "Порт должен быть в диапазоне от 1 до 65534"
         return 1
     fi
 
     # Проверка, занят ли порт
-    if lsof -i :"$port" >/dev/null ; then
-        echo "Ошибка: Порт $port уже занят"
+    if lsof -i :"$1" >/dev/null ; then
+        echoerr "Порт $1 уже занят"
         return 1
     fi
 
     return 0
 }
 
-# Цикл для ввода имени домена
-while true; do
-   sleep 1 && echo "Введите домен, например mydomain.com, который указывает по A записи на ip $server_ip, если его нет просто нажмите Enter:"
-   read domain
 
-    # Проверка на пустой ввод
-    if [ -z "$domain" ]; then
-        break
-    fi
+## Функции ввода, проверки данных:
 
-    # Проверка имени
-    if check_domain "$domain"; then
-        # Переопределяем wg_host
-        wg_host="$domain"
-        sleep 1 && echo " Ок. Домен для WireGuard: $wg_host"
-        break
-    else
-        sleep 1 && echo " Ошибка: Это не домен: $domain"
-        echo "Попробуйте снова"
-    fi
-done
+# - имя домена
+input_wg_host() {
+    # IP текущего сервера
+    wg_host=$(hostname -I | awk '{print $1}')
 
-# Цикл ввода email для полученя SSL сертификата, если ранее указан домен 
-if [[ -n "$domain" ]]; then
-  while true; do
-     sleep 1 && echo "Введите email для получения SSL сертификата домена $domain:"
-     read email
-
-      # Проверка ввода
-      if check_email "$email"; then
-          echo " Ок. Email для получения SSL сертификата: $email"
-          break
-      else
-          echo "Попробуйте снова"
-      fi
-  done
-fi
-
-# Цикл для ввода порта  wg
-while true; do
-    sleep 1 && echo "Введите порт (от 1 до 65534):"
-    read wg_port
-
-    # Проверка порта
-    if check_port "$wg_port"; then
-        # Увеличиваем порт на 1
-        port=$((wg_port + 1))
-        echo " Ок. Порт для WireGuard: $wg_port"
-        echo " Ок. Порт для веб интерфейста: $port"
-        sleep 1
-        break
-    else
-        echo "Попробуйте снова"
-    fi
-done
-
-# Ввод диапазона адресов для клиентов wg
-default_value="10.0.0.x"
-sleep 1 && echo "Введите диапазон адресов клиентов (Enter, если не знаете зачем):"
-read -e -i "$default_value" def_address
-# Если пользователь ничего не ввёл (просто нажал Enter), используем значение по умолчанию
-def_address=${def_address:-$default_value}
-sleep 1 & echo "Используем диапазон адресов для клиентов: $def_address"
-
-# Цикл для ввода IPv4 адреса shadowsocks
-while true; do
-   sleep 1 && echo "Введите IP адрес shadowsocks сервера, если его нет нажмите Enter:"
-   read ss_ip
-
-    # Проверка на пустой ввод
-    if [ -z "$ss_ip" ]; then
-        break
-    fi
-
-    # Проверка IPv4
-    if check_IPv4 "$ss_ip"; then
-        sleep 1 && echo " Ок. IPv4 shadowsocks: $ss_ip"
-        break
-    else
-        sleep 1 && echo " Ошибка: Это не IPv4: $ss_ip"
-        echo "Попробуйте снова"
-    fi
-done
-
-# Цикл для ввода порта shadowsocks
-if [[ -n "$ss_ip" ]]; then
     while true; do
-        sleep 1 && echo "Введите порт shadowsocks сервера $ss_ip:"
-        read ss_port
-    
-        # Проверка порта
-        if check_port "$ss_port"; then
-            sleep 1 && echo " Ок. Порт от shadowsocks сервера $ss_ip: $ss_port"
-            break
-        else
-            echo "Попробуйте снова"
-        fi
-    done
-fi
-
-# Ввод пароля shadowsocks сервера:
-if [[ -n "$ss_ip" ]]; then
-    while true; do
-        sleep 1 && echo "Вставьте пароль shadowsocks сервера $ss_ip:"
-        read -rs ss_password
+        echomsg "Введите домен, например mydomain.com, который указывает по A записи на IP $wg_host, если его нет просто нажмите Enter:"
+        read wg_host
 
         # Проверка на пустой ввод
-        if [ -z "$ss_password" ]; then
-            sleep 1 && echo " Ошибка: Пароль не может быть пустым"
+        if [ -z "$wg_host" ]; then
+            echook "Используем в качестве хоста IP: $wg_host"
+            break
+        fi
+
+        # Проверка имени
+        if check_domain "$wg_host"; then
+            echook "Домен для wg-easy: $wg_host"
+            break
+        fi
+    done
+}
+
+# - e-mail для полученя SSL сертификата домена
+input_email() {
+    if check_domain "$wg_host"; then
+        while true; do
+            echomsg "Введите email для получения SSL сертификата домена $domain:"
+            read email
+
+            # Проверка ввода
+            if check_email "$email"; then
+                echook "Email для получения SSL сертификата: $email"
+                break
+            fi
+        done
+    fi
+}
+
+# - IPv4 адрес сервера shadowsocks
+input_ss_ip() {
+    while true; do
+    echomsg "Введите IP адрес shadowsocks сервера, если его нет нажмите Enter:"
+    read ss_ip
+
+        # Проверка на пустой ввод
+        if [ -z "$ss_ip" ]; then
+            break
+        fi
+
+        # Проверка IPv4
+        if check_IPv4 "$ss_ip"; then
+            echook "IPv4 shadowsocks: $ss_ip"
+            break
+        fi
+    done
+}
+
+# - порт shadowsocks сервера
+input_ss_port() {
+    if [[ -n "$ss_ip" ]]; then
+        while true; do
+            echomsg "Введите порт shadowsocks сервера $ss_ip:"
+            read ss_port
+
+            # Проверка порта
+            if check_port "$ss_port"; then
+                echook "Порт от shadowsocks сервера $ss_ip: $ss_port"
+                break
+            fi
+        done
+    fi
+}
+
+# - пароль shadowsocks сервера
+input_ss_password() {
+    if [[ -n "$ss_ip" ]]; then
+        while true; do
+            echomsg "Пароль shadowsocks сервера $ss_ip:"
+            read -rs ss_password
+
+            # Проверка на пустой ввод
+            if [ -z "$ss_password" ]; then
+                echoerr "Пароль не может быть пустым"
+                continue
+            fi
+            echook "Пароль shadowsocks сервера $ss_ip принят"
+            break
+        done
+    fi
+}
+
+# - порт WireGuard сервера
+input_wg_port() {
+    while true; do
+        echomsg "Введите порт WireGuard (от 1 до 65534):"
+        read wg_port
+
+        # Увеличиваем порт на 1 (для UI интерфейса)
+        port=$((wg_port + 1))
+
+        # Проверка портов
+        if check_port "$wg_port" && check_port "$port"; then
+            echook "Порт для WireGuard: $wg_port"
+            echook "Порт для UI интерфейса wg-easy: $port"
+            # Cсылка на UI интерфейс wg-easy
+            link_ui="http://$wg_host:$port"
+            if check_domain "$wg_host"; then
+                link_ui="https://$wg_host/$handle_path_ui"
+            fi
+            break
+        fi
+    done
+
+    if [[ -n "$ss_ip" ]]; then
+        while true; do
+            echomsg "Введите порт WireGuard работающего через shadowsocks прокси (от 1 до 65534):"
+            read wg_port_ss
+
+            # Увеличиваем порт на 1 (для UI интерфейса)
+            port_ss=$((wg_port_ss + 1))
+
+            # Проверка портов
+            if check_port "$wg_port_ss" && check_port "$port_ss"; then
+                echook "Порт для WireGuard, shadowsocks прокси: $wg_port"
+                echook "Порт для UI интерфейса wg-easy, shadowsocks прокси: $port"
+                # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
+                link_ui_ss="http://$wg_host:$port_ss"
+                if check_domain "$wg_host"; then
+                    link_ui_ss="https://$wg_host/$handle_path_ui_ss"
+                fi
+                break
+            fi
+        done
+    fi
+}
+
+# - диапазон адресов для клиентов WireGuard
+input_default_address() {
+    local default_value="10.0.0.x"
+    local default_value_ss="10.1.0.x"
+
+    echomsg "Диапазон адресов клиентов WireGuard (нажмите Enter, чтобы оставить по умолчанию):"
+    read -e -i "$default_value" default_address
+    default_address=${default_address:-$default_value}
+    echook "Используем диапазон адресов для клиентов: $default_address"
+
+    if [[ -n "$ss_ip" ]]; then
+        echomsg "Диапазон адресов клиентов (WireGuard через shadowsocks прокси, нажмите Enter, чтобы оставить по умолчанию):"
+        read -e -i "$default_value_ss" default_address_ss
+        default_address_ss=${default_address_ss:-$default_value_ss}
+        echook "Используем диапазон адресов для клиентов (WireGuard через shadowsocks прокси): $default_address_ss"
+    fi
+}
+
+# - пароль для входа в UI wg-easy
+input_ui_password() {
+    local password
+
+    while true; do
+        echomsg "Введите сложный пароль для UI веб-интерфейса wg-easy:"
+        read -rs password
+
+        # Проверка на пустой ввод
+        if [ -z "$password" ]; then
+            echoerr "Пароль не может быть пустым"
             continue
         fi
-        sleep 1 && echo " Ok. Пароль shadowsocks сервера $ss_ip принят"
-        break
+
+        # Проверка и обработка пароля
+        if check_password "$password"; then
+            # Запрашиваем хеша пароля
+            output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
+            # Извлекаем и экранируем хеш пароля
+            password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
+
+            echook "Пароль принят"
+            break
+        fi
     done
-fi
+}
 
-# Цикл для ввода пароля wg
-while true; do
-    sleep 1 && echo "Введите сложный пароль для веб интерфейса wg-easy:"
-    read -rs password
+# Функция создания конфигов сервисов и служб
+create_configs() {
+echomsg "Создаём конфиги сервисов"
 
-    # Проверка на пустой ввод
-    if [ -z "$password" ]; then
-        sleep 1 && echo " Ошибка: Пароль не может быть пустым"
-        continue
-    fi
-
-    # Проверка и обработка пароля
-    if check_password "$password"; then
-        # Запрашиваем хеша пароля
-        output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
-        # Извлекаем и экранируем хеш пароля
-        password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
-
-        sleep 1 && echo " Ok. Пароль принят"
-        break
-    else
-        echo "Попробуйте снова"
-    fi
-done
-
-# Сохраняем  конфиги
-sleep 1 && echo "Сохраняем конфиги в домашней директории"
-# Задаем значение для wg_easy_tcp_port
-wg_easy_tcp_port=""
-if [[ -z "$domain" ]]; then
-   wg_easy_tcp_port=" - $port:$port/tcp"
-fi
-# Сохраняем  конфиг на запуск wg
-cat <<WG_YML > "wg.yml"
+## wg-easy:
+# - wg-easy дефолтный сервис docker compose
+cat <<WG_EASY_SERVICE  > "$path_docker_compose_file"
 services:
   wg-easy:
     environment:
@@ -297,20 +508,21 @@ services:
       - WG_HOST=$wg_host
       - PASSWORD_HASH=$password_hash
       - PORT=$port
+      - WG_DEVICE=$default_device_name
       - WG_PORT=$wg_port
-      - WG_MTU=1384
+      - WG_MTU=1420
       - WG_PERSISTENT_KEEPALIVE=25
-      - WG_DEFAULT_ADDRESS=$def_address
-      - WG_DEFAULT_DNS=1.1.1.1,8.8.8.8
+      - WG_DEFAULT_ADDRESS=$default_address
+      - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
     image: ghcr.io/wg-easy/wg-easy
     container_name: wg-easy
     hostname: wg-easy
     volumes:
-      - $PWD/.wg-easy:/etc/wireguard
+      - $path_data_wg_dir/wg-easy:/etc/wireguard
     ports:
       - $wg_port:$wg_port/udp
-     $wg_easy_tcp_port
+      - $port:$port/tcp"
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -320,12 +532,46 @@ services:
       - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
 
-WG_YML
+WG_EASY_SERVICE
 
-# Если доменное имя задано
-if [[ -n "$domain" ]]; then
-# добавляем сервис Caddy в wg.yml
-cat <<CADDY_SERVICES >> "wg.yml"
+# - wg-easy-ss сервис docker compose сервис wg-easy через tun2socks девайс shadowsocks прокси
+cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
+  wg-easy-ss:
+    environment:
+      - LANG=ru
+      - WG_HOST=$wg_host
+      - PASSWORD_HASH=$password_hash
+      - PORT=$port_ss
+      - WG_DEVICE=$tun2socks_device_name
+      - WG_PORT=$wg_port_ss
+      - WG_MTU=1384
+      - WG_PERSISTENT_KEEPALIVE=25
+      - WG_DEFAULT_ADDRESS=$default_address_ss
+      - WG_DEFAULT_DNS=$default_dns
+      - UI_TRAFFIC_STATS=true
+    image: ghcr.io/wg-easy/wg-easy
+    container_name: wg-easy-ss
+    hostname: wg-easy-ss
+    volumes:
+      - $path_data_wg_dir/wg-easy-ss:/etc/wireguard
+    ports:
+      - $wg_port_ss:$wg_port_ss/udp
+      - $port_ss:$port_ss/tcp"
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+      - net.ipv4.conf.all.src_valid_mark=1
+
+WG_EASY_SS_SERVICE
+
+## Caddy сервер (если указан домен):
+if check_domain "$wg_host"; then
+# - docker compose сервис
+cat <<CADDY_SERVICE >> "$path_docker_compose_file"
   caddy:
     image: caddy
     container_name: caddy
@@ -333,32 +579,44 @@ cat <<CADDY_SERVICES >> "wg.yml"
     cap_add:
       - NET_ADMIN
     ports:
-      - 443:443
+      - 443:443/tcp
       - 443:443/udp
     volumes:
-      - $PWD/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+      - $path_caddyfile:/etc/caddy/Caddyfile
+      - $path_caddy_data:/data
+      - $path_caddy_config:/config
 
-volumes:
-  caddy_data:
-    name: caddy_data
-  caddy_config:
-    name: caddy_config
+CADDY_SERVICE
 
-CADDY_SERVICES
+# - Caddyfile:
+# -- открываем основной блок хоста
+echo "$wg_host {" > "$path_caddyfile"
+# -- указываем email для успешного получения сертификата
+echo "  tls $email" >> "$path_caddyfile"
+# -- reverse_proxy на UI wg-easy
+cat <<CADDY_FILE_PROXY_WG_EASY > "$path_caddyfile"
+
+  handle_path /$handle_path_ui/* {
+    reverse_proxy wg-easy:$port
+  }
+CADDY_FILE_PROXY_WG_EASY
+# -- reverse_proxy на UI wg-easy (если IP адрес shadowsocks сервера задан)
+if [[ -n "$ss_ip" ]]; then
+cat <<CADDY_FILE_PROXY_WG_EASY_SS >> "$path_caddyfile"
+
+  handle_path /$handle_path_ui_ss/* {
+    reverse_proxy wg-easy-ss:$port_ss
+  }
+CADDY_FILE_PROXY_WG_EASY_SS
 fi
 
-# Если ip адрес shadowsocks сервера указан:
+# -- закрываем основной блок хоста
+echo "}" >> "$path_caddyfile"
+fi
+
+## Cлужба Tun2Socks (если IP адрес shadowsocks сервера задан)
 if [[ -n "$ss_ip" ]]; then
-# получем название интерфейса по умолчанию (eth0)
-DIF="$(ip route | grep default | awk '{print $5}')"
-# получаем IP-адрес шлюза по умолчанию
-MIP=$(ip r l | grep "default via" | cut -f3 -d" ")
-# получаем локальный IP-адреса интерфейса
-LIP=$(ip a l $DIF | awk '/inet /{ print $2 }' | cut -f1 -d"/")
-# дабавляем службу Tun2Socks
-cat <<TUN2SOCKS_SERVICE > "/etc/systemd/system/tun2socks.service"
+cat <<TUN2SOCKS_SERVICE > "$path_tun2socks_service"
 [Unit]
 Description=Tun2Socks
 Documentation=https://github.com/xjasonlyu/tun2socks
@@ -367,143 +625,304 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStartPre=-ip tuntap add mode tun dev sstun
-ExecStartPre=ip addr add 10.255.0.1/24 dev sstun
-ExecStartPre=ip link set dev sstun up
-ExecStart=tun2socks -device tun://sstun -proxy ss://aes-256-gcm:${ss_password}@${ss_ip}:${ss_port}
-ExecStartPost=ip r del default dev $DIF
-ExecStartPost=ip r add default via $MIP dev $DIF metric 200
-ExecStartPost=ip rule add from $LIP table lip
-ExecStartPost=ip r add default via $MIP dev $DIF table lip
-ExecStartPost=ip r add ${ss_ip}/32 via $MIP dev $DIF
-ExecStartPost=ip r add default dev sstun metric 50
-ExecStopPost=-ip r flush table lip
-ExecStopPost=-ip rule delete table lip
-ExecStopPost=-ip link set dev sstun down
-ExecStopPost=-ip link del dev sstun
-ExecStopPost=-ip r del ${ss_ip}/32 dev $DIF
+ExecStartPre=-ip tuntap add mode tun dev ${tun2socks_device_name}
+ExecStartPre=ip addr add ${tun2socks_device_addr} dev ${tun2socks_device_name}
+ExecStartPre=ip link set dev ${tun2socks_device_name} up
+ExecStart=${path_tun2socks} -interface ${default_device_name} \
+                    -device ${tun2socks_device_name} \
+                    -proxy ss://aes-256-gcm:${ss_password}@${ss_ip}:${ss_port}
+ExecStopPost=-ip link set dev ${tun2socks_device_name} down
+ExecStopPost=-ip link del dev ${tun2socks_device_name}
 
 [Install]
 WantedBy=multi-user.target
 TUN2SOCKS_SERVICE
-
-# Добавляем таблицу для маршрутизации в конец /etc/iproute2/rt_tables
-grep -q "^20\s\+lip$" /etc/iproute2/rt_tables || echo "20 lip" | sudo tee -a /etc/iproute2/rt_tables >/dev/null 2>&1
+# перезапускаем демон systemctl чтобы увидеть новый сервис 
+systemctl daemon-reload
 fi
 
-# Cсылка на WEB UI по умолчанию
-link_ui="http://$wg_host:$port"
-
-# Если доменное имя задано
-if [[ -n "$domain" ]]; then
-# добавляем Caddyfile файл для настройки reverse_proxy контейнера wg-easy
-cat <<CADDY_FILE > "Caddyfile"
-$domain {
-  tls $email
-  reverse_proxy wg-easy:$port
+echook "Конфиги сохранены"
 }
-CADDY_FILE
 
-# переопределяем link_ui
-link_ui="https://$wg_host"
-fi
+# Функция разрешения портов (через файрвол ufw)
+allow_ports(){
+  local ports=(
+    "$wg_port/udp"
+    "$port/tcp"
+    "$port/udp"
+  )
 
-# Сохраняем  конфиг на запуск wg
-cat <<RUN_CONFIG > "run-wg"
-#!/bin/sh
-echo "run-wg: Запускаем wg-easy"
-docker compose -f /root/wg.yml up -d
-echo "run-wg: Ok. 🎉 wg-easy запущен $link_ui"
-RUN_CONFIG
+  if check_domain "$wg_host"; then
+    ports+=("443/tcp" "443/udp")
+  fi
 
-# Сохраняем  конфиг на остановку wg
-cat <<STOP_CONFIG > "stop-wg"
-#!/bin/sh
-echo "stop-wg: Останавливаем wg-easy"
-docker compose -f /root/wg.yml down --remove-orphans
-echo "stop-wg: Ok. wg-easy остановлен"
-STOP_CONFIG
+  if [[ -n "$ss_ip" ]]; then
+    ports+=("$wg_port_ss/udp" "$port_ss/tcp" "$port_ss/udp")
+  fi
 
-# Сохраняем  конфиг на перезапуск wg
-cat <<RERUN_CONFIG > "rerun-wg"
-#!/bin/sh
-echo "rerun-wg: Перезапускаем wg-easy"
-./stop-wg 
-./run-wg
-echo "rerun-wg: Ok. wg-easy перезапущен"
-RERUN_CONFIG
+  # Очистка файла перед записью
+  > "$path_save_ports"
 
-# Даём права на запуск конфигов управления docker-compose
-chmod +x run-wg stop-wg rerun-wg
+  # Разрешаем порт ssh
+  local ssh_port=$(grep -E '^\s*Port\s+[0-9]+' /etc/ssh/sshd_config | head -1 | awk '{print $2}')
+  ufw allow ${ssh_port:-22}/tcp
 
-sleep 1 && echo " Ок. Конфиги сохранены"
+  for p in "${ports[@]}"; do
+    ufw allow "$p"
+    echo "allow $p" >> "$save_ports_file"
+  done
 
-# Разрешение портов через файрвол ufw
-sleep 1 && echo "Разрешаем порты $port/tcp, $port/upd, $wg_port/upd, запрещаем 80/tcp через файрвол ufw"
-if [[ -n "$domain" ]]; then
-    port="443"
-    ufw allow "$port/udp" >/dev/null 2>&1
-fi
-ufw allow "$port/tcp" >/dev/null 2>&1
-ufw allow "$wg_port/udp" >/dev/null 2>&1
-ufw deny "80/tcp" >/dev/null 2>&1
-sleep 1 && echo " Ок. Портам выданы разрешения"
+  ufw deny 80/tcp
+  echo "deny 80/tcp" >> "$save_ports_file"
 
-# Запрет определения туннеля (двусторонний пинг)
-sleep 1 && echo "Запрещаем определения туннеля (двусторонний пинг)"
-grep -q "^net/ipv4/icmp_echo_ignore_all" /etc/ufw/sysctl.conf || echo "net/ipv4/icmp_echo_ignore_all=1" | sudo tee -a /etc/ufw/sysctl.conf >/dev/null 2>&1
-sed -i 's|^net/ipv4/icmp_echo_ignore_all.*|net/ipv4/icmp_echo_ignore_all=1|' /etc/ufw/sysctl.conf >/dev/null 2>&1
-ufw reload >/dev/null 2>&1
-sleep 1 && echo " Ок. Запрет установлен"
+  ufw --force enable
+  echook "Порты разрешены, список сохранён в $path_save_ports"
+}
 
-# Включение ip_forward
-sleep 1 && echo "Включаем форвардинг в /etc/sysctl.conf"
-# проверяем, существует ли строка, начинающаяся с net.ipv4.ip_forward
-if grep -q '^net.ipv4.ip_forward' /etc/sysctl.conf; then
-    # если строка существует, заменяем ее на net.ipv4.ip_forward=1
-    sed -i 's/^net\.ip\.v4\.ip_forward.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf >/dev/null 2>&1
-else
-    # если строка не существует, добавляем ее в конец файла
-    echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf >/dev/null 2>&1
-fi
-# проверяем, существует ли строка, начинающаяся с net.ipv6.conf.all.forwarding
-if grep -q '^net.ipv6.conf.all.forwarding' /etc/sysctl.conf; then
-    # если строка существует, заменяем ее на net.ipv6.conf.all.forwarding=1
-    sed -i 's/^net\.ipv6\.conf\.all\.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf >/dev/null 2>&1
-else
-    # если строка не существует, добавляем ее в конец файла
-    echo 'net.ipv6.conf.all.forwarding=1' | sudo tee -a /etc/sysctl.conf >/dev/null 2>&1
-fi
-# применяем изменения
-sudo sysctl -p >/dev/null 2>&1
-sleep 1 && echo " Ок. Форвардинг включен"
+# Функция конфигурации sysctl (запрет двустороннего пинга, включение форвардинга)
+config_sysctl() {
+  # Запрет определения туннеля (двусторонний пинг)
+  echomsg "Запрещаем определения туннеля (двусторонний пинг)"
+  grep -q "^net/ipv4/icmp_echo_ignore_all" /etc/ufw/sysctl.conf || echo "net/ipv4/icmp_echo_ignore_all=1" | sudo tee -a /etc/ufw/sysctl.conf
+  sed -i 's|^net/ipv4/icmp_echo_ignore_all.*|net/ipv4/icmp_echo_ignore_all=1|' /etc/ufw/sysctl.conf
+  echook "Запрет установлен"
 
-# Установка, активация и запуск shasowsocks туннель сервиса tun2socks
-if [[ -n "$ss_ip" ]]; then
-# устанавливаем tun2socks
-sleep 1 && echo "Загружаем tun2socks"
-wget https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-linux-amd64.zip >/dev/null 2>&1
-unzip tun2socks-linux-amd64.zip >/dev/null 2>&1
-mv tun2socks-linux-amd64 /usr/local/bin/tun2socks >/dev/null 2>&1
-chmod +x /usr/local/bin/tun2socks >/dev/null 2>&1
-sleep 1 && echo " Ок. Загружено"
-# активируем и запускаем сервис туннеля shadowsocks tun2socks
-sleep 1 && echo "Активируем и запускаем сервис туннеля shadowsocks"
-systemctl daemon-reload >/dev/null 2>&1
-systemctl enable --now tun2socks >/dev/null 2>&1
-    if systemctl is-active --quiet tun2socks; then
-        echo " Ok. создан и запущен сервис туннеля tun2socks!"
-    else
-        echo " Ошибка. туннель tun2socks не запущен! Введите 'journalctl -u tun2socks -n 20' для справки"
+  # Включение ip_forward
+  echomsg "Включаем форвардинг в /etc/sysctl.conf"
+  # проверяем, существует ли строка, начинающаяся с net.ipv4.ip_forward
+  if grep -q '^net.ipv4.ip_forward' /etc/sysctl.conf; then
+      # если строка существует, заменяем ее на net.ipv4.ip_forward=1
+      sed -i 's/^net\.ip\.v4\.ip_forward.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+  else
+      # если строка не существует, добавляем ее в конец файла
+      echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
+  fi
+  # проверяем, существует ли строка, начинающаяся с net.ipv6.conf.all.forwarding
+  if grep -q '^net.ipv6.conf.all.forwarding' /etc/sysctl.conf; then
+      # если строка существует, заменяем ее на net.ipv6.conf.all.forwarding=1
+      sed -i 's/^net\.ipv6\.conf\.all\.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
+  else
+      # если строка не существует, добавляем ее в конец файла
+      echo 'net.ipv6.conf.all.forwarding=1' | sudo tee -a /etc/sysctl.conf
+  fi
+
+  # применяем изменения
+  ufw reload
+  sysctl -p
+
+  echook "Форвардинг включен"
+}
+
+# Загрузка tun2socks v2.5.2
+download_tun2socks() {
+  if [[ -n "$ss_ip" ]]; then
+    # Скачиваем tun2socks
+    echomsg "Скачиваем tun2socks"
+    mkdir -p "$(dirname "$path_tun2socks")"
+    curl -L -o "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
+    chmod +x "$path_tun2socks"
+    echook "tun2socks скачен"
+  fi
+}
+
+# Функция проверки что все сервисы запущены и работают корректно
+is_all_ok_services() {
+  # если файл docker compose не существует то false
+  if ! [[ -e "$path_docker_compose_file" ]]; then
+    return  1
+  fi
+
+  # контейнеры docker указанные в docker compose файле
+  for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
+    local status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container")
+    if [[ "$status" != "true 0" ]]; then
+      return  1
     fi
+  done
+
+  # служба tun2socks если она существует 
+  if [[ -e "$path_tun2socks_service" ]]; then
+    if ! systemctl is-active --quiet tun2socks; then
+      return  1
+    fi
+  fi
+
+  return 0
+}
+
+
+# Функция запуска всех сервисов и служб
+start_services() {
+  # Запускаем с автозапуском службу tun2socks если она существует
+  if [[ -e "$path_tun2socks_service" ]]; then
+    systemctl enable --now tun2socks
+    if ! systemctl is-active --quiet tun2socks; then
+      echoerr "Ошибка запуска tun2socks службы! Наберите 'journalctl -u tun2socks -n 100' для просмотра лога"
+    fi
+  fi
+
+  # Запускаем докер контейнеры
+  docker compose -f "$path_docker_compose_file" up
+  for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
+    local status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container")
+    if [[ "$status" != "true 0" ]]; then
+      echoerr "Контейнер $container не работает! Наберите 'docker logs -f --tail 100 $container' для просмотра лога"
+    fi
+  done
+}
+
+# Функция остановки всех сервисов и служб
+stop_services() {
+  # Останавливаем и удаляем докер контейнеры
+  docker compose -f "$path_docker_compose_file" down --remove-orphans
+  for container in $(docker compose -f "$path_docker_compose_file" ps -a -q 2>/dev/null); do
+    if docker inspect "$container" >/dev/null 2>&1; then
+      echoerr "Контейнер $container не остановлен! Наберите 'docker logs -f --tail 100 $container' для просмотра лога"
+    fi
+  done
+
+  # Останавливаем и выключаем службу tun2socks если она существует
+  if [[ -e "$path_tun2socks_service" ]]; then
+    systemctl stop tun2socks
+    systemctl disable tun2socks
+    if systemctl is-active --quiet tun2socks; then
+      echoerr "Ошибка остановки tun2socks службы! Наберите 'journalctl -u tun2socks -n 100' для просмотра лога"
+    fi
+  fi
+}
+
+# Функция переключения статуса активности сервисов/служб
+switch_active_services() {
+  # Если все сервисы и службы работают
+  if is_all_ok_services; then
+    stop_services
+  else
+    start_services
+  fi
+
+  select_menu_option
+}
+
+# Функция установки приложения
+install_services() {
+  # проверка поддержки
+  check_root
+  check_shell
+  check_kernel
+  check_os
+  check_os_ver
+  check_container
+
+  # приветсвие
+  show_header
+  read -n1 -r -p "Нажмите любую клавишу, чтобы начать установку..."
+
+  # удаление предущей установки если была
+  # и остались файлы после неудачной
+  remove_install
+
+  # создаем необходимы папки
+  mkdir -p "$path_data_dir"
+  mkdir -p "$(dirname "$path_script")"
+
+  # перемещам текущий скрипт, добавляем на него права и ссылку
+  mv "$(realpath "$0")" "$path_script"
+  chmod +x "$path_script"
+  ln -s "$path_script" "$path_script_link"
+
+  # установка зависимостей
+  install_pkgs
+
+  # считывание вода пользователя
+  input_wg_host
+  input_email
+  input_ss_ip
+  input_ss_port
+  input_ss_password
+  input_wg_port
+  input_default_address
+  input_ui_password
+
+  # создание конфигов
+  create_configs
+  # разрешение портов
+  allow_ports
+  # конфигурация sysctl
+  config_sysctl
+  # загрузка tun2socks
+  download_tun2socks
+
+  # запуск сервисов
+  start_services
+
+  # отображение меню опций
+  select_menu_option
+}
+
+# Функция подтверждения удаления приложения
+remove_services() {
+  echo
+
+  local msg="Удалить приложение? [y/N]: "
+  read -rp "$msg" remove
+
+  until [[ "$remove" =~ ^[yYnN]*$ ]]; do
+    echo "$remove: неверная опция."
+    read -rp "$msg" remove
+  done
+
+  if [[ "$remove" =~ ^[yY]$ ]]; then
+    remove_install "1"
+    exit 0
+  else
+    select_menu_option
+  fi
+}
+
+select_menu_option() {
+  if [[ -d "$path_data_dir" ]]; then
+    select_menu_option
+  else
+
+  local select_option="Выберите опцию:"
+  
+  if is_all_ok_services; then
+    echo "Статус: ✅ Все сервисы работают"
+    echo
+    echo "$select_option"
+    echo "   1) Выключить"
+  else
+    echo "Статус: ❌ Не активно"
+    echo
+    echo "$select_option"
+    echo "   1) Включить"
+  fi
+  echo "   2) Удалить"
+  echo "   3) Выход"
+
+  read -rp "Опция: " option
+  until [[ "$option" =~ ^[1-5]$ ]]; do
+    echo "$option: неккоректное значение."
+    read -rp "Опция: " option
+  done
+
+  case "$option" in
+    1)
+      switch_active_services
+    ;;
+    2)
+      remove_services
+    ;;
+    3)
+      exit 0
+    ;;
+  esac
+}
+
+if [[ -d "$path_data_dir" ]]; then
+  select_menu_option
+else
+  install_services
 fi
-
-# Загрузка образа wg-easy
-sleep 1 && echo "Загрузка образа wg-easy"
-docker pull ghcr.io/wg-easy/wg-easy >/dev/null 2>&1
-echo " Ок. Образ wg-easy загружен"
-
-# Запускаем wg-easy
-./run-wg
 
 $SHELL

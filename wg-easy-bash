@@ -153,7 +153,7 @@ check_container() {
 remove_install() {
     local is_show_info="$1"
 
-    if "$is_show_info"; then
+    if [[ -n "$is_show_info" ]]; then
       echomsg "Удаляем предыдущую установку"
     fi
 
@@ -189,7 +189,7 @@ remove_install() {
       rm -rf "$path_data_dir"
     fi
 
-    if "$is_show_info"; then
+    if [[ -n "$is_show_info" ]]; then
       echook "Файлы и службы/сервисы удалены"
     fi
 }

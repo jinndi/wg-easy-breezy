@@ -551,7 +551,7 @@ services:
       - $path_data_wg_dir/wg-easy:/etc/wireguard
     ports:
       - $wg_port:$wg_port/udp
-      - $port:$port/tcp"
+      - $port:$port/tcp
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -586,7 +586,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - $path_data_wg_dir/wg-easy-ss:/etc/wireguard
     ports:
       - $wg_port_ss:$wg_port_ss/udp
-      - $port_ss:$port_ss/tcp"
+      - $port_ss:$port_ss/tcp
     restart: unless-stopped
     cap_add:
       - NET_ADMIN

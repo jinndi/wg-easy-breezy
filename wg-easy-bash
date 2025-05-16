@@ -41,6 +41,9 @@ default_device_name="$(ip route | grep default | awk '{print $5}')"
 tun2socks_device_name="sstun"
 tun2socks_device_addr="10.255.0.1/24"
 
+# Ссылка на образ wg-easy
+wg_easy_image="ghcr.io/wg-easy/wg-easy:latest"
+
 ## Пути в адресной строке браузера к UI интерфейсу (если указан домен):
 # - по умолчанию
 handle_path_ui="wg-easy"
@@ -88,32 +91,34 @@ is_shadowsocks=""
 # - шапка установщика
 show_header() {
 cat <<EOF
+
 ###################################################
 #                  WG-EASY-BASH                   #
 # GitHub: https://github.com/jinndi/wg-easy-bash  #
 ###################################################
+
 EOF
 }
 # - стандартное через задержку
 echomsg() {
   sleep 2; 
   echo
-  echo " ➡️  $1";
+  echo " 🟠 $1";
 }
 # - об успехе
 echook() {
   echo
-  echo " ✅  $1"
+  echo " 🟢 $1"
 }
 # - об ошибке
 echoerr () {
   echo
-  echo " ❌  $1"
+  echo " 🔴 $1"
 }
 # - об ошибке с выходом из скрипта
 exiterr() {
   echo
-  echo " ❌ Ошибка: $1" >&2
+  echo " 🔴 Ошибка: $1" >&2
   exit 1
 }
 
@@ -236,6 +241,12 @@ install_pkgs() {
     curl -sSL https://get.docker.com | sh
     echook "docker установлен"
   fi
+
+  # Спуллить образ wg-easy если его нет
+  if ! docker image inspect "$wg_easy_image" > /dev/null 2>&1; then
+    docker pull "$wg_easy_image"
+  fi
+
   usermod -a -G docker "$USER"
   systemctl restart docker
 }
@@ -539,7 +550,7 @@ services:
       - WG_DEFAULT_ADDRESS=$default_address
       - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
-    image: ghcr.io/wg-easy/wg-easy
+    image: $wg_easy_image
     container_name: wg-easy
     hostname: wg-easy
     volumes:
@@ -574,7 +585,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - WG_DEFAULT_ADDRESS=$default_address_ss
       - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
-    image: ghcr.io/wg-easy/wg-easy
+    image: $wg_easy_image
     container_name: wg-easy-ss
     hostname: wg-easy-ss
     volumes:
@@ -685,6 +696,8 @@ allow_ports(){
   if [[ "$is_shadowsocks" ]]; then
     ports+=("$wg_port_ss/udp" "$port_ss/tcp" "$port_ss/udp")
   fi
+
+  echomsg "Разрешаем порты: ${ports[*]}, запрещаем: 80/tcp"
 
   # Создать дирректорию для сохранения списка портов если не создана
   mkdir -p "$(dirname "$path_save_ports")"

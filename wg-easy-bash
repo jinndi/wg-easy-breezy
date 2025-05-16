@@ -96,13 +96,31 @@ GitHub: https://github.com/jinndi/wg-easy-bash
 EOF
 }
 # - стандартное через задержку
-echomsg() { sleep 1; echo "➡️ $1"; }
+echomsg() {
+  echo
+  sleep 1; 
+  echo "➡️ $1";
+  echo
+}
 # - об успехе
-echook() { echo " ✅ $1"; }
+echook() {
+  echo
+  echo "✅ $1"
+  echo
+}
 # - об ошибке
-echoerr () { echo " ❌ $1"; }
+echoerr () {
+  echo
+  echo "❌ $1"
+  echo
+}
 # - об ошибке с выходом из скрипта
-exiterr() { echo "❌ Ошибка: $1" >&2; exit 1; }
+exiterr() {
+  echo
+  echo "❌ Ошибка: $1" >&2
+  echo
+  exit 1
+}
 
 
 ## Функции проверок возможности установки:
@@ -688,11 +706,11 @@ allow_ports(){
 
   for p in "${ports[@]}"; do
     ufw allow "$p"
-    echo "allow $p" >> "$save_ports_file"
+    echo "allow $p" >> "$path_save_ports"
   done
 
   ufw deny 80/tcp
-  echo "deny 80/tcp" >> "$save_ports_file"
+  echo "deny 80/tcp" >> "$path_save_ports"
 
   ufw --force enable
   echook "Порты разрешены, список сохранён в $path_save_ports"

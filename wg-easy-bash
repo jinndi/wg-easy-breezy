@@ -546,6 +546,7 @@ services:
 WG_EASY_SERVICE
 
 # - wg-easy-ss сервис docker compose сервис wg-easy через tun2socks девайс shadowsocks прокси
+if [[ "$is_shadowsocks" ]]; then
 cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
   wg-easy-ss:
     environment:
@@ -578,6 +579,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SS_SERVICE
+fi
 
 ## Caddy сервер (если указан домен):
 if [[ "$is_domain" ]]; then
@@ -671,12 +673,15 @@ allow_ports(){
     ports+=("$wg_port_ss/udp" "$port_ss/tcp" "$port_ss/udp")
   fi
 
+  # Создать дирректорию для сохранения списка портов если не создана
+  mkdir -p "$(dirname "$save_ports_file")"
+
   # Очистка файла перед записью
   > "$path_save_ports"
 
   # Разрешаем порт ssh
   local ssh_port=$(grep -E '^\s*Port\s+[0-9]+' /etc/ssh/sshd_config | head -1 | awk '{print $2}')
-  ufw allow ${ssh_port:-22}/tcp
+  ufw allow "${ssh_port:-22}/tcp"
 
   for p in "${ports[@]}"; do
     ufw allow "$p"

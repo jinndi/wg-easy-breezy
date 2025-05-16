@@ -83,7 +83,7 @@ link_ui_ss=""
 ## Функции вывода сообщений:
 # - шапка установщика
 show_header() {
-cat <<'EOF'
+cat <<EOF
 
 🇼​​​​​🇬​​​​​-🇪​​​​​🇦​​​​​🇸​​​​​🇾​​​​​-🇧​​​​​🇦​​​​​🇸​​​​​🇭​​​​​
 Добро пожаловать в установщик!
@@ -594,7 +594,7 @@ echo "$wg_host {" > "$path_caddyfile"
 # -- указываем email для успешного получения сертификата
 echo "  tls $email" >> "$path_caddyfile"
 # -- reverse_proxy на UI wg-easy
-cat <<CADDY_FILE_PROXY_WG_EASY > "$path_caddyfile"
+cat <<CADDY_FILE_PROXY_WG_EASY >> "$path_caddyfile"
 
   handle_path /$handle_path_ui/* {
     reverse_proxy wg-easy:$port
@@ -880,10 +880,6 @@ remove_services() {
 }
 
 select_menu_option() {
-  if [[ -d "$path_data_dir" ]]; then
-    select_menu_option
-  else
-
   local select_option="Выберите опцию:"
   
   if is_all_ok_services; then

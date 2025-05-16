@@ -79,6 +79,10 @@ password_hash=""
 link_ui=""
 # - ссылка на UI интерфейс wg-easy, shadowsocks тунннель
 link_ui_ss=""
+# - указал ли пользователя адрес домена
+is_domain=""
+# - ввел ли пользователя адрес shadowsocks сервера
+is_shadowsocks=""
 
 ## Функции вывода сообщений:
 # - шапка установщика
@@ -230,12 +234,11 @@ install_pkgs() {
 check_domain() {
   # Если строка не является доменом
   if [[ ! "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
-    if [[ -n "$1" ]]; then
-      echoerr "Неккоректный адрес домена: $1"
-    fi
+    echoerr "Неккоректный адрес домена: $1"
+    is_domain=""
     return 1
   fi
-
+  is_domain="true"
   return 0
 }
 
@@ -343,7 +346,7 @@ input_wg_host() {
 
 # - e-mail для полученя SSL сертификата домена
 input_email() {
-  if check_domain "$wg_host"; then
+  if [[ "$is_domain" ]]; then
     while true; do
       echomsg "Введите email для получения SSL сертификата домена $domain:"
       read email
@@ -365,11 +368,13 @@ input_ss_ip() {
 
     # Проверка на пустой ввод
     if [ -z "$ss_ip" ]; then
+      is_shadowsocks=""
       break
     fi
 
     # Проверка IPv4
     if check_IPv4 "$ss_ip"; then
+      is_shadowsocks="true"
       echook "IPv4 shadowsocks: $ss_ip"
       break
     fi
@@ -378,7 +383,7 @@ input_ss_ip() {
 
 # - порт shadowsocks сервера
 input_ss_port() {
-  if [[ -n "$ss_ip" ]]; then
+  if [[ "$is_shadowsocks" ]]; then
     while true; do
       echomsg "Введите порт shadowsocks сервера $ss_ip:"
       read ss_port
@@ -394,7 +399,7 @@ input_ss_port() {
 
 # - пароль shadowsocks сервера
 input_ss_password() {
-  if [[ -n "$ss_ip" ]]; then
+  if [[ "$is_shadowsocks" ]]; then
     while true; do
       echomsg "Пароль shadowsocks сервера $ss_ip:"
       read -rs ss_password
@@ -425,14 +430,14 @@ input_wg_port() {
       echook "Порт для UI интерфейса wg-easy: $port"
       # Cсылка на UI интерфейс wg-easy
       link_ui="http://$wg_host:$port"
-      if check_domain "$wg_host"; then
+      if [[ "$is_domain" ]]; then
         link_ui="https://$wg_host/$handle_path_ui"
       fi
       break
     fi
   done
 
-  if [[ -n "$ss_ip" ]]; then
+  if [[ "$is_shadowsocks" ]]; then
     while true; do
       echomsg "Введите порт WireGuard работающего через shadowsocks прокси (от 1 до 65534):"
       read wg_port_ss
@@ -446,7 +451,7 @@ input_wg_port() {
         echook "Порт для UI интерфейса wg-easy, shadowsocks прокси: $port"
         # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
         link_ui_ss="http://$wg_host:$port_ss"
-        if check_domain "$wg_host"; then
+        if [[ "$is_domain" ]]; then
           link_ui_ss="https://$wg_host/$handle_path_ui_ss"
         fi
         break
@@ -465,7 +470,7 @@ input_default_address() {
   default_address=${default_address:-$default_value}
   echook "Используем диапазон адресов для клиентов: $default_address"
 
-  if [[ -n "$ss_ip" ]]; then
+  if [[ "$is_shadowsocks" ]]; then
     echomsg "Диапазон адресов клиентов (WireGuard через shadowsocks прокси, нажмите Enter, чтобы оставить по умолчанию):"
     read -e -i "$default_value_ss" default_address_ss
     default_address_ss=${default_address_ss:-$default_value_ss}
@@ -575,7 +580,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
 WG_EASY_SS_SERVICE
 
 ## Caddy сервер (если указан домен):
-if check_domain "$wg_host"; then
+if [[ "$is_domain" ]]; then
 # - docker compose сервис
 cat <<CADDY_SERVICE >> "$path_docker_compose_file"
   caddy:
@@ -607,7 +612,7 @@ cat <<CADDY_FILE_PROXY_WG_EASY >> "$path_caddyfile"
   }
 CADDY_FILE_PROXY_WG_EASY
 # -- reverse_proxy на UI wg-easy (если IP адрес shadowsocks сервера задан)
-if [[ -n "$ss_ip" ]]; then
+if [[ "$is_shadowsocks" ]]; then
 cat <<CADDY_FILE_PROXY_WG_EASY_SS >> "$path_caddyfile"
 
   handle_path /$handle_path_ui_ss/* {
@@ -621,7 +626,7 @@ echo "}" >> "$path_caddyfile"
 fi
 
 ## Cлужба Tun2Socks (если IP адрес shadowsocks сервера задан)
-if [[ -n "$ss_ip" ]]; then
+if [[ "$is_shadowsocks" ]]; then
 cat <<TUN2SOCKS_SERVICE > "$path_tun2socks_service"
 [Unit]
 Description=Tun2Socks
@@ -658,11 +663,11 @@ allow_ports(){
     "$port/udp"
   )
 
-  if check_domain "$wg_host"; then
+  if [[ "$is_domain" ]]; then
     ports+=("443/tcp" "443/udp")
   fi
 
-  if [[ -n "$ss_ip" ]]; then
+  if [[ "$is_shadowsocks" ]]; then
     ports+=("$wg_port_ss/udp" "$port_ss/tcp" "$port_ss/udp")
   fi
 
@@ -721,7 +726,7 @@ config_sysctl() {
 
 # Загрузка tun2socks v2.5.2
 download_tun2socks() {
-  if [[ -n "$ss_ip" ]]; then
+  if [[ "$is_shadowsocks" ]]; then
     # Скачиваем tun2socks
     echomsg "Скачиваем tun2socks"
     mkdir -p "$(dirname "$path_tun2socks")"

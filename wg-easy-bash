@@ -221,15 +221,14 @@ remove_install() {
 
 # Функция установки необходимых пакетов программ
 install_pkgs() {
-  # Обновление пакетов
-  echomsg "Обновление пакетов"
-  apt update
-  apt upgrade -y
-  echook "Пакеты обновлены"
-
   # Установка зависимостей
-  echomsg "Установка зависимостей ufw, curl, unzip, lsof, docker compose"
-  apt install ufw curl unzip lsof -y
+  echomsg "Установка зависимостей"
+  export DEBIAN_FRONTEND=noninteractive
+  (
+    set -x
+    apt-get -yqq update || apt-get -yqq update
+    apt-get -yqq install ufw curl unzip lsof
+  ) || exiterr "'apt-get install' ошибка."
 
   # Установка и запуск докера если ранее не установлен 
   if ! docker compose version &> /dev/null; then
@@ -718,6 +717,7 @@ allow_ports(){
   echo "deny 80/tcp" >> "$path_save_ports"
 
   ufw --force enable
+  ufw reload
   echook "Порты разрешены, список сохранён в $path_save_ports"
 }
 

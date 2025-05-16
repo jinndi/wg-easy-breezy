@@ -674,7 +674,7 @@ allow_ports(){
   fi
 
   # Создать дирректорию для сохранения списка портов если не создана
-  mkdir -p "$(dirname "$save_ports_file")"
+  mkdir -p "$(dirname "$path_save_ports")"
 
   # Очистка файла перед записью
   > "$path_save_ports"

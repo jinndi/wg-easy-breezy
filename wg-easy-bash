@@ -799,7 +799,7 @@ start_services() {
   fi
 
   # Запускаем докер контейнеры
-  docker compose -f "$path_docker_compose_file" up
+  docker compose -f "$path_docker_compose_file" up -d
   for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
     local status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container")
     if [[ "$status" != "true 0" ]]; then

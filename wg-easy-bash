@@ -570,6 +570,10 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
       - WG_PRE_UP=/sbin/tun2socks-init.sh
+      - SS_TUN_NAME=$ss_tun_name
+      - SS_IP=$ss_ip
+      - SS_PORT=$ss_port
+      - SS_PASSWORD=$ss_password
     image: $wg_easy_image
     container_name: wg-easy-ss
     hostname: wg-easy-ss
@@ -590,11 +594,6 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - net.ipv4.conf.all.src_valid_mark=1
       - net.ipv4.conf.all.rp_filter=0
       - net.ipv4.conf.eth0.rp_filter=0
-    environment:
-      - ss_tun_name=$ss_tun_name
-      - ss_ip=$ss_ip
-      - ss_port=$ss_port
-      - ss_password=$ss_password
 
 WG_EASY_SS_SERVICE
 fi
@@ -787,7 +786,7 @@ start_services() {
 # Функция остановки всех сервисов и служб
 stop_services() {
   echomsg "Останавливаем сервисы"
-  
+
   # Останавливаем и удаляем docker-контейнеры
   if [[ -f "$path_docker_compose_file" ]]; then
     docker compose -f "$path_docker_compose_file" down --remove-orphans || {

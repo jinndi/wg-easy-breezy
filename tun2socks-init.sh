@@ -32,16 +32,11 @@ ip route add "$SS_IP/32" via "$MIP" dev "$DIF"
 ip route add default dev "$SS_TUN_NAME" metric 50 
 
 # Запуск tun2socks в фоне
-# echo "[tun2socks-init] Starting tun2socks..."
-# nohup tun2socks \
-#   -interface "$DIF" \
-#   -device "tun://$SS_TUN_NAME" \
-#   -proxy "ss://aes-256-gcm:${SS_PASSWORD}@${SS_IP}:${SS_PORT}" \
-#   > /tmp/tun2socks.log 2>&1 &
+echo "[tun2socks-init] Starting tun2socks..."
+nohup tun2socks \
+  -interface "$DIF" \
+  -device "tun://$SS_TUN_NAME" \
+  -proxy "ss://aes-256-gcm:${SS_PASSWORD}@${SS_IP}:${SS_PORT}" \
+  > /tmp/tun2socks.log 2>&1 &
 
-nohup tun2socks --protocol tun -s "${SS_IP}:${SS_PORT}" \
-    -m "aes-256-gcm" -k "${SS_PASSWORD}" \
-    --outbound-bind-interface "$DIF" --tun-interface-name "$SS_TUN_NAME" &
-
-echo "[tun2socks-init] Done. Sleeping to allow tun2socks to initialize..."
-sleep 3
+echo "[tun2socks-init] Done."

@@ -649,11 +649,7 @@ fi
 
 ## Cлужба Tun2Socks (если IP адрес shadowsocks сервера задан)
 if [[ "$is_shadowsocks" ]]; then
-# get the default gateway IP address
-MIP=$(ip r l | grep "default via" | cut -f3 -d" ")
-# get the local IP address of the interface
-LIP=$(ip a l $DIF | awk '/inet /{ print $2 }' | cut -f1 -d"/")
-cat <<TUN2SOCKS_SERVICE > "/etc/systemd/system/tun2socks.service"
+cat <<TUN2SOCKS_SERVICE > "$path_tun2socks_service"
 [Unit]
 Description=Tun2Socks
 Documentation=https://github.com/xjasonlyu/tun2socks
@@ -663,26 +659,17 @@ After=network.target
 Type=simple
 User=root
 ExecStartPre=-ip tuntap add mode tun dev ${tun2socks_device_name}
-ExecStartPre=ip addr add 10.255.0.1/24 dev ${tun2socks_device_name}
+ExecStartPre=ip addr add ${tun2socks_device_addr} dev ${tun2socks_device_name}
 ExecStartPre=ip link set dev ${tun2socks_device_name} up
-ExecStart=tun2socks -interface ${default_device_name} -device ${tun2socks_device_name} -proxy ss://aes-256-gcm:${ss_password}@${ss_ip}:${ss_port}
-ExecStartPost=ip route del default dev ${default_device_name}
-ExecStartPost=ip route add default via $MIP dev ${default_device_name} metric 200
-ExecStartPost=ip rule add from $LIP table lip
-ExecStartPost=ip route add default via $MIP dev ${default_device_name} table lip
-ExecStartPost=ip route add ${ss_ip}/32 via $MIP dev ${default_device_name}
-ExecStartPost=ip route add default dev ${tun2socks_device_name} metric 50
-ExecStopPost=-ip route flush table lip
-ExecStopPost=-ip rule delete table lip
+ExecStart=${path_tun2socks} -interface ${default_device_name} \
+-device ${tun2socks_device_name} \
+-proxy ss://aes-256-gcm:${ss_password}@${ss_ip}:${ss_port}
 ExecStopPost=-ip link set dev ${tun2socks_device_name} down
 ExecStopPost=-ip link del dev ${tun2socks_device_name}
-ExecStopPost=-ip route del ${ss_ip}/32 dev ${default_device_name}
 
 [Install]
 WantedBy=multi-user.target
 TUN2SOCKS_SERVICE
-# add a 'lip' table for routing
-grep -q "^20\s\+lip$" /etc/iproute2/rt_tables || echo "20 lip" | sudo tee -a /etc/iproute2/rt_tables >/dev/null 2>&1
 
 # перезапускаем демон systemctl чтобы увидеть новый сервис 
 systemctl daemon-reload

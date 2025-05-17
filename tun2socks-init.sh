@@ -11,6 +11,11 @@ DIF=$(ip route | grep default | awk '{print $5}')
 LIP=$(ip a l $DIF | awk '/inet /{ print $2 }' | cut -f1 -d"/")
 MIP=$(ip r l | grep "default via" | cut -f3 -d" ")
 
+# Таблицы маршрутизации "lip" в /etc/iproute2/rt_tables
+mkdir -p /etc/iproute2
+touch /etc/iproute2/rt_tables
+grep -q -E '\s+lip$' /etc/iproute2/rt_tables || echo "20 lip" >> /etc/iproute2/rt_tables
+
 # TUN интерфейс
 echo "[tun2socks-init] Setting up $SS_TUN_NAME..."
 ip tuntap add mode tun dev "$SS_TUN_NAME" 2>/dev/null || true

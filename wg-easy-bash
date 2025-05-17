@@ -456,8 +456,8 @@ input_wg_port() {
 
       # Проверка портов
       if check_port "$wg_port_ss" && check_port "$port_ss"; then
-        echook "Порт для WireGuard, shadowsocks прокси: $wg_port"
-        echook "Порт для UI интерфейса wg-easy, shadowsocks прокси: $port"
+        echook "Порт для WireGuard, shadowsocks прокси: $wg_port_ss"
+        echook "Порт для UI интерфейса wg-easy, shadowsocks прокси: $port_ss"
         # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
         link_ui_ss="http://$wg_host:$port_ss"
         if [[ "$is_domain" ]]; then
@@ -548,7 +548,6 @@ services:
       - SYS_MODULE
     sysctls:
       - net.ipv4.ip_forward=1
-      - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SERVICE
@@ -590,10 +589,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - SYS_MODULE
     sysctls:
       - net.ipv4.ip_forward=1
-      - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv4.conf.all.rp_filter=0
-      - net.ipv4.conf.eth0.rp_filter=0
 
 WG_EASY_SS_SERVICE
 fi

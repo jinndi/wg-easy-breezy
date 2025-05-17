@@ -25,14 +25,18 @@ path_tun2socks_init="$path_data_dir/tun2socks/tun2socks-init.sh"
 path_data_wg_dir="$path_data_dir/wireguard"
 # - файл docker compose сервисов
 path_docker_compose_file="$path_data_dir/services.yml"
+# - ссылка на файл systemd unit службы
+path_systemd_unit_file="/etc/systemd/system/wg-easy.service"
 # - файл настройки Caddy сервера
 path_caddyfile="$path_data_dir/caddy/Caddyfile"
 # - папка с данными  Caddy сервера
 path_caddy_data="$path_data_dir/caddy/data"
 # - папка с настройками Caddy сервера
 path_caddy_config="$path_data_dir/caddy/config"
-# - файл с портами которым выдали разрешения через ufw
-path_save_ports="$path_data_dir/.ufw_ports.txt"
+# - файл скрипта c сетевыми правилами iptables на запуск служб
+path_iptables_active_script="$path_data_dir/iptables/active.sh"
+# - файл скрипта для удаления ранее созданных iptables правил
+path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 
 ## Переменные настройки shadowsocks прокси интерфейса через tun2socks:
 # - имя интерфейса
@@ -178,18 +182,18 @@ remove_install() {
     echomsg "Удаляем предыдущую установку"
   fi
 
-  # Остановка докер сервисов с удаление всех задействованных контейнеров и образов
+  # Остановка сервисов с удаление всех задействованных контейнеров и образов
   if [[ -e "$path_docker_compose_file" ]]; then
-      docker compose -f "$path_docker_compose_file" down --remove-orphans --rmi all
+    if systemctl is-active --quiet wg-easy; then
+      systemctl disable --now wg-easy
+    fi
   fi
 
-  # Удаление правил ранее заданных для портов (через файрвол ufw)
-  if [[ -f "$path_save_ports" ]]; then
-    while read -r line; do
-      action=$(echo "$line" | cut -d' ' -f1)
-      rule=$(echo "$line" | cut -d' ' -f2)
-      ufw delete "$action" "$rule"
-    done < "$path_save_ports"
+  # Удаление ранее заданных iptables правил 
+  if [[ -f "$path_iptables_delete_script" ]]; then
+    if systemctl is-active --quiet wg-easy; then
+      bash "$path_iptables_delete_script"
+    fi
   fi
 
   # Удаление ссылки на скрипт управления
@@ -200,6 +204,11 @@ remove_install() {
   # Удаление папки данных
   if [[ -d "$path_data_dir" ]]; then
     rm -rf "$path_data_dir"
+  fi
+
+  # Удаление файла systemd unit службы
+  if [[ -f "$path_systemd_unit_file" ]]; then
+    rm -f "path_systemd_unit_file"
   fi
 
   if [[ -n "$is_show_info" ]]; then
@@ -514,8 +523,23 @@ input_ui_password() {
   done
 }
 
+# Загрузка tun2socks v2.5.2
+download_tun2socks() {
+  if [[ "$is_shadowsocks" ]]; then
+    echomsg "Загружаем tun2socks, с скриптом поднятия tun интерфейса"
+    mkdir -p "$(dirname "$path_tun2socks")"
+    curl -L -o "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
+    chmod +x "$path_tun2socks"
+
+    mkdir -p "$(dirname "$path_tun2socks_init")"
+    curl -L -o "$path_tun2socks_init" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh
+    chmod +x "$path_tun2socks_init"
+    echook "файлы загружены"
+  fi
+}
+
 # Функция создания конфигов сервисов и служб
-create_configs() {
+create_services_config() {
 echomsg "Создаём конфиги сервисов"
 
 ## wg-easy:
@@ -644,100 +668,91 @@ fi
 echo "}" >> "$path_caddyfile"
 fi
 
-echook "Конфиги сохранены"
+echook "Конфиги сервисов созданы"
 }
 
-# Функция разрешения портов (через файрвол ufw)
-allow_ports(){
+# Функция создания скриптов правил sysctl, iptables
+create_iptables_scripts(){
   local ports=(
-    "$wg_port/udp"
-    "$port/tcp"
-    "$port/udp"
+    "$wg_port udp"
+    "$port tcp"
+    "$port udp"
   )
 
   if [[ "$is_domain" ]]; then
-    ports+=("443/tcp" "443/udp")
+    ports+=("443 tcp" "443 udp")
   fi
 
   if [[ "$is_shadowsocks" ]]; then
-    ports+=("$wg_port_ss/udp" "$port_ss/tcp" "$port_ss/udp")
+    ports+=("$wg_port_ss udp" "$port_ss tcp" "$port_ss udp")
   fi
 
-  echomsg "Разрешаем порты: ${ports[*]}, запрещаем: 80/tcp"
+  echomsg "Создание скриптов с правилами iptables: 
+  - при запуске служб разрешаем порты: 
+  -- ${ports[*]}, запрещаем: 80 tcp
+  - при остановки удаляем эти правила."
 
-  # Создать дирректорию для сохранения списка портов если не создана
-  mkdir -p "$(dirname "$path_save_ports")"
+  # Создать дирректорию для сохранения скриптов на запуск/остановку служб
+  mkdir -p "$(dirname "$path_iptables_active_script")"
+  mkdir -p "$(dirname "$path_iptables_delete_script")"
 
-  # Очистка файла перед записью
-  > "$path_save_ports"
+  # Очистка файлов перед формированием данных
+  > "$path_iptables_active_script"
+  > "$path_iptables_delete_script"
 
-  # Разрешаем порт ssh
-  local ssh_port=""
-  if [[ -e "/etc/ssh/sshd_config" ]]; then
-    ssh_port=$(grep -E '^\s*Port\s+[0-9]+' /etc/ssh/sshd_config | head -1 | awk '{print $2}')
-  fi
-  ufw allow "${ssh_port:-22}/tcp"
+  # Формируем скрипты с правилами
+  echo "#!/bin/bash" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
+  echo "" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
+
+  # разрешение forward между (трафика между интерфейсами)
+  echo "sysctl -w net.ipv4.ip_forward=1" >> "$path_iptables_active_script"
+
+  # запрещаем определения туннеля (двусторонний пинг)
+  echo "sysctl -w net.ipv4.icmp_echo_ignore_all=1" >> "$path_iptables_active_script"
+
+  echo "" >> "$path_iptables_active_script"
 
   for p in "${ports[@]}"; do
-    ufw allow "$p"
-    echo "allow $p" >> "$path_save_ports"
+    read -r port proto <<< "$p"
+    echo "iptables -I INPUT 1 -p $proto --dport $port -j ACCEPT" >> "$path_iptables_active_script"
+    echo "iptables -D INPUT -p $proto --dport $port -j ACCEPT" >> "$path_iptables_delete_script"
   done
 
-  ufw deny 80/tcp
-  echo "deny 80/tcp" >> "$path_save_ports"
+  echo "iptables -I INPUT 1 -p tcp --dport 80 -j DROP" >> "$path_iptables_active_script"
+  echo "iptables -D INPUT -p tcp --dport 80 -j ACCEPT" >> "$path_iptables_delete_script"
 
-  ufw --force enable
-  ufw reload
-  echook "Порты разрешены, список сохранён в $path_save_ports"
+  # Делаем исполняемыми
+  chmod +x "$path_iptables_active_script"
+  chmod +x "$path_iptables_delete_script"
+
+  echook "Скрипты с правилами iptables созданы"
 }
 
-# Функция конфигурации sysctl (запрет двустороннего пинга, включение форвардинга)
-config_sysctl() {
-  # Запрет определения туннеля (двусторонний пинг)
-  echomsg "Запрещаем определения туннеля (двусторонний пинг)"
-  grep -q "^net/ipv4/icmp_echo_ignore_all" /etc/ufw/sysctl.conf || echo "net/ipv4/icmp_echo_ignore_all=1" | sudo tee -a /etc/ufw/sysctl.conf
-  sed -i 's|^net/ipv4/icmp_echo_ignore_all.*|net/ipv4/icmp_echo_ignore_all=1|' /etc/ufw/sysctl.conf
-  echook "Запрет установлен"
+# Функция создания systemd unit службы управления сервисами
+create_systemd_unit(){
+local working_dir="$(dirname "$path_docker_compose_file")"
 
-  # Включение ip_forward
-  echomsg "Включаем форвардинг в /etc/sysctl.conf"
-  # проверяем, существует ли строка, начинающаяся с net.ipv4.ip_forward
-  if grep -q '^net.ipv4.ip_forward' /etc/sysctl.conf; then
-    # если строка существует, заменяем ее на net.ipv4.ip_forward=1
-    sed -i 's/^net\.ip\.v4\.ip_forward.*/net.ipv4.ip_forward=1/' /etc/sysctl.conf
-  else
-    # если строка не существует, добавляем ее в конец файла
-    echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf
-  fi
-  # проверяем, существует ли строка, начинающаяся с net.ipv6.conf.all.forwarding
-  if grep -q '^net.ipv6.conf.all.forwarding' /etc/sysctl.conf; then
-    # если строка существует, заменяем ее на net.ipv6.conf.all.forwarding=1
-    sed -i 's/^net\.ipv6\.conf\.all\.forwarding.*/net.ipv6.conf.all.forwarding=1/' /etc/sysctl.conf
-  else
-    # если строка не существует, добавляем ее в конец файла
-    echo 'net.ipv6.conf.all.forwarding=1' | sudo tee -a /etc/sysctl.conf
-  fi
+cat <<SYSTEMD_UNIT > "$path_systemd_unit_file"
+[Unit]
+Description=wg-easy with iptables hooks via docker compose
+After=network.target docker.service
+Requires=docker.service
 
-  # применяем изменения
-  ufw reload
-  sysctl -p
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$working_dir
+ExecStartPre=$path_iptables_active_script
+ExecStart=/usr/bin/docker compose -f $path_docker_compose_file up -d --force-recreate
+ExecStop=/usr/bin/docker compose -f $path_docker_compose_file down --remove-orphans
+ExecStopPost=$path_iptables_delete_script
+TimeoutStartSec=0
 
-  echook "Форвардинг включен"
-}
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_UNIT
 
-# Загрузка tun2socks v2.5.2
-download_tun2socks() {
-  if [[ "$is_shadowsocks" ]]; then
-    # Скачиваем tun2socks
-    echomsg "Скачиваем tun2socks"
-    mkdir -p "$(dirname "$path_tun2socks")"
-    curl -L -o "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
-    chmod +x "$path_tun2socks"
-    mkdir -p "$(dirname "$path_tun2socks_init")"
-    curl -L -o "$path_tun2socks_init" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh
-    chmod +x "$path_tun2socks_init"
-    echook "tun2socks скачен"
-  fi
+systemctl daemon-reload
 }
 
 # Функция проверки что все сервисы запущены и работают корректно
@@ -772,7 +787,8 @@ start_services() {
   echomsg "Запускаем сервисы"
 
   # Запускаем докер контейнеры
-  docker compose -f "$path_docker_compose_file" up -d --force-recreate
+  systemctl enable --now wg-easy
+  #docker compose -f "$path_docker_compose_file" up -d --force-recreate
   local container status name
   for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
     status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)
@@ -781,6 +797,10 @@ start_services() {
       echoerr "Контейнер $name ($container) не работает! docker logs -f --tail 100 $name"
     fi
   done
+
+  if ! systemctl is-active --quiet wg-easy; then
+    echoerr "Запуск не удался"
+  fi
 }
 
 # Функция остановки всех сервисов и служб
@@ -789,9 +809,13 @@ stop_services() {
 
   # Останавливаем и удаляем docker-контейнеры
   if [[ -f "$path_docker_compose_file" ]]; then
-    docker compose -f "$path_docker_compose_file" down --remove-orphans || {
-      echoerr "Ошибка при остановке контейнеров через docker compose"
-    }
+    systemctl disable --now wg-easy
+    #docker compose -f "$path_docker_compose_file" down --remove-orphans || {
+    #  echoerr "Ошибка при остановке контейнеров через docker compose"
+    #}
+    if systemctl is-active --quiet wg-easy; then
+      echoerr "Остановка не удалась"
+    fi
   else
     echoerr "Файл docker-compose не найден: $path_docker_compose_file"
   fi
@@ -810,9 +834,8 @@ switch_active_services() {
 }
 
 # Функция перезапуска  сервисов
-reload_services() {
-  stop_services
-  start_services
+restart_services() {
+  systemctl restart wg-easy
   select_menu_option
 }
 
@@ -856,14 +879,17 @@ install_services() {
   input_default_address
   input_ui_password
 
-  # создание конфигов
-  create_configs
-  # разрешение портов
-  allow_ports
-  # конфигурация sysctl
-  config_sysctl
   # загрузка tun2socks
   download_tun2socks
+
+  # создание конфига докер сервисов
+  create_services_config
+
+  # создание скриптов iptables настроек
+  create_iptables_scripts
+
+  # создание systemd unit службы управления сервисами
+  create_systemd_unit
 
   # запуск сервисов
   start_services
@@ -924,7 +950,7 @@ select_menu_option() {
       switch_active_services
     ;;
     2)
-      reload_services
+      restart_services
     ;;
     3)
       remove_services

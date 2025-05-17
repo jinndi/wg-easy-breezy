@@ -768,7 +768,7 @@ start_services() {
   echomsg "Запускаем сервисы"
 
   # Запускаем докер контейнеры
-  docker compose -f "$path_docker_compose_file" up -d
+  docker compose -f "$path_docker_compose_file" up -d --force-recreate
   local container status name
   for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
     status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)

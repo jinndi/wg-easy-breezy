@@ -702,7 +702,7 @@ create_iptables_scripts(){
 
   # Формируем скрипты с правилами
   echo "#!/bin/bash" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
-  echo "" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
+  echo "" | tee -a "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
 
   # разрешение forward между (трафика между интерфейсами)
   echo "sysctl -w net.ipv4.ip_forward=1" >> "$path_iptables_active_script"

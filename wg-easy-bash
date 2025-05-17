@@ -548,6 +548,7 @@ services:
       - SYS_MODULE
     sysctls:
       - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SERVICE
@@ -568,7 +569,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - WG_DEFAULT_ADDRESS=$default_address_ss
       - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
-      - WG_PRE_UP=/sbin/tun2socks-init.sh
+      - WG_POST_UP=/sbin/tun2socks-init.sh
       - SS_TUN_NAME=$ss_tun_name
       - SS_IP=$ss_ip
       - SS_PORT=$ss_port
@@ -591,6 +592,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - /dev/net/tun:/dev/net/tun
     sysctls:
       - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SS_SERVICE
@@ -795,7 +797,7 @@ stop_services() {
   fi
 }
 
-# Функция переключения статуса активности сервисов/служб
+# Функция переключения статуса активности сервисов
 switch_active_services() {
   # Если все сервисы и службы работают
   if is_all_ok_services; then
@@ -804,6 +806,13 @@ switch_active_services() {
     start_services
   fi
 
+  select_menu_option
+}
+
+# Функция перезапуска  сервисов
+reload_services() {
+  stop_services
+  start_services
   select_menu_option
 }
 
@@ -900,11 +909,12 @@ select_menu_option() {
     echo "$select_option"
     echo "  1) Включить"
   fi
-  echo "  2) Удалить"
-  echo "  3) Выход"
+  echo "  2) Перезапустить"
+  echo "  3) Удалить"
+  echo "  4) Выход"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-3]$ ]]; do
+  until [[ "$option" =~ ^[1-4]$ ]]; do
     echo "$option: неккоректное значение."
     read -rp "Опция: " option
   done
@@ -914,9 +924,12 @@ select_menu_option() {
       switch_active_services
     ;;
     2)
-      remove_services
+      reload_services
     ;;
     3)
+      remove_services
+    ;;
+    4)
       exit 0
     ;;
   esac

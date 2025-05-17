@@ -21,6 +21,7 @@ echo "[tun2socks-init] Setting up $SS_TUN_NAME..."
 ip tuntap add mode tun dev "$SS_TUN_NAME" 2>/dev/null || true
 ip addr add 192.168.0.33/24 dev "$SS_TUN_NAME"
 ip link set dev "$SS_TUN_NAME" up
+sleep 2
 
 # Маршруты
 echo "[tun2socks-init] Setting up routing...."
@@ -40,4 +41,4 @@ nohup tun2socks \
   > /tmp/tun2socks.log 2>&1 &
 
 echo "[tun2socks-init] Done. Sleeping to allow tun2socks to initialize..."
-sleep 2
+sleep 5

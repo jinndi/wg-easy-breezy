@@ -17,6 +17,10 @@ path_data_dir="$HOME/.wg-easy"
 path_script="$path_data_dir/wg-easy"
 # - ссылка на файл текущего скрипта
 path_script_link="/usr/bin/wg-easy"
+# - исполняемый файл tun2socks
+path_tun2socks="$path_data_dir/tun2socks/tun2socks"
+# - скрипт инициализации интерфейса tun2socks
+path_tun2socks_init="$path_data_dir/tun2socks/tun2socks-init.sh"
 # - папка настроек wireguard
 path_data_wg_dir="$path_data_dir/wireguard"
 # - файл docker compose сервисов
@@ -27,19 +31,12 @@ path_caddyfile="$path_data_dir/caddy/Caddyfile"
 path_caddy_data="$path_data_dir/caddy/data"
 # - папка с настройками Caddy сервера
 path_caddy_config="$path_data_dir/caddy/config"
-# - исполняемый файл shadowsocks прокси tun2socks
-path_tun2socks="$path_data_dir/tun2socks"
-# - файл настройки службы tun2socks
-path_tun2socks_service=/etc/systemd/system/tun2socks.service
 # - файл с портами которым выдали разрешения через ufw
 path_save_ports="$path_data_dir/.ufw_ports.txt"
 
-## Интернет интерфейсы:
-# - по умолчанию (обычно eth0)
-default_device_name="$(ip route | grep default | awk '{print $5}')"
-# - shadowsocks прокси tun2socks
-tun2socks_device_name="sstun"
-tun2socks_device_addr="10.255.0.1/24"
+## Переменные настройки shadowsocks прокси интерфейса через tun2socks:
+# - имя интерфейса
+ss_tun_name="sstun"
 
 # Ссылка на образ wg-easy
 wg_easy_image="ghcr.io/wg-easy/wg-easy:latest"
@@ -184,14 +181,6 @@ remove_install() {
   # Остановка докер сервисов с удаление всех задействованных контейнеров и образов
   if [[ -e "$path_docker_compose_file" ]]; then
       docker compose -f "$path_docker_compose_file" down --remove-orphans --rmi all
-  fi
-
-  # Остановка и удаление tun2socks службы
-  if [[ -e "$path_tun2socks_service" ]]; then
-    systemctl stop tun2socks
-    systemctl disable tun2socks
-    rm -f "$path_tun2socks_service"
-    systemctl daemon-reload
   fi
 
   # Удаление правил ранее заданных для портов (через файрвол ufw)
@@ -539,7 +528,6 @@ services:
       - WG_HOST=$wg_host
       - PASSWORD_HASH=$password_hash
       - PORT=$port
-      - WG_DEVICE=$default_device_name
       - WG_PORT=$wg_port
       - WG_MTU=1420
       - WG_PERSISTENT_KEEPALIVE=25
@@ -574,18 +562,21 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - WG_HOST=$wg_host
       - PASSWORD_HASH=$password_hash
       - PORT=$port_ss
-      - WG_DEVICE=$tun2socks_device_name
+      - WG_DEVICE=$ss_tun_name
       - WG_PORT=$wg_port_ss
       - WG_MTU=1384
       - WG_PERSISTENT_KEEPALIVE=25
       - WG_DEFAULT_ADDRESS=$default_address_ss
       - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
+      - WG_PRE_UP=/sbin/tun2socks-init.sh
     image: $wg_easy_image
     container_name: wg-easy-ss
     hostname: wg-easy-ss
     volumes:
       - $path_data_wg_dir/wg-easy-ss:/etc/wireguard
+      - $path_tun2socks:/sbin/tun2socks
+      - $path_tun2socks_init:/sbin/tun2socks-init.sh
     ports:
       - $wg_port_ss:$wg_port_ss/udp
       - $port_ss:$port_ss/tcp
@@ -597,6 +588,13 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - net.ipv4.ip_forward=1
       - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.conf.all.rp_filter=0
+      - net.ipv4.conf.eth0.rp_filter=0
+    environment:
+      - ss_tun_name=$ss_tun_name
+      - ss_ip=$ss_ip
+      - ss_port=$ss_port
+      - ss_password=$ss_password
 
 WG_EASY_SS_SERVICE
 fi
@@ -645,34 +643,6 @@ fi
 
 # -- закрываем основной блок хоста
 echo "}" >> "$path_caddyfile"
-fi
-
-## Cлужба Tun2Socks (если IP адрес shadowsocks сервера задан)
-if [[ "$is_shadowsocks" ]]; then
-cat <<TUN2SOCKS_SERVICE > "$path_tun2socks_service"
-[Unit]
-Description=Tun2Socks
-Documentation=https://github.com/xjasonlyu/tun2socks
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStartPre=-ip tuntap add mode tun dev ${tun2socks_device_name}
-ExecStartPre=ip addr add ${tun2socks_device_addr} dev ${tun2socks_device_name}
-ExecStartPre=ip link set dev ${tun2socks_device_name} up
-ExecStart=${path_tun2socks} -interface ${default_device_name} \
--device ${tun2socks_device_name} \
--proxy ss://aes-256-gcm:${ss_password}@${ss_ip}:${ss_port}
-ExecStopPost=-ip link set dev ${tun2socks_device_name} down
-ExecStopPost=-ip link del dev ${tun2socks_device_name}
-
-[Install]
-WantedBy=multi-user.target
-TUN2SOCKS_SERVICE
-
-# перезапускаем демон systemctl чтобы увидеть новый сервис 
-systemctl daemon-reload
 fi
 
 echook "Конфиги сохранены"
@@ -764,6 +734,9 @@ download_tun2socks() {
     mkdir -p "$(dirname "$path_tun2socks")"
     curl -L -o "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
     chmod +x "$path_tun2socks"
+    mkdir -p "$(dirname "$path_tun2socks_init")"
+    curl -L -o "$path_tun2socks_init" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh
+    chmod +x "$path_tun2socks_init"
     echook "tun2socks скачен"
   fi
 }
@@ -791,26 +764,13 @@ is_all_ok_services() {
     fi
   done <<< "$containers"
 
-  # служба tun2socks, если есть
-  if [[ -e "$path_tun2socks_service" ]]; then
-    if ! systemctl is-active --quiet tun2socks; then
-      return 1
-    fi
-  fi
-
   return 0
 }
 
 
-# Функция запуска всех сервисов и служб
+# Функция запуска всех сервисов
 start_services() {
-  # Запускаем службу tun2socks если она существует
-  if [[ -e "$path_tun2socks_service" ]]; then
-    systemctl enable --now tun2socks
-    if ! systemctl is-active --quiet tun2socks; then
-      echoerr "Ошибка запуска tun2socks службы! Наберите 'journalctl -u tun2socks -n 100' для просмотра лога"
-    fi
-  fi
+  echomsg "Запускаем сервисы"
 
   # Запускаем докер контейнеры
   docker compose -f "$path_docker_compose_file" up -d
@@ -826,6 +786,8 @@ start_services() {
 
 # Функция остановки всех сервисов и служб
 stop_services() {
+  echomsg "Останавливаем сервисы"
+  
   # Останавливаем и удаляем docker-контейнеры
   if [[ -f "$path_docker_compose_file" ]]; then
     docker compose -f "$path_docker_compose_file" down --remove-orphans || {
@@ -833,15 +795,6 @@ stop_services() {
     }
   else
     echoerr "Файл docker-compose не найден: $path_docker_compose_file"
-  fi
-
-  # Останавливаем и выключаем службу tun2socks если она существует
-  if [[ -e "$path_tun2socks_service" ]]; then
-    systemctl stop tun2socks
-    systemctl disable tun2socks
-    if systemctl is-active --quiet tun2socks; then
-      echoerr "Ошибка остановки tun2socks службы! Наберите 'journalctl -u tun2socks -n 100' для просмотра лога"
-    fi
   fi
 }
 
@@ -909,6 +862,11 @@ install_services() {
   # запуск сервисов
   start_services
 
+  echo "Веб интерфейс: $link_ui"
+  if [[ "$is_shadowsocks" ]]; then
+    echo "Веб интерфейс (shadowsocks): $link_ui_ss"
+  fi
+
   # отображение меню опций
   select_menu_option
 }
@@ -938,10 +896,6 @@ select_menu_option() {
   show_header
   if is_all_ok_services; then
     echo "Статус: ✅ Все сервисы работают"
-    echo "Веб интерфейс: $link_ui"
-    if [[ "$is_shadowsocks" ]]; then
-      echo "Веб интерфейс (shadowsocks): $link_ui_ss"
-    fi
     echo "$select_option"
     echo "  1) Выключить"
   else

@@ -20,6 +20,7 @@ grep -q -E '\s+lip$' /etc/iproute2/rt_tables || echo "20 lip" >> /etc/iproute2/r
 echo "[tun2socks-init] Setting up $SS_TUN_NAME..."
 ip tuntap add mode tun dev "$SS_TUN_NAME" || true 
 ip addr add 192.168.0.33/24 dev "$SS_TUN_NAME"
+ip link set dev "$SS_TUN_NAME" mtu 1400
 ip link set dev "$SS_TUN_NAME" up
 
 # Маршруты

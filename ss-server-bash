@@ -139,7 +139,7 @@ install_pkgs(){
   (
     set -x
     apt-get -yqq update || apt-get -yqq update
-    apt-get -yqq install pwgen lsof xz-utils >/dev/null
+    apt-get -yqq install iptables pwgen lsof >/dev/null
   ) || exiterr "'apt-get install' ошибка."
   echook "Зависимости установлены"
 }

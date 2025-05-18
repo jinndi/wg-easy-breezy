@@ -446,7 +446,7 @@ input_wg_port() {
       # Cсылка на UI интерфейс wg-easy
       link_ui="http://$wg_host:$port"
       if [[ "$is_domain" ]]; then
-        link_ui="https://$wg_host/$handle_path_ui"
+        link_ui="https://$wg_host/$handle_path_ui/"
       fi
       break
     fi
@@ -467,7 +467,7 @@ input_wg_port() {
         # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
         link_ui_ss="http://$wg_host:$port_ss"
         if [[ "$is_domain" ]]; then
-          link_ui_ss="https://$wg_host/$handle_path_ui_ss"
+          link_ui_ss="https://$wg_host/$handle_path_ui_ss/"
         fi
         break
       fi

@@ -7,8 +7,6 @@
 # Released under the MIT License, see the accompanying file LICENSE
 # or https://opensource.org/licenses/MIT
 
-set -e
-
 ## Пути исполняемых файлов
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 

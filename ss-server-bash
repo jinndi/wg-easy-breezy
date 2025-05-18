@@ -23,8 +23,6 @@ path_sysctl_config="/etc/sysctl.d/00-shadowsocks.conf"
 path_security_limits="/etc/security/limits.conf"
 # - место сохранения текущего скрипта после установки сервера
 path_script="/sbin/ss-server"
-# - где будут сохранены разрешенные порты
-path_save_ports="/etc/.ssserver_allow_ports"
 
 ## Функции вывода сообщений:
 # - шапка установщика
@@ -198,6 +196,7 @@ input_port(){
 
 create_config(){
 echomsg "Формируем конфиг shadowsocks-rust сервера"
+password=$(pwgen 32 1)
 mkdir -p "$(dirname "$path_config")"
 cat >"$path_config" <<CONFIG
 {
@@ -215,7 +214,6 @@ CONFIG
 
 create_service(){
 echomsg "Добавляем ssserver сервис"
-password=$(pwgen 32 1)
 cat >"$path_service" <<CONFIG_SUSTEMD
 [Unit]
 Description=Shadowsocks-rust ssserver
@@ -224,7 +222,9 @@ After=network.target
 Wants=network.target
 
 [Service]
+ExecStartPre=/bin/bash -c 'iptables -I INPUT 1 -p tcp --dport ${port} -j ACCEPT; iptables -I INPUT 1 -p udp --dport ${port} -j ACCEPT'
 ExecStart=${path_ssserver} -c ${path_config}
+ExecStopPost=/bin/bash -c 'iptables -D INPUT -p tcp --dport ${port} -j ACCEPT; iptables -D INPUT -p udp --dport ${port} -j ACCEPT'
 Restart=on-failure
 User=shadowsocks
 Group=shadowsocks
@@ -235,33 +235,6 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 [Install]
 WantedBy=multi-user.target
 CONFIG_SUSTEMD
-}
-
-allow_port(){
-  local ports=(
-    "$port/tcp"
-    "$port/udp"
-  )
-
-  # Очистка файла перед записью
-  > "$path_save_ports"
-
-  echomsg "Разрешаем порты: ssh, ${ports[*]}"
-
-  # Разрешаем порт ssh
-  local ssh_port=""
-  if [[ -e "/etc/ssh/sshd_config" ]]; then
-    ssh_port=$(grep -E '^\s*Port\s+[0-9]+' /etc/ssh/sshd_config | head -1 | awk '{print $2}')
-  fi
-  ufw allow "${ssh_port:-22}/tcp" >/dev/null 2>&1
-
-  for p in "${ports[@]}"; do
-    ufw allow "$p"  >/dev/null 2>&1
-    echo "allow $p" >> "$path_save_ports"
-  done
-
-  ufw --force enable >/dev/null 2>&1
-  ufw reload >/dev/null 2>&1
 }
 
 add_user(){
@@ -319,7 +292,6 @@ remove_ssserver(){
   rm -f "$path_service"
   rm -f "$path_ssserver"
   rm -f "$path_sysctl_config"  
-  rm -f "$path_save_ports"
   > "$path_security_limits"
   systemctl daemon-reload
   userdel shadowsocks
@@ -348,10 +320,9 @@ install_ssserver(){
   input_port
   install_pkgs
   download_ssserver
-  create_service
   create_config
+  create_service
   add_user
-  allow_port
   optimization_configs
   activate_ssserver
 

@@ -230,11 +230,8 @@ install_pkgs() {
 
   # Установка и запуск докера если ранее не установлен 
   if ! docker compose version &> /dev/null; then
-    echomsg "Установка docker"
     curl -sSL https://get.docker.com | sh
-    echook "docker установлен"
   fi
-  usermod -a -G docker "$USER"
   systemctl restart docker
 
   # Спуллить образ wg-easy если его нет
@@ -639,6 +636,8 @@ cat <<CADDY_SERVICE >> "$path_docker_compose_file"
 CADDY_SERVICE
 
 # - Caddyfile:
+mkdir -p "$(dirname "$path_caddyfile")"
+
 # -- открываем основной блок хоста
 echo "$wg_host {" > "$path_caddyfile"
 # -- указываем email для успешного получения сертификата

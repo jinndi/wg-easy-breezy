@@ -224,6 +224,7 @@ After=network.target
 Wants=network.target
 
 [Service]
+PermissionsStartOnly=true
 ExecStartPre=/bin/bash -c 'iptables -I INPUT 1 -p tcp --dport ${port} -j ACCEPT; iptables -I INPUT 1 -p udp --dport ${port} -j ACCEPT'
 ExecStart=${path_ssserver} -c ${path_config}
 ExecStopPost=/bin/bash -c 'iptables -D INPUT -p tcp --dport ${port} -j ACCEPT; iptables -D INPUT -p udp --dport ${port} -j ACCEPT'

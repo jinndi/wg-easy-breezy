@@ -225,7 +225,7 @@ install_pkgs() {
   (
     set -x
     apt-get -yqq update || apt-get -yqq update
-    apt-get -yqq install curl unzip lsof
+    apt-get -yqq install iptables curl lsof
   ) || exiterr "'apt-get install' ошибка."
 
   # Установка и запуск докера если ранее не установлен 

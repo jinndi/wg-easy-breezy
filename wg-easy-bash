@@ -587,7 +587,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - PORT=$port_ss
       - WG_DEVICE=$ss_tun_name
       - WG_PORT=$wg_port_ss
-      - WG_MTU=1384
+      - WG_MTU=1420
       - WG_PERSISTENT_KEEPALIVE=25
       - WG_DEFAULT_ADDRESS=$default_address_ss
       - WG_DEFAULT_DNS=$default_dns

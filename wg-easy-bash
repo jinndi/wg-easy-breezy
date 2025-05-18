@@ -225,7 +225,7 @@ install_pkgs() {
   (
     set -x
     apt-get -yqq update || apt-get -yqq update
-    apt-get -yqq install ufw curl unzip lsof
+    apt-get -yqq install curl unzip lsof
   ) || exiterr "'apt-get install' ошибка."
 
   # Установка и запуск докера если ранее не установлен 
@@ -345,7 +345,7 @@ input_wg_host() {
   while true; do
     echomsg "Введите домен, например mydomain.com, который указывает по A записи на IP $wg_host, если его нет просто нажмите Enter:"
     read wg_host
-
+    echo
     # Проверка на пустой ввод
     if [ -z "$wg_host" ]; then
       # IP текущего сервера
@@ -368,7 +368,7 @@ input_email() {
     while true; do
       echomsg "Введите email для получения SSL сертификата домена $domain:"
       read email
-
+      echo
       # Проверка ввода
       if check_email "$email"; then
         echook "Email для получения SSL сертификата: $email"
@@ -383,7 +383,7 @@ input_ss_ip() {
   while true; do
     echomsg "Введите IP адрес shadowsocks сервера, если его нет нажмите Enter:"
     read ss_ip
-
+    echo
     # Проверка на пустой ввод
     if [ -z "$ss_ip" ]; then
       is_shadowsocks=""
@@ -405,7 +405,7 @@ input_ss_port() {
     while true; do
       echomsg "Введите порт shadowsocks сервера $ss_ip:"
       read ss_port
-
+      echo
       # Проверка порта
       if check_port "$ss_port"; then
         echook "Порт от shadowsocks сервера $ss_ip: $ss_port"
@@ -421,7 +421,7 @@ input_ss_password() {
     while true; do
       echomsg "Пароль shadowsocks сервера $ss_ip:"
       read -rs ss_password
-
+      echo
       # Проверка на пустой ввод
       if [ -z "$ss_password" ]; then
         echoerr "Пароль не может быть пустым"
@@ -438,7 +438,7 @@ input_wg_port() {
   while true; do
     echomsg "Введите порт WireGuard (от 1 до 65534):"
     read wg_port
-
+    echo
     # Увеличиваем порт на 1 (для UI интерфейса)
     port=$((wg_port + 1))
 
@@ -459,7 +459,7 @@ input_wg_port() {
     while true; do
       echomsg "Введите порт WireGuard работающего через shadowsocks прокси (от 1 до 65534):"
       read wg_port_ss
-
+      echo
       # Увеличиваем порт на 1 (для UI интерфейса)
       port_ss=$((wg_port_ss + 1))
 
@@ -485,6 +485,7 @@ input_default_address() {
 
   echomsg "Диапазон адресов клиентов WireGuard (нажмите Enter, чтобы оставить по умолчанию):"
   read -e -i "$default_value" default_address
+  echo
   default_address=${default_address:-$default_value}
   echook "Используем диапазон адресов для клиентов: $default_address"
 
@@ -503,7 +504,7 @@ input_ui_password() {
   while true; do
     echomsg "Введите сложный пароль для UI веб-интерфейса wg-easy:"
     read -rs password
-
+    echo
     # Проверка на пустой ввод
     if [ -z "$password" ]; then
       echoerr "Пароль не может быть пустым"
@@ -566,13 +567,11 @@ services:
     ports:
       - $wg_port:$wg_port/udp
       - $port:$port/tcp
-    restart: unless-stopped
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
     sysctls:
       - net.ipv4.ip_forward=1
-      - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SERVICE
@@ -608,15 +607,13 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
     ports:
       - $wg_port_ss:$wg_port_ss/udp
       - $port_ss:$port_ss/tcp
-    restart: unless-stopped
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
     devices:
-      - /dev/net/tun:/dev/net/tun
+      - /dev/net/tun
     sysctls:
       - net.ipv4.ip_forward=1
-      - net.ipv6.conf.all.forwarding=1
       - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SS_SERVICE
@@ -629,7 +626,6 @@ cat <<CADDY_SERVICE >> "$path_docker_compose_file"
   caddy:
     image: caddy
     container_name: caddy
-    restart: unless-stopped
     cap_add:
       - NET_ADMIN
     ports:
@@ -702,7 +698,7 @@ create_iptables_scripts(){
 
   # Формируем скрипты с правилами
   echo "#!/bin/bash" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
-  echo "" | tee -a "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
+  echo "" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
 
   # разрешение forward между (трафика между интерфейсами)
   echo "sysctl -w net.ipv4.ip_forward=1" >> "$path_iptables_active_script"
@@ -719,7 +715,7 @@ create_iptables_scripts(){
   done
 
   echo "iptables -I INPUT 1 -p tcp --dport 80 -j DROP" >> "$path_iptables_active_script"
-  echo "iptables -D INPUT -p tcp --dport 80 -j ACCEPT" >> "$path_iptables_delete_script"
+  echo "iptables -D INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_delete_script"
 
   # Делаем исполняемыми
   chmod +x "$path_iptables_active_script"
@@ -894,10 +890,12 @@ install_services() {
   # запуск сервисов
   start_services
 
+  echo 
   echo "Веб интерфейс: $link_ui"
   if [[ "$is_shadowsocks" ]]; then
     echo "Веб интерфейс (shadowsocks): $link_ui_ss"
   fi
+  echo
 
   # отображение меню опций
   select_menu_option

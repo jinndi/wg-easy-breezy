@@ -204,7 +204,7 @@ cat >"$path_config" <<CONFIG
   "server": "0.0.0.0",
   "server_port": $port,
   "mode": "tcp_and_udp",
-  "method": "aes-256-gcm",
+  "method": "chacha20-ietf-poly1305",
   "password": "$password",
   "timeout": 120,
   "udp_timeout": 120,

@@ -163,6 +163,8 @@ root hard nofile 51200
 LIMITS
 ulimit -n 51200
 cat >"$path_sysctl_config" <<SYSCTL_CONF
+net.ipv4.icmp_echo_ignore_all=1
+
 fs.file-max = 51200
 net.core.rmem_max = 67108864
 net.core.wmem_max = 67108864

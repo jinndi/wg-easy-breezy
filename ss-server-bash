@@ -318,8 +318,8 @@ confirm_reinstall() {
 }
 
 install_ssserver(){
-  input_port
   install_pkgs
+  input_port
   download_ssserver
   create_config
   create_service

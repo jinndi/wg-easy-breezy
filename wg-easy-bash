@@ -37,6 +37,8 @@ path_caddy_config="$path_data_dir/caddy/config"
 path_iptables_active_script="$path_data_dir/iptables/active.sh"
 # - файл скрипта для удаления ранее созданных iptables правил
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
+# - файл конфига sysctl параметров 
+path_sysctl_conf="/etc/sysctl.d/99-wg-easy.conf"
 
 ## Переменные настройки shadowsocks прокси интерфейса через tun2socks:
 # - имя интерфейса
@@ -166,13 +168,12 @@ check_kernel() {
   fi
 }
 
-# - среда работы ОС
+# - среда работы ОС (запрет установки из контейнера, например докер)
 check_container() {
   if systemd-detect-virt -cq 2>/dev/null; then
-    exiterr "Эта система работает внутри контейнера, который не поддерживается данным установщиком."
+    exiterr "Установка внути контейнера не поддерживается данным установщиком."
   fi
 }
-
 
 # Функция удаления предыдущих установок (без докера)
 remove_install() {
@@ -219,20 +220,37 @@ remove_install() {
 
 # Функция установки необходимых пакетов программ
 install_pkgs() {
+  # ожидания пока система освободит блокировку пакетного менеджера (apt/dpkg)
+  local count=0
+  local apt_lk="/var/lib/apt/lists/lock"
+  local pkg_lk="/var/lib/dpkg/lock"
+  while fuser "$apt_lk" "$pkg_lk" >/dev/null 2>&1 \
+    || lsof "$apt_lk" >/dev/null 2>&1 || lsof "$pkg_lk" >/dev/null 2>&1; do
+    [ "$count" = 0 ] && echo "Ожидаем, когда apt освободится..."
+    [ "$count" -ge 100 ] && exiterr "Не удалось дождаться разблокировку apt/dpkg."
+    count=$((count+1))
+    printf '%s' '.'
+    sleep 3
+  done
+
   # Установка зависимостей
   echomsg "Установка зависимостей"
   export DEBIAN_FRONTEND=noninteractive
   (
     set -x
     apt-get -yqq update || apt-get -yqq update
-    apt-get -yqq install iptables curl lsof
+  ) || exiterr "'apt-get update' ошибка."
+  (
+    set -x
+    apt-get -yqq install iproute2 iptables curl lsof dnsutils grep sed \
+    || apt-get -yqq install iproute2 iptables curl lsof dnsutils grep sed
   ) || exiterr "'apt-get install' ошибка."
 
   # Установка и запуск докера если ранее не установлен 
   if ! docker compose version &> /dev/null; then
     curl -sSL https://get.docker.com | sh
   fi
-  systemctl restart docker
+  systemctl start docker
 
   # Спуллить образ wg-easy если его нет
   if ! docker image inspect "$wg_easy_image" > /dev/null 2>&1; then
@@ -261,15 +279,23 @@ check_domain() {
 check_IPv4() {
   # Проверка на формат IPv4
   if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-    echoerr "Это не IPv4: $input"
+    echoerr "Это не IPv4: $1"
     return 1
   fi
 
   # Проверка на диапазон для каждого октета IP
   IFS='.' read -r -a octets <<< "$1"
   for octet in "${octets[@]}"; do
-    if ((octet < 0 || octet > 255)); then
-      echoerr "Неверный IPv4 адрес (не все октеты в пределах 0-255): $1"
+    # Проверка на ведущие нули (например, 01, 001)
+    if [[ "$octet" != "0" && "$octet" =~ ^0 ]]; then
+      echoerr "Октет с ведущим нулём недопустим: $octet"
+      return 1
+    fi
+
+    # Преобразуем явно в десятичное значение и проверим диапазон
+    dec_octet=$((10#$octet))
+    if ((dec_octet < 0 || dec_octet > 255)); then
+      echoerr "Неверный диапазон октета: $octet"
       return 1
     fi
   done
@@ -340,20 +366,42 @@ check_port() {
 # - имя домена
 input_wg_host() {
   while true; do
-    echomsg "Введите домен, например mydomain.com, который указывает по A записи на IP $wg_host, если его нет просто нажмите Enter:"
+    echomsg "Введите домен, например mydomain.com, если его нет, нажмите Enter:"
     read wg_host
     
     # Проверка на пустой ввод
     if [ -z "$wg_host" ]; then
       # IP текущего сервера
-      wg_host=$(hostname -I | awk '{print $1}')
-      echook "Используем в качестве хоста IP: $wg_host"
+      local public_ip
+
+      # ip route (локальный интерфейс)
+      public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
+
+      # через DNS (OpenDNS)
+      [ -z "$public_ip" ] && command -v dig >/dev/null && \
+        public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
+
+      # Проверка формата
+      if [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        wg_host="$public_ip"
+      else
+        echoerr "Не удалось определить публичный IP"
+        while true; do
+          echomsg "Введите публичный IPv4 ардес этого сервера:"
+          read wg_host
+          if check_IPv4 "$wg_host"; then
+            break
+          fi
+        done
+      fi
+
+      echook "IP: $wg_host принят"
       break
     fi
 
     # Проверка имени
     if check_domain "$wg_host"; then
-      echook "Домен для wg-easy: $wg_host"
+      echook "Домен: $wg_host принят"
       break
     fi
   done
@@ -363,7 +411,7 @@ input_wg_host() {
 input_email() {
   if [[ "$is_domain" ]]; then
     while true; do
-      echomsg "Введите email для получения SSL сертификата домена $domain:"
+      echomsg "Введите email для получения SSL сертификата домена $wg_host:"
       read email
       
       # Проверка ввода
@@ -499,7 +547,7 @@ input_ui_password() {
   local password
 
   while true; do
-    echomsg "Введите сложный пароль для UI веб-интерфейса wg-easy:"
+    echomsg "Пароль для веб-интерфейса:"
     read -rs password
     
     # Проверка на пустой ввод
@@ -666,8 +714,9 @@ fi
 echook "Конфиги сервисов созданы"
 }
 
-# Функция создания скриптов правил sysctl, iptables
+# Создание скриптов разрешения портов через iptables, при запуске/остановке службы
 create_iptables_scripts(){
+  # порты для открытия
   local ports=(
     "$wg_port udp"
     "$port tcp"
@@ -682,45 +731,83 @@ create_iptables_scripts(){
     ports+=("$wg_port_ss udp" "$port_ss tcp" "$port_ss udp")
   fi
 
-  echomsg "Создание скриптов с правилами iptables: 
+  echomsg "Создание скриптов разрешения портов через iptables: 
   - при запуске служб разрешаем порты: 
   -- ${ports[*]}, запрещаем: 80 tcp
-  - при остановки удаляем эти правила."
+  - удаляем созданные правила при остановке"
 
   # Создать дирректорию для сохранения скриптов на запуск/остановку служб
   mkdir -p "$(dirname "$path_iptables_active_script")"
   mkdir -p "$(dirname "$path_iptables_delete_script")"
 
-  # Очистка файлов перед формированием данных
+  # Очистка/создание файлов перед формированием конфигов
   > "$path_iptables_active_script"
   > "$path_iptables_delete_script"
 
-  # Формируем скрипты с правилами
+  # Путь к iptables
+  local iptables_path=$(command -v iptables)
+  if [[ $(systemd-detect-virt) == "openvz" ]] && readlink -f "$(command -v iptables)" | grep -q "nft" && hash iptables-legacy 2>/dev/null; then
+    iptables_path=$(command -v iptables-legacy)
+  fi
+
+  # Формируем скрипты с правилами:
   echo "#!/bin/bash" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
   echo "" | tee -a "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
 
-  # разрешение forward между (трафика между интерфейсами)
-  echo "sysctl -w net.ipv4.ip_forward=1" >> "$path_iptables_active_script"
-
-  # запрещаем определения туннеля (двусторонний пинг)
-  echo "sysctl -w net.ipv4.icmp_echo_ignore_all=1" >> "$path_iptables_active_script"
-
-  echo "" >> "$path_iptables_active_script"
-
   for p in "${ports[@]}"; do
     read -r port proto <<< "$p"
-    echo "iptables -I INPUT 1 -p $proto --dport $port -j ACCEPT" >> "$path_iptables_active_script"
-    echo "iptables -D INPUT -p $proto --dport $port -j ACCEPT" >> "$path_iptables_delete_script"
+    echo "$iptables_path -w 5 -I INPUT -p $proto --dport $port -j ACCEPT" >> "$path_iptables_active_script"
+    echo "$iptables_path -w 5 -D INPUT -p $proto --dport $port -j ACCEPT" >> "$path_iptables_delete_script"
   done
 
-  echo "iptables -I INPUT 1 -p tcp --dport 80 -j DROP" >> "$path_iptables_active_script"
-  echo "iptables -D INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_delete_script"
+  echo "$iptables_path -w 5 -I INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_active_script"
+  echo "$iptables_path -w 5 -D INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_delete_script"
 
-  # Делаем исполняемыми
+  # Делаем скрипты исполняемыми
   chmod +x "$path_iptables_active_script"
   chmod +x "$path_iptables_delete_script"
 
   echook "Скрипты с правилами iptables созданы"
+}
+
+# Функция создания конфига sysctl настроек сети
+create_sysctl_config(){
+  echomsg "Создание конфига sysctl по пути $path_sysctl_conf
+  - разрешение forward ipv4
+  - запрет определения туннеля
+  - настройка сетевых буферов
+  - включение TCP BBR, если версия ядра >= 4.20" 
+
+  # Создать дирректорию если нет
+  mkdir -p "$(dirname "$path_sysctl_conf")"
+
+  # Очистка/создание файла перед формированием конфига
+  > "$path_sysctl_conf"
+
+  # Формируем конфиг:
+  # - разрешение forward (трафик между интерфейсами)
+  echo "net.ipv4.ip_forward = 1" >> "$path_sysctl_conf"
+  # - запрет определения туннеля (двусторонний пинг)
+  echo "net.ipv4.icmp_echo_ignore_all = 1" >> "$path_sysctl_conf"
+  # - настройка сетевых буферов и IPC (16МБ)
+  echo "kernel.msgmnb = 65536" >> "$path_sysctl_conf"
+  echo "kernel.msgmax = 65536" >> "$path_sysctl_conf"
+  echo "net.core.wmem_max = 16777216" >> "$path_sysctl_conf"
+  echo "net.core.rmem_max = 16777216" >> "$path_sysctl_conf"
+  echo "net.ipv4.tcp_rmem = 4096 87380 16777216" >> "$path_sysctl_conf"
+  echo "net.ipv4.tcp_wmem = 4096 87380 16777216" >> "$path_sysctl_conf"
+  # - включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
+	if modprobe -q tcp_bbr \
+      && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
+      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
+    echo "net.core.default_qdisc = fq" >> "$path_sysctl_conf"
+    echo "net.ipv4.tcp_congestion_control = bbr" >> "$path_sysctl_conf"
+  fi
+
+  # Применяем полученный конфиг
+	sysctl -e -q -p "$path_sysctl_conf"
+
+  echook "Конфиг sysctl создан и применен"
 }
 
 # Функция создания systemd unit службы управления сервисами
@@ -890,6 +977,9 @@ install_services() {
 
   # создание скриптов iptables настроек
   create_iptables_scripts
+
+  # создание скриптов sysctl конфига
+  create_sysctl_config
 
   # создание systemd unit службы управления сервисами
   create_systemd_unit

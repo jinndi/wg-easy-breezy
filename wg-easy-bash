@@ -591,16 +591,16 @@ download_tun2socks() {
   if [[ "$is_shadowsocks" ]]; then
     echomsg "Загружаем tun2socks, с скриптом поднятия tun интерфейса"
     mkdir -p "$(dirname "$path_tun2socks")"
-    curl -fsSL "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
+    curl -fsSL -o "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
     chmod +x "$path_tun2socks"
 
     mkdir -p "$(dirname "$path_tun2socks_init")"
-    curl -fsSL "$path_tun2socks_init" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh
+    curl -fsSL -o "$path_tun2socks_init" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh
     chmod +x "$path_tun2socks_init"
     echook "файлы загружены"
 
     # Проверка что оба файла загружены
-    if [ -f "$path_tun2socks" ] && [ -f "$path_tun2socks_init" ]; then
+    if [ -s "$path_tun2socks" ] && [ -s "$path_tun2socks_init" ]; then
       echook "Файлы загружены и готовы"
     else
       exiterr "Ошибка загрузки tun2socks файлов"

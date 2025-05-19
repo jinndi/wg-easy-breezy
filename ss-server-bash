@@ -19,8 +19,6 @@ path_service="/etc/systemd/system/ssserver.service"
 path_config="/etc/shadowsocks-rust/config.json"
 # - файл конфига sysctl
 path_sysctl_config="/etc/sysctl.d/99-shadowsocks.conf"
-# - файл конфига security limits
-path_security_limits="/etc/security/limits.conf"
 # - место сохранения текущего скрипта после установки сервера
 path_script="/sbin/ss-server"
 
@@ -102,10 +100,10 @@ check_kernel() {
   fi
 }
 
-# - среда работы ОС
+# - среда работы ОС (запрет установки из контейнера, например докер)
 check_container() {
   if systemd-detect-virt -cq 2>/dev/null; then
-    exiterr "Эта система работает внутри контейнера, который не поддерживается данным установщиком."
+    exiterr "Установка внути контейнера не поддерживается данным установщиком."
   fi
 }
 
@@ -118,9 +116,9 @@ check_port() {
     return 1
   fi
 
-  # Проверка диапазона порта (1–65535)
-  if [ "$1" -lt 1 ] || [ "$1" -gt 65535 ]; then
-    echoerr "Порт должен быть в диапазоне от 1 до 65535"
+  # Проверка диапазона порта (49152–65534)
+  if [ "$1" -lt 49152 ] || [ "$1" -gt 65535 ]; then
+    echoerr "Порт должен быть в диапазоне от 49152 до 65535"
     return 1
   fi
 
@@ -155,41 +153,43 @@ download_ssserver(){
   echook "shadowsocks-rust ssserver v1.23.4 загружен"
 }
 
-optimization_configs(){
-echomsg "Оптимизируем shadowsocks-rust сервер"
-cat >"$path_security_limits" <<LIMITS
-root soft nofile 51200
-root hard nofile 51200
-LIMITS
-ulimit -n 51200
-cat >"$path_sysctl_config" <<SYSCTL_CONF
-net.ipv4.icmp_echo_ignore_all=1
+create_sysctl_config (){
+  echomsg "Создание конфига sysctl по пути $path_sysctl_config
+  - разрешение forward ipv4
+  - запрет определения туннеля
+  - настройка сетевых буферов, ipv4 оптимизация
+  - включение TCP BBR, если версия ядра >= 4.20" 
 
-fs.file-max = 51200
-net.core.rmem_max = 67108864
-net.core.wmem_max = 67108864
-net.core.netdev_max_backlog = 250000
-net.core.somaxconn = 4096
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_fin_timeout = 30
-net.ipv4.tcp_keepalive_time = 1200
-net.ipv4.ip_local_port_range = 10000 65000
-net.ipv4.tcp_max_syn_backlog = 8192
-net.ipv4.tcp_max_tw_buckets = 5000
-net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_mem = 25600 51200 102400
-net.ipv4.tcp_rmem = 4096 87380 67108864
-net.ipv4.tcp_wmem = 4096 65536 67108864
-net.ipv4.tcp_mtu_probing = 1
-net.ipv4.tcp_congestion_control = hybla
+  # Создать дирректорию если нет
+  mkdir -p "$(dirname "$path_sysctl_config")"
+
+  # Загружаем конфиг
+  curl -fsSL "$path_sysctl_config" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf
+
+  # Проверка что файл загружен
+  if [ -s "$path_sysctl_config" ]; then
+    # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
+    if modprobe -q tcp_bbr \
+      && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
+      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
+      cat >> "$path_sysctl_config" <<SYSCTL_CONF
+# TCP BBR контроль перегрузки сети
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 SYSCTL_CONF
-sysctl -e -q -p "$path_sysctl_config" >/dev/null 2>&1
+
+    # Применяем полученный конфиг
+    sysctl -e -q -p "$path_sysctl_config"
+
+    echook "Конфиг sysctl создан и применен"
+  else
+    exiterr "Ошибка загрузки sysctl конфига"
+  fi
 }
 
 input_port(){
   while true; do
-    read -rp "Введите порт (от 1 до 65535): " port
+    read -rp " > Введите порт (от 49152 до 65535): " port
     if check_port "$port"; then
       break
     fi
@@ -202,20 +202,30 @@ password=$(pwgen 32 1)
 mkdir -p "$(dirname "$path_config")"
 cat >"$path_config" <<CONFIG
 {
-  "server": "0.0.0.0",
+  "server": "::",
   "server_port": $port,
   "mode": "tcp_and_udp",
   "method": "aes-128-gcm",
   "password": "$password",
-  "timeout": 120,
-  "udp_timeout": 120,
-  "udp_max_associations": 512
+  "timeout": 300,
+  "udp_timeout": 300,
+  "udp_max_associations": 512,
+  "nofile": 51200,
+  "fast_open": true
 }
 CONFIG
 }
 
 create_service(){
 echomsg "Добавляем ssserver сервис"
+
+# Путь к iptables
+local iptables_path
+iptables_path=$(command -v iptables)
+if [[ $(systemd-detect-virt) == "openvz" ]] && readlink -f "$(command -v iptables)" | grep -q "nft" && hash iptables-legacy 2>/dev/null; then
+  iptables_path=$(command -v iptables-legacy)
+fi
+
 cat >"$path_service" <<CONFIG_SUSTEMD
 [Unit]
 Description=Shadowsocks-rust ssserver
@@ -225,15 +235,17 @@ Wants=network.target
 
 [Service]
 PermissionsStartOnly=true
-ExecStartPre=/bin/bash -c 'iptables -I INPUT 1 -p tcp --dport ${port} -j ACCEPT; iptables -I INPUT 1 -p udp --dport ${port} -j ACCEPT'
+ExecStartPre=${iptables_path} -I INPUT -p tcp --dport ${port} -j ACCEPT
+ExecStartPre=${iptables_path} -I INPUT -p udp --dport ${port} -j ACCEPT
 ExecStart=${path_ssserver} -c ${path_config}
-ExecStopPost=/bin/bash -c 'iptables -D INPUT -p tcp --dport ${port} -j ACCEPT; iptables -D INPUT -p udp --dport ${port} -j ACCEPT'
+ExecStopPost=${iptables_path} -D INPUT -p tcp --dport ${port} -j ACCEPT
+ExecStopPost=${iptables_path} -D INPUT -p udp --dport ${port} -j ACCEPT
 Restart=on-failure
 User=shadowsocks
-Group=shadowsocks
 LimitNOFILE=51200
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
@@ -295,7 +307,6 @@ remove_ssserver(){
   rm -f "$path_service"
   rm -f "$path_ssserver"
   rm -f "$path_sysctl_config"  
-  > "$path_security_limits"
   systemctl daemon-reload
   userdel shadowsocks
   echook "shadowsocks-rust успешно удален из системы!"
@@ -304,18 +315,9 @@ remove_ssserver(){
 confirm_remove() {
   echo
   read -rp "Подтвердите удаление [y/N]: " remove
-  until [[ "$remove" =~ ^[yYnN]*$ ]]; do
+  until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
     echo "$remove: неверная опция."
     read -rp "Подтвердите удаление [y/N]: " remove
-  done
-}
-
-confirm_reinstall() {
-  echo
-  read -rp "Подтвердите переустановку [y/N]: " reinstall
-  until [[ "$reinstall" =~ ^[yYnN]*$ ]]; do
-    echo "$reinstall: неверная опция."
-    read -rp "Подтвердите переустановку [y/N]: " reinstall
   done
 }
 
@@ -326,7 +328,7 @@ install_ssserver(){
   create_config
   create_service
   add_user
-  optimization_configs
+  create_sysctl_config
   activate_ssserver
 
   # перемещам текущий скрипт, добавляем на него права
@@ -379,7 +381,7 @@ select_menu_option() {
     ;;
     3)
       confirm_remove
-      if [[ "$remove" =~ ^[yY]$ ]]; then
+      if [[ "$remove" =~ ^[yYдД]$ ]]; then
         remove_ssserver
         rm -f "$path_script"
         exit 0

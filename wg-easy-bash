@@ -38,7 +38,7 @@ path_iptables_active_script="$path_data_dir/iptables/active.sh"
 # - файл скрипта для удаления ранее созданных iptables правил
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 # - файл конфига sysctl параметров 
-path_sysctl_conf="/etc/sysctl.d/99-wg-easy.conf"
+path_sysctl_config="/etc/sysctl.d/99-wg-easy-bash.conf"
 
 ## Переменные настройки shadowsocks прокси интерфейса через tun2socks:
 # - имя интерфейса
@@ -214,8 +214,8 @@ remove_install() {
   fi
 
   # Удаление sysctl кофига
-  if [[ -f "$path_sysctl_conf" ]]; then
-    rm -f "$path_sysctl_conf"
+  if [[ -f "$path_sysctl_config" ]]; then
+    rm -f "$path_sysctl_config"
     sysctl --system > /dev/null 2>&1
   fi
 
@@ -776,8 +776,10 @@ create_iptables_scripts(){
   fi
 
   # Формируем скрипты с правилами:
-  echo "#!/bin/bash" | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
-  echo "" | tee -a "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
+  {
+    echo "#!/bin/bash"
+    echo ""
+  } | tee "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
 
   for p in "${ports[@]}"; do
     read -r port proto <<< "$p"
@@ -788,50 +790,48 @@ create_iptables_scripts(){
   echo "$iptables_path -w 5 -I INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_active_script"
   echo "$iptables_path -w 5 -D INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_delete_script"
 
+  # Завершаем скрипты
+  echo "exit 0" | tee -a "$path_iptables_active_script" "$path_iptables_delete_script" > /dev/null
+
   # Делаем скрипты исполняемыми
-  chmod +x "$path_iptables_active_script"
-  chmod +x "$path_iptables_delete_script"
+  chmod +x "$path_iptables_active_script" "$path_iptables_delete_script"
 
   echook "Скрипты с правилами iptables созданы"
 }
 
 # Функция создания конфига sysctl настроек сети
 create_sysctl_config(){
-  echomsg "Создание конфига sysctl по пути $path_sysctl_conf
+  echomsg "Создание конфига sysctl по пути $path_sysctl_config
   - разрешение forward ipv4
   - запрет определения туннеля
-  - настройка сетевых буферов
+  - настройка сетевых буферов, ipv4 оптимизация
   - включение TCP BBR, если версия ядра >= 4.20" 
 
   # Создать дирректорию если нет
-  mkdir -p "$(dirname "$path_sysctl_conf")"
+  mkdir -p "$(dirname "$path_sysctl_config")"
 
-  # Формируем конфиг:
-  {
-    # - разрешение forward (трафик между интерфейсами)
-    echo "net.ipv4.ip_forward = 1"
-    # - запрет определения туннеля (двусторонний пинг)
-    echo "net.ipv4.icmp_echo_ignore_all = 1"
-    # - настройка сетевых буферов и IPC (16МБ)
-    echo "kernel.msgmnb = 65536"
-    echo "kernel.msgmax = 65536"
-    echo "net.core.wmem_max = 16777216"
-    echo "net.core.rmem_max = 16777216"
-    echo "net.ipv4.tcp_rmem = 4096 87380 16777216"
-    echo "net.ipv4.tcp_wmem = 4096 87380 16777216"
-    # - включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
+  # Загружаем конфиг
+  curl -fsSL "$path_sysctl_config" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf
+
+  # Проверка что файл загружен
+  if [ -s "$path_sysctl_config" ]; then
+    # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
     if modprobe -q tcp_bbr \
-        && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
-        && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
-      echo "net.core.default_qdisc = fq"
-      echo "net.ipv4.tcp_congestion_control = bbr"
-    fi
-  } > "$path_sysctl_conf"
+      && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
+      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
+      cat >> "$path_sysctl_config" <<SYSCTL_CONF
+# TCP BBR контроль перегрузки сети
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+SYSCTL_CONF
 
-  # Применяем полученный конфиг
-	sysctl -e -q -p "$path_sysctl_conf"
+    # Применяем полученный конфиг
+    sysctl -e -q -p "$path_sysctl_config"
 
-  echook "Конфиг sysctl создан и применен"
+    echook "Конфиг sysctl создан и применен"
+  else
+    exiterr "Ошибка загрузки sysctl конфига"
+  fi
 }
 
 # Функция создания systemd unit службы управления сервисами
@@ -1030,12 +1030,12 @@ remove_services() {
   msg="Удалить приложение? [y/N]: "
   read -rp "$msg" remove
 
-  until [[ "$remove" =~ ^[yYnN]*$ ]]; do
+  until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
     echo "$remove: неверная опция."
     read -rp "$msg" remove
   done
 
-  if [[ "$remove" =~ ^[yY]$ ]]; then
+  if [[ "$remove" =~ ^[yYnNдДнН]$ ]]; then
     remove_install "1"
     exit 0
   else

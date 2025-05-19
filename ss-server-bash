@@ -145,7 +145,7 @@ install_pkgs(){
 download_ssserver(){
   echomsg "Загрузка shadowsocks-rust ssserver v1.23.4"
   mkdir -p "$(dirname "$path_ssserver")"
-  curl -fsSL "$path_ssserver" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/ssserver
+  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/ssserver -o "$path_ssserver"
   if [[ -f "$path_ssserver" ]]; then
     exiterr "Ошибка загрузки shadowsocks-rust ssserver"
   fi
@@ -164,7 +164,7 @@ create_sysctl_config (){
   mkdir -p "$(dirname "$path_sysctl_config")"
 
   # Загружаем конфиг
-  curl -fsSL "$path_sysctl_config" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf
+  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf -o "$path_sysctl_config"
 
   # Проверка что файл загружен
   if [ -f "$path_sysctl_config" ]; then

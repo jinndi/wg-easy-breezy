@@ -815,6 +815,9 @@ create_sysctl_config(){
 
   # Проверка что файл загружен
   if [ -f "$path_sysctl_config" ]; then
+    # Добавляем модуль hybla контроля перегрузки по умолчанию
+    modprobe tcp_hybla
+    
     # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
     if modprobe -q tcp_bbr \
       && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \

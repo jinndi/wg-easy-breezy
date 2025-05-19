@@ -18,7 +18,7 @@ path_service="/etc/systemd/system/ssserver.service"
 # - файл конфига shadowsocks-rust
 path_config="/etc/shadowsocks-rust/config.json"
 # - файл конфига sysctl
-path_sysctl_config="/etc/sysctl.d/00-shadowsocks.conf"
+path_sysctl_config="/etc/sysctl.d/99-shadowsocks.conf"
 # - файл конфига security limits
 path_security_limits="/etc/security/limits.conf"
 # - место сохранения текущего скрипта после установки сервера

@@ -167,7 +167,7 @@ create_sysctl_config (){
   curl -fsSL "$path_sysctl_config" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf
 
   # Проверка что файл загружен
-  if [ -s "$path_sysctl_config" ]; then
+  if [ -f "$path_sysctl_config" ]; then
     # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
     if modprobe -q tcp_bbr \
       && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \

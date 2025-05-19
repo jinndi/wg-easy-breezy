@@ -324,6 +324,12 @@ check_email() {
 
 # - пароль
 check_password() {
+  # Проверка на пустой ввод
+  if [ -z "$1" ]; then
+    echoerr "Пароль не может быть пустым"
+    return 1
+  fi
+
   # Проверка длины пароля (минимум 6 символов)
   if [ "${#1}" -lt 6 ]; then
     echoerr "Пароль должен быть не короче 6 символов"
@@ -353,9 +359,9 @@ check_port() {
     return 1
   fi
 
-  # Проверка диапазона порта (1–65534)
-  if [ "$1" -lt 1 ] || [ "$1" -gt 65534 ]; then
-    echoerr "Порт должен быть в диапазоне от 1 до 65534"
+  # Проверка диапазона порта (49152–65534)
+  if [ "$1" -lt 49152 ] || [ "$1" -gt 65534 ]; then
+    echoerr "Порт должен быть в диапазоне от 49152 до 65534"
     return 1
   fi
 
@@ -374,8 +380,9 @@ check_port() {
 # - имя домена
 input_wg_host() {
   while true; do
-    echomsg "Введите домен, например mydomain.com, если его нет, нажмите Enter:"
-    read -r wg_host
+    echomsg "Введите доменное имя этого сервера, например mydomain.com"
+    echo "Если его нет просто нажмите клавишу Enter"
+    read -rp " > Доменное имя: " wg_host
     
     # Проверка на пустой ввод
     if [ -z "$wg_host" ]; then
@@ -395,21 +402,22 @@ input_wg_host() {
       else
         echoerr "Не удалось определить публичный IP"
         while true; do
-          echomsg "Введите публичный IPv4 ардес этого сервера:"
-          read -r wg_host
+          echomsg "Введите публичный IPv4 ардес этого сервера"
+          read -rp "IPv4 этого сервера: " wg_host
+
           if check_IPv4 "$wg_host"; then
             break
           fi
         done
       fi
 
-      echook "IP: $wg_host принят"
+      echook "IPv4: $wg_host принят"
       break
     fi
 
     # Проверка имени
     if check_domain "$wg_host"; then
-      echook "Домен: $wg_host принят"
+      echook "Доменное имя: $wg_host принято"
       break
     fi
   done
@@ -419,12 +427,12 @@ input_wg_host() {
 input_email() {
   if [[ "$is_domain" ]]; then
     while true; do
-      echomsg "Введите email для получения SSL сертификата домена $wg_host:"
-      read -r email
-      
+      echomsg "Введите e-mail для получения SSL сертификата домена $wg_host:"
+      read -rp " > Ваш e-mail: "
+
       # Проверка ввода
       if check_email "$email"; then
-        echook "Email для получения SSL сертификата: $email"
+        echook "E-mail: $email принят"
         break
       fi
     done
@@ -489,16 +497,18 @@ input_ss_password() {
 # - порт WireGuard сервера
 input_wg_port() {
   while true; do
-    echomsg "Введите порт WireGuard (от 1 до 65534):"
-    read -r wg_port
-    
+    echomsg "Введите порт WireGuard от 49152 до 65534"
+    echo "(Для веб интерфейса будет увеличен на 1)"
+    read -rp " > Порт WireGuard: " wg_port
+
     # Увеличиваем порт на 1 (для UI интерфейса)
     port=$((wg_port + 1))
 
     # Проверка портов
     if check_port "$wg_port" && check_port "$port"; then
-      echook "Порт для WireGuard: $wg_port"
-      echook "Порт для веб интерфейса: $port"
+      echook "Заданы порты:"
+      echo " - WireGuard: $wg_port"
+      echo " - Веб интерфейс: $port"
       # Cсылка на UI интерфейс wg-easy
       link_ui="http://$wg_host:$port"
       if [[ "$is_domain" ]]; then
@@ -510,16 +520,18 @@ input_wg_port() {
 
   if [[ "$is_shadowsocks" ]]; then
     while true; do
-      echomsg "Введите порт WireGuard работающего через shadowsocks прокси (от 1 до 65534):"
-      read -r wg_port_ss
+      echomsg "Введите порт WireGuard от 49152 до 65534"
+      echo "(Для веб интерфейса будет увеличен на 1)"
+      read -rp " > Порт WireGuard (shadowsocks прокси): " wg_port_ss
       
       # Увеличиваем порт на 1 (для UI интерфейса)
       port_ss=$((wg_port_ss + 1))
 
       # Проверка портов
       if check_port "$wg_port_ss" && check_port "$port_ss"; then
-        echook "Порт для WireGuard, shadowsocks прокси: $wg_port_ss"
-        echook "Порт для UI интерфейса wg-easy, shadowsocks прокси: $port_ss"
+        echook "Заданы порты:"
+        echo " - WireGuard (shadowsocks прокси): $wg_port_ss"
+        echo " - Веб интерфейс (shadowsocks прокси): $port_ss"
         # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
         link_ui_ss="http://$wg_host:$port_ss"
         if [[ "$is_domain" ]]; then
@@ -536,17 +548,20 @@ input_default_address() {
   local default_value="10.0.0.x"
   local default_value_ss="10.1.0.x"
 
-  echomsg "Диапазон адресов клиентов WireGuard (нажмите Enter, чтобы оставить по умолчанию):"
+  echomsg "Диапазон адресов клиентов WireGuard"
+  echo "(нажмите Enter, чтобы оставить по умолчанию)"
   read -r -e -i "$default_value" default_address
   
   default_address=${default_address:-$default_value}
-  echook "Используем диапазон адресов для клиентов: $default_address"
+  echook "Задан диапазон адресов для клиентов: $default_address"
 
   if [[ "$is_shadowsocks" ]]; then
-    echomsg "Диапазон адресов клиентов (WireGuard через shadowsocks прокси, нажмите Enter, чтобы оставить по умолчанию):"
+    echomsg "Диапазон адресов клиентов WireGuard через shadowsocks прокси"
+    echo "(нажмите Enter, чтобы оставить по умолчанию)"
     read -r -e -i "$default_value_ss" default_address_ss
     default_address_ss=${default_address_ss:-$default_value_ss}
-    echook "Используем диапазон адресов для клиентов (WireGuard через shadowsocks прокси): $default_address_ss"
+    echook "Задан диапазон адресов для клиентов WireGuard" 
+    echo "(shadowsocks прокси): $default_address_ss"
   fi
 }
 
@@ -555,15 +570,9 @@ input_ui_password() {
   local password
 
   while true; do
-    echomsg "Пароль для веб-интерфейса:"
-    read -rs password
+    echomsg "Придумайте пароль для входа в веб-интерфейс (ввод скрыт)"
+    read -rsp " > Пароль веб интерфейса: " password
     
-    # Проверка на пустой ввод
-    if [ -z "$password" ]; then
-      echoerr "Пароль не может быть пустым"
-      continue
-    fi
-
     # Проверка и обработка пароля
     if check_password "$password"; then
       # Запрашиваем хеша пароля
@@ -571,7 +580,7 @@ input_ui_password() {
       # Извлекаем и экранируем хеш пароля
       password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
 
-      echook "Пароль принят"
+      echook "Пароль веб интерфейса принят"
       break
     fi
   done
@@ -582,19 +591,26 @@ download_tun2socks() {
   if [[ "$is_shadowsocks" ]]; then
     echomsg "Загружаем tun2socks, с скриптом поднятия tun интерфейса"
     mkdir -p "$(dirname "$path_tun2socks")"
-    curl -L -o "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
+    curl -fsSL "$path_tun2socks" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks
     chmod +x "$path_tun2socks"
 
     mkdir -p "$(dirname "$path_tun2socks_init")"
-    curl -L -o "$path_tun2socks_init" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh
+    curl -fsSL "$path_tun2socks_init" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh
     chmod +x "$path_tun2socks_init"
     echook "файлы загружены"
+
+    # Проверка что оба файла загружены
+    if [ -s "$path_tun2socks" ] && [ -s "$path_tun2socks_init" ]; then
+      echook "Файлы загружены и готовы"
+    else
+      exiterr "Ошибка загрузки tun2socks файлов"
+    fi
   fi
 }
 
 # Функция создания конфигов сервисов и служб
 create_services_config() {
-echomsg "Создаём конфиги сервисов"
+echomsg "Создаём конфиги Docker сервисов"
 
 ## wg-easy:
 # - wg-easy дефолтный сервис docker compose
@@ -719,7 +735,7 @@ fi
 echo "}" >> "$path_caddyfile"
 fi
 
-echook "Конфиги сервисов созданы"
+echook "Конфиги Docker сервисов созданы"
 }
 
 # Создание скриптов разрешения портов через iptables, при запуске/остановке службы

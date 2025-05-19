@@ -146,7 +146,7 @@ download_ssserver(){
   echomsg "Загрузка shadowsocks-rust ssserver v1.23.4"
   mkdir -p "$(dirname "$path_ssserver")"
   curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/ssserver -o "$path_ssserver"
-  if [[ -f "$path_ssserver" ]]; then
+  if [[ ! -f "$path_ssserver" ]]; then
     exiterr "Ошибка загрузки shadowsocks-rust ssserver"
   fi
   chmod +x "$path_ssserver"

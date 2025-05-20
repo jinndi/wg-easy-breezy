@@ -614,9 +614,10 @@ download_tun2socks() {
       set -x
     
       mkdir -p "$(dirname "$path_tun2socks")"
-      curl -fsSL https://github.com/xjasonlyu/tun2socks/releases/download/${version_tun2socks}/tun2socks-linux-amd64.zip
+      curl -fsSL https://github.com/xjasonlyu/tun2socks/releases/download/${version_tun2socks}/tun2socks-linux-amd64.zip --output tun2socks-linux-amd64.zip
       unzip tun2socks-linux-amd64.zip
       mv tun2socks-linux-amd64 "$path_tun2socks"
+      rm tun2socks-linux-amd64.zip
       chmod +x "$path_tun2socks"
 
       mkdir -p "$(dirname "$path_tun2socks_init")"
@@ -1002,11 +1003,6 @@ install_services() {
   mkdir -p "$path_data_dir"
   mkdir -p "$(dirname "$path_script")"
 
-  # перемещам текущий скрипт, добавляем на него права и ссылку
-  mv "$(realpath "$0")" "$path_script"
-  chmod +x "$path_script"
-  ln -s "$path_script" "$path_script_link"
-
   # установка зависимостей
   install_pkgs
 
@@ -1042,6 +1038,13 @@ install_services() {
     echo "Веб интерфейс (shadowsocks): $link_ui_ss"
   fi
   echo
+
+  # перемещам текущий скрипт, добавляем на него права и ссылку
+  mv "$(realpath "$0")" "$path_script"
+  chmod +x "$path_script"
+  ln -s "$path_script" "$path_script_link"
+
+  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
 
   # отображение меню опций
   select_menu_option

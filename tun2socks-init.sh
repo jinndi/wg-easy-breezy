@@ -2,8 +2,6 @@
 
 set -e
 
-# === Переменные ===
-
 # Название для прокси интерфейса shadowsocks
 SS_TUN_NAME="${SS_TUN_NAME:-tun0}"
 
@@ -21,11 +19,6 @@ LIP=$(ip -4 addr show "$DIF" | awk '/inet / {print $2}' | cut -d/ -f1)
 
 # Получение основного шлюза
 MIP=$(ip route | awk '/default via/ {print $3}' | head -n1)
-
-# Проверка всех переменных
-for var in SS_LINK SS_IP DIF LIP MIP; do
-  [ -n "${!var}" ] || { echo "[tun2socks-init] ❌ Переменная $var не задана"; exit 1; }
-done
 
 # Таблица маршрутизации "lip" в /etc/iproute2/rt_tables
 mkdir -p /etc/iproute2
@@ -51,8 +44,6 @@ ip route add default dev "$SS_TUN_NAME" metric 50
 # Запуск tun2socks в фоне
 echo "[tun2socks-init] Starting tun2socks..."
 nohup tun2socks -interface "$DIF" -device "tun://$SS_TUN_NAME" \
-  -proxy "${SS_LINK}" > /tmp/tun2socks.log 2>&1 &
+  -proxy "$SS_LINK" > /tmp/tun2socks.log 2>&1 &
 
 echo "[tun2socks-init] Done."
-
-exit 0

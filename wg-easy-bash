@@ -61,6 +61,8 @@ default_dns=1.1.1.1,8.8.8.8
 wg_host=""
 # - e-mail адрес необходимый для получения SSL сертификата домена
 email=""
+# - ссылка (SIP002 URI scheme) для подключения к shadowsocks серверу
+ss_link=""
 # - tcp порт доступа к UI интерфейсу wg-easy
 port=""
 # - tcp порт доступа к UI интерфейсу wg-easy, shadowsocks тунннель
@@ -73,12 +75,6 @@ wg_port_ss=""
 default_address=""
 # - диапазон IP-адресов клиентов WireGuard, shadowsocks тунннель
 default_address_ss=""
-# - IP-адрес shadowsocks сервера
-ss_ip=""
-# - порт shadowsocks сервера
-ss_port=""
-# - пароль к подключению по shadowsocks
-ss_password=""
 # - хеш пароля от UI интерфейса/ов wg-easy
 password_hash=""
 # - ссылка на UI интерфейс wg-easy
@@ -87,7 +83,7 @@ link_ui=""
 link_ui_ss=""
 # - указал ли пользователя адрес домена
 is_domain=""
-# - ввел ли пользователя адрес shadowsocks сервера
+# - ввел ли пользователя ссылку на shadowsocks сервер
 is_shadowsocks=""
 
 ## Функции вывода сообщений:
@@ -428,7 +424,7 @@ input_email() {
   if [[ "$is_domain" ]]; then
     while true; do
       echomsg "Введите e-mail для получения SSL сертификата домена $wg_host:"
-      read -rp " > Ваш e-mail: "
+      read -rp " > Ваш e-mail: " email
 
       # Проверка ввода
       if check_email "$email"; then
@@ -439,59 +435,90 @@ input_email() {
   fi
 }
 
-# - IPv4 адрес сервера shadowsocks
-input_ss_ip() {
+# - ссылка на подключение к shadowsocks (SIP002 URI scheme)
+input_ss_link() {
+  local ss_clean base64_part ip_port_part public_ip port decoded password method
+
   while true; do
-    echomsg "Введите IP адрес shadowsocks сервера, если его нет нажмите Enter:"
-    read -r ss_ip
+    echomsg "Введите ссылку подключения по shadowsocks," 
+    echo "если нужен прокси Wrireguard через shadowsocks,"
+    echo "либо нажмите Enter чтобы пропустить настроку"
+    read -rp " > Ссылка shadowsocks: " ss_link
     
     # Проверка на пустой ввод
-    if [ -z "$ss_ip" ]; then
+    if [ -z "$ss_link" ]; then
       is_shadowsocks=""
       break
     fi
 
+    # Добавляем префикс ss://, если его нет
+    [[ "$ss_link" != ss://* ]] && ss_link="ss://${ss_link}"
+
+    # Удаляем префикс
+    ss_clean="${ss_link#ss://}"
+
+    # Извлекаем base64, IP и порт
+    base64_part="${ss_clean%@*}"
+    ip_port_part="${ss_clean#*@}"
+    public_ip="${ip_port_part%%:*}"
+    port="${ip_port_part##*:}"
+
+    # Проверка base64 (допустимые символы)
+    if ! [[ "$base64_part" =~ ^[A-Za-z0-9+/=]+$ ]]; then
+      echoerr "Ошибка: base64-строка содержит недопустимые символы"
+      continue
+    fi
+
+    # Пробуем декодировать base64
+    decoded=$(echo "$base64_part" | base64 --decode 2>/dev/null)
+    if [[ -z "$decoded" ]]; then
+      echoerr "Ошибка: base64 не удалось декодировать"
+      continue
+    fi
+
+    # Проверка, что результат в формате method:password
+    if [[ "$decoded" != *:* ]]; then
+        echoerr "Ошибка: декодированная строка не в формате method:password"
+        continue
+    fi
+
+    # Получаем и проверяем пароль
+    password="${decoded#*:}"
+    if [ "${#password}" -ne 32 ]; then
+      echoerr "Ошибка: пароль должен быть длиной 32 символа"
+      continue
+    fi
+
+    if ! [[ "$password" =~ ^[a-zA-Z0-9]+$ ]]; then
+      echoerr "Ошибка: пароль содержит недопустимые символы"
+      continue
+    fi
+
+    # Получаем и проверяем метод шифра 
+    method="${decoded%%:*}"
+    case "$method" in
+      chacha20-ietf-poly1305|aes-128-gcm|aes-256-gcm)
+        # Всё ок
+        ;;
+      *)
+        echoerr "Ошибка: недопустимый метод шифрования: $method"
+        continue
+        ;;
+    esac
+
     # Проверка IPv4
-    if check_IPv4 "$ss_ip"; then
+    if check_IPv4 "$ss_ip" && ; then
+      # Проверка порта
+      if ! [[ "$port" =~ ^[0-9]+$ ]] || (( port < 49152 || port > 65535 )); then
+        echoerr "Ошибка: порт $port вне диапазона 49152–65535"
+        continue
+      fi
+
       is_shadowsocks="true"
-      echook "IPv4 shadowsocks: $ss_ip"
+      echook "Ссылка shadowsocks принята"
       break
     fi
   done
-}
-
-# - порт shadowsocks сервера
-input_ss_port() {
-  if [[ "$is_shadowsocks" ]]; then
-    while true; do
-      echomsg "Введите порт shadowsocks сервера $ss_ip:"
-      read -r ss_port
-      
-      # Проверка порта
-      if check_port "$ss_port"; then
-        echook "Порт от shadowsocks сервера $ss_ip: $ss_port"
-        break
-      fi
-    done
-  fi
-}
-
-# - пароль shadowsocks сервера
-input_ss_password() {
-  if [[ "$is_shadowsocks" ]]; then
-    while true; do
-      echomsg "Пароль shadowsocks сервера $ss_ip:"
-      read -rs ss_password
-      
-      # Проверка на пустой ввод
-      if [ -z "$ss_password" ]; then
-        echoerr "Пароль не может быть пустым"
-        continue
-      fi
-      echook "Пароль shadowsocks сервера $ss_ip принят"
-      break
-    done
-  fi
 }
 
 # - порт WireGuard сервера
@@ -663,9 +690,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - UI_TRAFFIC_STATS=true
       - WG_POST_UP=/sbin/tun2socks-init.sh
       - SS_TUN_NAME=$ss_tun_name
-      - SS_IP=$ss_ip
-      - SS_PORT=$ss_port
-      - SS_PASSWORD=$ss_password
+      - SS_LINK=$ss_link
     image: $wg_easy_image
     container_name: wg-easy-ss
     hostname: wg-easy-ss

@@ -10,9 +10,19 @@
 ## Пути исполняемых файлов
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
+## Используемая версия Shadowsocks-rust  
+# https://github.com/shadowsocks/shadowsocks-rust/releases/
+version="v1.23.4"
+
 ## Пути файлов:
-# - исполняемый файл
-path_ssserver="/sbin/ssserver"
+# - папка с исполняемыми файлами Shadowsocks-rust
+path_shadowsocks_rust="/opt/shadowsocks-rust"
+# - файл ssserver (сервер Shadowsocks-rust)
+path_ssserver="$path_shadowsocks_rust/ssserver"
+# - файл ssservice (Shadowsocks-rust создание паролей )
+path_ssservice="$path_shadowsocks_rust/ssservice"
+# - файл ssurl ( Shadowsocks-rust создание ссылок)
+path_ssurl="$path_shadowsocks_rust/ssurl"
 # - файл службы
 path_service="/etc/systemd/system/ssserver.service"
 # - файл конфига shadowsocks-rust
@@ -193,22 +203,27 @@ install_pkgs(){
   ) || exiterr "'apt-get update' ошибка."
   (
     set -x
-    apt-get -yqq install iproute2 iptables pwgen curl lsof dnsutils grep \
-    || apt-get -yqq install iproute2 iptables pwgen curl lsof dnsutils grep
+    apt-get -yqq install iproute2 iptables wget tar lsof dnsutils grep \
+    || apt-get -yqq install iproute2 iptables wget tar lsof dnsutils grep
   ) || exiterr "'apt-get install' ошибка."
 
   echook "Зависимости установлены"
 }
 
-download_ssserver(){
-  echomsg "Загрузка shadowsocks-rust ssserver v1.23.4"
-  mkdir -p "$(dirname "$path_ssserver")"
-  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/ssserver -o "$path_ssserver"
-  if [[ ! -f "$path_ssserver" ]]; then
-    exiterr "Ошибка загрузки shadowsocks-rust ssserver"
-  fi
-  chmod +x "$path_ssserver"
-  echook "shadowsocks-rust ssserver v1.23.4 загружен"
+download_shadowsocks_rust(){
+  echomsg "Загрузка shadowsocks-rust $version"
+
+  mkdir -p "$path_shadowsocks_rust"
+
+  export DEBIAN_FRONTEND=noninteractive
+  (
+    set -x
+    wget -q "https://github.com/shadowsocks/shadowsocks-rust/releases/download/${version}/shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz" && \
+    tar -xf "shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz" -C "$path_shadowsocks_rust/" && \
+    rm -r "shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz"
+  ) || exiterr "Ошибка загрузки shadowsocks-rust"
+
+  echook "shadowsocks-rust $version загружен"
 }
 
 create_sysctl_config (){
@@ -222,35 +237,34 @@ create_sysctl_config (){
   mkdir -p "$(dirname "$path_sysctl_config")"
 
   # Загружаем конфиг
-  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf -o "$path_sysctl_config"
+  export DEBIAN_FRONTEND=noninteractive
+  (
+    set -x
+    link_sysctl_config="https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf"
+    wget -q "$link_sysctl_config" -O "$path_sysctl_config"
+  ) || exiterr "Ошибка загрузки sysctl конфига"
 
-  # Проверка что файл загружен
-  if [ -f "$path_sysctl_config" ]; then
-    # Добавляем если поддерживается модуль hybla контроля перегрузки 
-    # (для сетей с в сысокой задежкой) 
-    if modprobe -q tcp_hybla \
-      && printf '%s\n%s' "2.6.13" "$(uname -r)" | sort -C -V \
-      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
-      echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
-    fi
+  # Добавляем если поддерживается модуль hybla контроля перегрузки 
+  # (для сетей с в сысокой задежкой) 
+  if modprobe -q tcp_hybla \
+    && printf '%s\n%s' "2.6.13" "$(uname -r)" | sort -C -V \
+    && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
+    echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
+  fi
 
-    # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
-    if modprobe -q tcp_bbr \
-      && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
-      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
-      cat >> "$path_sysctl_config" <<SYSCTL_CONF
+  # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
+  if modprobe -q tcp_bbr \
+    && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
+    && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
+    cat >> "$path_sysctl_config" <<SYSCTL_CONF
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 SYSCTL_CONF
-    fi
-    
-    # Применяем полученный конфиг
-    sysctl -e -q -p "$path_sysctl_config"
 
-    echook "Конфиг sysctl создан и применен"
-  else
-    exiterr "Ошибка загрузки sysctl конфига"
-  fi
+  # Применяем полученный конфиг
+  sysctl -e -q -p "$path_sysctl_config"
+
+  echook "Конфиг sysctl создан и применен"
 }
 
 input_port(){
@@ -264,8 +278,11 @@ input_port(){
 
 create_config(){
 echomsg "Формируем конфиг shadowsocks-rust сервера"
-password=$(pwgen 32 1)
+
 mkdir -p "$(dirname "$path_config")"
+
+password=$($path_ssservice genkey -m "$encrypt_method")
+
 cat >"$path_config" <<CONFIG
 {
   "server": "::",
@@ -365,7 +382,7 @@ reload_service(){
   select_menu_option
 }
 
-remove_ssserver(){
+remove_shadowsocks_rust(){
   echo
   read -rp "Подтвердите удаление [y/N]: " remove
   until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
@@ -379,9 +396,9 @@ remove_ssserver(){
     systemctl disable ssserver
     rm -f "$path_config"
     rm -f "$path_service"
-    rm -f "$path_ssserver"
     rm -f "$path_sysctl_config" 
     rm -f "$path_script" 
+    rm -rf "$path_shadowsocks_rust"
     systemctl daemon-reload
     userdel shadowsocks
     echook "shadowsocks-rust успешно удален из системы!"
@@ -394,7 +411,7 @@ remove_ssserver(){
 install_ssserver(){
   install_pkgs
   input_port
-  download_ssserver
+  download_shadowsocks_rust
   create_config
   create_service
   add_user
@@ -428,14 +445,11 @@ install_ssserver(){
     done
   fi
 
-  # base64 кодирование (без перевода строки)
-  base64=$(printf "%s" "$encrypt_method:$password" | base64 | tr -d '\n')
-
   # Данные для подключения
   echo
   echo "-------------------------------------------------------"
   echo "Ссылка для подключения к shadowsocks:"
-  echo "ss://${base64}@${public_ip}:${port}"
+  echo "$("$path_ssurl" --encode "$path_config")"
   echo "-------------------------------------------------------"
   echo
 
@@ -478,7 +492,7 @@ select_menu_option() {
       reload_service
     ;;
     3)
-      remove_ssserver
+      remove_shadowsocks_rust
     ;;
     4)
       exit 0

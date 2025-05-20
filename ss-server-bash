@@ -333,7 +333,7 @@ cat >"$path_client_for_url_config" <<CLIENT_CONFIG
   "server": "$public_ip",
   "server_port": $port,
   "method": "$encrypt_method",
-  "password": "$password",
+  "password": "$password"
 }
 CLIENT_CONFIG
 }
@@ -461,7 +461,7 @@ install_ssserver(){
   echo
   echo "-------------------------------------------------------"
   echo "Ссылка для подключения к shadowsocks:"
-  echo "$("$path_ssurl" --encode "$path_config")"
+  echo "$("$path_ssurl" --encode "$path_client_for_url_config")"
   echo "-------------------------------------------------------"
   echo
 

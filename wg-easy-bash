@@ -482,18 +482,6 @@ input_ss_link() {
         continue
     fi
 
-    # Получаем и проверяем пароль
-    password="${decoded#*:}"
-    if [ "${#password}" -ne 32 ]; then
-      echoerr "Ошибка: пароль должен быть длиной 32 символа"
-      continue
-    fi
-
-    if ! [[ "$password" =~ ^[a-zA-Z0-9]+$ ]]; then
-      echoerr "Ошибка: пароль содержит недопустимые символы"
-      continue
-    fi
-
     # Получаем и проверяем метод шифра 
     method="${decoded%%:*}"
     case "$method" in

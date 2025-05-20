@@ -193,8 +193,8 @@ install_pkgs(){
   ) || exiterr "'apt-get update' ошибка."
   (
     set -x
-    apt-get -yqq install iproute2 iptables curl lsof dnsutils grep \
-    || apt-get -yqq install iproute2 iptables curl lsof dnsutils grep
+    apt-get -yqq install iproute2 iptables pwgen curl lsof dnsutils grep \
+    || apt-get -yqq install iproute2 iptables pwgen curl lsof dnsutils grep
   ) || exiterr "'apt-get install' ошибка."
 
   echook "Зависимости установлены"
@@ -437,7 +437,7 @@ install_ssserver(){
   echo "Ссылка для подключения к shadowsocks:"
   echo "ss://${base64}@${public_ip}:${port}"
   echo "-------------------------------------------------------"
-  echo "Пасс: $password"
+  echo
 
   # перемещам текущий скрипт, добавляем на него права
   mv "$(realpath "$0")" "$path_script"

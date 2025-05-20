@@ -800,7 +800,7 @@ create_iptables_scripts(){
 }
 
 # Функция создания конфига sysctl настроек сети
-create_sysctl_config(){
+create_sysctl_config (){
   echomsg "Создание конфига sysctl по пути $path_sysctl_config
   - разрешение forward ipv4
   - запрет определения туннеля
@@ -811,23 +811,28 @@ create_sysctl_config(){
   mkdir -p "$(dirname "$path_sysctl_config")"
 
   # Загружаем конфиг
-  curl -fsSL "$path_sysctl_config" https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf
+  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf -o "$path_sysctl_config"
 
   # Проверка что файл загружен
   if [ -f "$path_sysctl_config" ]; then
-    # Добавляем модуль hybla контроля перегрузки по умолчанию
-    modprobe tcp_hybla
-    
+    # Добавляем если поддерживается модуль hybla контроля перегрузки 
+    # (для сетей с в сысокой задежкой) 
+    if modprobe -q tcp_hybla \
+      && printf '%s\n%s' "2.6.13" "$(uname -r)" | sort -C -V \
+      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
+      echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
+    fi
+
     # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
     if modprobe -q tcp_bbr \
       && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
       && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
       cat >> "$path_sysctl_config" <<SYSCTL_CONF
-# TCP BBR контроль перегрузки сети
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 SYSCTL_CONF
-
+    fi
+    
     # Применяем полученный конфиг
     sysctl -e -q -p "$path_sysctl_config"
 

@@ -27,6 +27,8 @@ path_ssurl="$path_shadowsocks_rust/ssurl"
 path_service="/etc/systemd/system/ssserver.service"
 # - файл конфига shadowsocks-rust
 path_config="/etc/shadowsocks-rust/config.json"
+# - файл конфига для генерации ссылки клиенту
+path_client_for_url_config="$path_shadowsocks_rust/for_url_config.json"
 # - файл конфига sysctl
 path_sysctl_config="/etc/sysctl.d/99-shadowsocks.conf"
 # - место сохранения текущего скрипта после установки сервера
@@ -298,6 +300,42 @@ cat >"$path_config" <<CONFIG
   "fast_open": true
 }
 CONFIG
+
+# IP текущего сервера
+local public_ip
+
+# ip route (локальный интерфейс)
+public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
+
+# через DNS (OpenDNS)
+[ -z "$public_ip" ] && command -v dig >/dev/null && \
+  public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
+
+# Проверка формата
+if [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+  wg_host="$public_ip"
+else
+  public_ip=""
+
+  echoerr "Не удалось определить публичный IP"
+  while true; do
+    echomsg "Введите публичный IPv4 ардес этого сервера"
+    read -rp "IPv4 этого сервера: " public_ip
+
+    if check_IPv4 "$public_ip"; then
+      break
+    fi
+  done
+fi
+
+cat >"$path_client_for_url_config" <<CLIENT_CONFIG
+{
+  "server": "$public_ip",
+  "server_port": $port,
+  "method": "$encrypt_method",
+  "password": "$password",
+}
+CLIENT_CONFIG
 }
 
 create_service(){
@@ -418,33 +456,6 @@ install_ssserver(){
   add_user
   create_sysctl_config
   activate_ssserver
-
-  # IP текущего сервера
-  local public_ip base64
-
-  # ip route (локальный интерфейс)
-  public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
-
-  # через DNS (OpenDNS)
-  [ -z "$public_ip" ] && command -v dig >/dev/null && \
-    public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
-
-  # Проверка формата
-  if [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-    wg_host="$public_ip"
-  else
-    public_ip=""
-
-    echoerr "Не удалось определить публичный IP"
-    while true; do
-      echomsg "Введите публичный IPv4 ардес этого сервера"
-      read -rp "IPv4 этого сервера: " public_ip
-
-      if check_IPv4 "$public_ip"; then
-        break
-      fi
-    done
-  fi
 
   # Данные для подключения
   echo

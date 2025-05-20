@@ -40,6 +40,10 @@ path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 # - файл конфига sysctl параметров 
 path_sysctl_config="/etc/sysctl.d/99-wg-easy-bash.conf"
 
+## Используемая версия tun2socks
+# https://github.com/xjasonlyu/tun2socks/releases
+version_tun2socks="v2.6.0-beta"
+
 ## Переменные настройки shadowsocks прокси интерфейса через tun2socks:
 # - имя интерфейса
 ss_tun_name="sstun"
@@ -246,8 +250,8 @@ install_pkgs() {
   ) || exiterr "'apt-get update' ошибка."
   (
     set -x
-    apt-get -yqq install iproute2 iptables curl lsof dnsutils grep sed \
-    || apt-get -yqq install iproute2 iptables curl lsof dnsutils grep sed
+    apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed \
+    || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed
   ) || exiterr "'apt-get install' ошибка."
 
   # Установка и запуск докера если ранее не установлен 
@@ -605,21 +609,22 @@ input_ui_password() {
 download_tun2socks() {
   if [[ "$is_shadowsocks" ]]; then
     echomsg "Загружаем tun2socks, с скриптом поднятия tun интерфейса"
-    mkdir -p "$(dirname "$path_tun2socks")"
-    curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks -o "$path_tun2socks"
-    chmod +x "$path_tun2socks"
+    export DEBIAN_FRONTEND=noninteractive
+    (
+      set -x
+    
+      mkdir -p "$(dirname "$path_tun2socks")"
+      curl -fsSL https://github.com/xjasonlyu/tun2socks/releases/download/${version_tun2socks}/tun2socks-linux-amd64.zip
+      unzip tun2socks-linux-amd64.zip
+      mv tun2socks-linux-amd64 "$path_tun2socks"
+      chmod +x "$path_tun2socks"
 
-    mkdir -p "$(dirname "$path_tun2socks_init")"
-    curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh -o "$path_tun2socks_init"
-    chmod +x "$path_tun2socks_init"
+      mkdir -p "$(dirname "$path_tun2socks_init")"
+      curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh -o "$path_tun2socks_init"
+      chmod +x "$path_tun2socks_init"
+    ) || exiterr "Ошибка загрузки tun2socks файлов"
+
     echook "файлы загружены"
-
-    # Проверка что оба файла загружены
-    if [ -f "$path_tun2socks" ] && [ -f "$path_tun2socks_init" ]; then
-      echook "Файлы загружены и готовы"
-    else
-      exiterr "Ошибка загрузки tun2socks файлов"
-    fi
   fi
 }
 

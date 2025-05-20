@@ -287,7 +287,7 @@ check_domain() {
 check_IPv4() {
   # Проверка на формат IPv4
   if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-    echoerr "Это не IPv4: $1"
+    echoerr "Неверный формат IPv4: $1"
     return 1
   fi
 
@@ -296,14 +296,14 @@ check_IPv4() {
   for octet in "${octets[@]}"; do
     # Проверка на ведущие нули (например, 01, 001)
     if [[ "$octet" != "0" && "$octet" =~ ^0 ]]; then
-      echoerr "Октет с ведущим нулём недопустим: $octet"
+      echoerr "Октет IPv4 с ведущим нулём недопустим: $octet"
       return 1
     fi
 
     # Преобразуем явно в десятичное значение и проверим диапазон
     dec_octet=$((10#$octet))
     if ((dec_octet < 0 || dec_octet > 255)); then
-      echoerr "Неверный диапазон октета: $octet"
+      echoerr "Неверный диапазон октета IPv4: $octet"
       return 1
     fi
   done

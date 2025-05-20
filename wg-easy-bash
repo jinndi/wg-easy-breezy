@@ -1020,9 +1020,7 @@ install_services() {
   # считывание вода пользователя
   input_wg_host
   input_email
-  input_ss_ip
-  input_ss_port
-  input_ss_password
+  input_ss_link
   input_wg_port
   input_default_address
   input_ui_password

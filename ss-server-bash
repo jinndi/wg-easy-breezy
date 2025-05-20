@@ -28,6 +28,9 @@ path_script="/sbin/ss-server"
 # -- aes-256-gcm
 encrypt_method="aes-128-gcm"
 
+## Некодированный пароль сервера
+password=""
+
 ## Функции вывода сообщений:
 # - шапка установщика
 show_header() {
@@ -398,12 +401,8 @@ install_ssserver(){
   create_sysctl_config
   activate_ssserver
 
-  # перемещам текущий скрипт, добавляем на него права
-  mv "$(realpath "$0")" "$path_script"
-  chmod +x "$path_script"
-
   # IP текущего сервера
-  local public_ip
+  local public_ip base64
 
   # ip route (локальный интерфейс)
   public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
@@ -430,7 +429,7 @@ install_ssserver(){
   fi
 
   # base64 кодирование (без перевода строки)
-  base64=$(echo -n "$encrypt_method:$password" | base64 | tr -d '\n')
+  base64=$(printf "%s" "$encrypt_method:$password" | base64 | tr -d '\n')
 
   # Данные для подключения
   echo
@@ -438,7 +437,11 @@ install_ssserver(){
   echo "Ссылка для подключения к shadowsocks:"
   echo "ss://${base64}@${public_ip}:${port}"
   echo "-------------------------------------------------------"
-  echo
+  echo "Пасс: $password"
+
+  # перемещам текущий скрипт, добавляем на него права
+  mv "$(realpath "$0")" "$path_script"
+  chmod +x "$path_script"
 
   read -n1 -r -p "Нажмите любую клавишу чтобы отобразить меню..."
   select_menu_option

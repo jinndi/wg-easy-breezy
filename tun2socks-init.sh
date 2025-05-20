@@ -8,7 +8,7 @@ set -e
 SS_TUN_NAME="${SS_TUN_NAME:-tun0}"
 
 # Ссылка (SIP002 URI scheme) для полкючение к серверу shadowsocks
-SS_LINK="${SS_LINK:''}"
+SS_LINK="${SS_LINK:-''}"
 
 # Извлечение IP сервера из ссылки ss://...@IP:port
 SS_IP=$(echo "$SS_LINK" | awk -F'[@:]' '{print $2}')

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -11,7 +11,7 @@ SS_TUN_NAME="${SS_TUN_NAME:-tun0}"
 SS_LINK="${SS_LINK:-''}"
 
 # Извлечение IP сервера из ссылки ss://...@IP:port
-SS_IP=$(echo "$SS_LINK" | awk -F'[@:]' '{print $2}')
+SS_IP=$(echo "$SS_LINK" | awk -F'[@:]' '{print $(NF-1)}')
 
 # Получение имени интерфейса по умолчанию
 DIF=$(ip route | awk '/default/ {print $5}' | head -n1)
@@ -51,8 +51,7 @@ ip route add default dev "$SS_TUN_NAME" metric 50
 # Запуск tun2socks в фоне
 echo "[tun2socks-init] Starting tun2socks..."
 nohup tun2socks -interface "$DIF" -device "tun://$SS_TUN_NAME" \
-  -proxy "ss://aes-128-gcm:${SS_PASSWORD}@${SS_IP}:${SS_PORT}" \
-  > /tmp/tun2socks.log 2>&1 &
+  -proxy "${SS_LINK}" > /tmp/tun2socks.log 2>&1 &
 
 echo "[tun2socks-init] Done."
 

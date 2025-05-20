@@ -507,7 +507,7 @@ input_ss_link() {
     esac
 
     # Проверка IPv4
-    if check_IPv4 "$ss_ip"; then
+    if check_IPv4 "$public_ip"; then
       # Проверка порта
       if ! [[ "$port" =~ ^[0-9]+$ ]] || (( port < 49152 || port > 65535 )); then
         echoerr "Ошибка: порт $port вне диапазона 49152–65535"

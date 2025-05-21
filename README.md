@@ -2,6 +2,9 @@
 
 ### bash-cкрипт развертывания wg-easy + wg-easy через tun2socks прокси shasowsocks + caddy сервер
 
+
+![Схема работы](https://github.com/user-attachments/assets/ece23720-b7a1-4ac2-9ef5-aa880be2cb2a)
+
 ## Возможности:
 
 Два WireGuard-а с интерфейсом wg-easy на одном хосте, второй опционален и настраивается на работу через прокси shasowsocks к другому серверу.

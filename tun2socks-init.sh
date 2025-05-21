@@ -1,12 +1,16 @@
 #!/bin/bash
+# Скрипт поднятия внутри контейне tun интерфейса прокси shadowsocks через tun2socks
 
 set -e
+
+# Ссылка (SIP002 URI scheme) для полкючение к серверу shadowsocks
+SS_LINK="${SS_LINK:-''}"
 
 # Название для прокси интерфейса shadowsocks
 SS_TUN_NAME="${SS_TUN_NAME:-tun0}"
 
-# Ссылка (SIP002 URI scheme) для полкючение к серверу shadowsocks
-SS_LINK="${SS_LINK:-''}"
+# Расчет значения MTU для shadowsocks интерфейса
+SS_MTU=$(( ${WG_MTU:-1420} - 80 ))
 
 # Извлечение IP сервера из ссылки ss://...@IP:port
 SS_IP=$(echo "$SS_LINK" | awk -F'[@:]' '{print $(NF-1)}')
@@ -29,7 +33,7 @@ grep -q -E '\s+lip$' /etc/iproute2/rt_tables || echo "20 lip" >> /etc/iproute2/r
 echo "[tun2socks-init] Setting up $SS_TUN_NAME..."
 ip tuntap add mode tun dev "$SS_TUN_NAME" || true 
 ip addr add 192.168.0.33/24 dev "$SS_TUN_NAME"
-ip link set dev "$SS_TUN_NAME" mtu 1400
+ip link set dev "$SS_TUN_NAME" mtu "$SS_MTU"
 ip link set dev "$SS_TUN_NAME" up
 
 # Настройка маршрутов
@@ -43,7 +47,8 @@ ip route add default dev "$SS_TUN_NAME" metric 50
 
 # Запуск tun2socks в фоне
 echo "[tun2socks-init] Starting tun2socks..."
-nohup tun2socks -interface "$DIF" -device "tun://$SS_TUN_NAME" \
+nohup tun2socks -interface "$DIF" \
+  -device "tun://$SS_TUN_NAME" -mtu "$SS_MTU" \
   -proxy "$SS_LINK" > /tmp/tun2socks.log 2>&1 &
 
 echo "[tun2socks-init] Done."

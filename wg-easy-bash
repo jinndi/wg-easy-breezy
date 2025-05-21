@@ -28,11 +28,7 @@ path_docker_compose_file="$path_data_dir/services.yml"
 # - ссылка на файл systemd unit службы
 path_systemd_unit_file="/etc/systemd/system/wg-easy.service"
 # - файл настройки Caddy сервера
-path_caddyfile="$path_data_dir/caddy/Caddyfile"
-# - папка с данными  Caddy сервера
-path_caddy_data="$path_data_dir/caddy/data"
-# - папка с настройками Caddy сервера
-path_caddy_config="$path_data_dir/caddy/config"
+path_caddyfile="$path_data_dir/Caddyfile"
 # - файл скрипта c сетевыми правилами iptables на запуск служб
 path_iptables_active_script="$path_data_dir/iptables/active.sh"
 # - файл скрипта для удаления ранее созданных iptables правил
@@ -605,10 +601,10 @@ input_ui_password() {
   done
 }
 
-# Загрузка tun2socks v2.5.2
+# Загрузка tun2socks
 download_tun2socks() {
   if [[ "$is_shadowsocks" ]]; then
-    echomsg "Загружаем tun2socks, с скриптом поднятия tun интерфейса"
+    echomsg "Загружаем tun2socks $version_tun2socks, с скриптом поднятия tun интерфейса"
     export DEBIAN_FRONTEND=noninteractive
     (
       set -x
@@ -629,6 +625,39 @@ download_tun2socks() {
   fi
 }
 
+# Функция поиска оптимального MTU WireGuard
+find_optimal_wg_mtu() {
+  local target=8.8.8.8
+  local low=1300
+  local high=1500
+  local last_good=0
+
+  echomsg "Поиск оптимального MTU для WireGuard..."
+
+  while (( low <= high )); do
+    local mid=$(((low + high) / 2))
+    local size=$((mid - 28))  # 20 байт IP + 8 байт ICMP
+
+    if ping -c1 -W1 -M do -s "$size" "$target" &>/dev/null; then
+      last_good=$mid
+      low=$((mid + 1))
+    else
+      high=$((mid - 1))
+    fi
+  done
+
+  if [ "$last_good" -ge 1000 ] 2>/dev/null; then
+    # Рассчитываем MTU для WireGuard
+    wg_mtu=$((last_good - 80))
+    (( wg_mtu < 1200 )) && wg_mtu=1200
+
+    echook "Оптимальный MTU WireGuard: $wg_mtu"
+  else
+    wg_mtu=1420
+    echoerr "Значение не найдено, используем: 1420"
+  fi
+}
+
 # Функция создания конфигов сервисов и служб
 create_services_config() {
 echomsg "Создаём конфиги Docker сервисов"
@@ -644,7 +673,7 @@ services:
       - PASSWORD_HASH=$password_hash
       - PORT=$port
       - WG_PORT=$wg_port
-      - WG_MTU=1420
+      - WG_MTU=$wg_mtu
       - WG_PERSISTENT_KEEPALIVE=25
       - WG_DEFAULT_ADDRESS=$default_address
       - WG_DEFAULT_DNS=$default_dns
@@ -677,7 +706,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - PORT=$port_ss
       - WG_DEVICE=$ss_tun_name
       - WG_PORT=$wg_port_ss
-      - WG_MTU=1420
+      - WG_MTU=$wg_mtu
       - WG_PERSISTENT_KEEPALIVE=25
       - WG_DEFAULT_ADDRESS=$default_address_ss
       - WG_DEFAULT_DNS=$default_dns
@@ -721,9 +750,12 @@ cat <<CADDY_SERVICE >> "$path_docker_compose_file"
       - 443:443/udp
     volumes:
       - $path_caddyfile:/etc/caddy/Caddyfile
-      - $path_caddy_data:/data
-      - $path_caddy_config:/config
+      - caddy_data:/data
+      - caddy_config:/config
 
+volumes:
+  caddy_data:
+  caddy_config:
 CADDY_SERVICE
 
 # - Caddyfile:
@@ -1017,13 +1049,16 @@ install_services() {
   # загрузка tun2socks
   download_tun2socks
 
+  # поиск оптимального MTU WireGuard
+  find_optimal_wg_mtu
+
   # создание конфига докер сервисов
   create_services_config
 
   # создание скриптов iptables настроек
   create_iptables_scripts
 
-  # создание скриптов sysctl конфига
+  # создание sysctl конфига
   create_sysctl_config
 
   # создание systemd unit службы управления сервисами

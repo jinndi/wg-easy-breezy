@@ -3,7 +3,8 @@
 ### bash-cкрипт развертывания wg-easy + wg-easy через tun2socks прокси shasowsocks + caddy сервер
 
 
-![Схема работы](https://github.com/user-attachments/assets/ece23720-b7a1-4ac2-9ef5-aa880be2cb2a)
+![Схема работы](https://github.com/user-attachments/assets/f041ac27-b01c-45e1-87c5-58f05bb432c3)
+
 
 ## Возможности:
 

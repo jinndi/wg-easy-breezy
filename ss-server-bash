@@ -293,6 +293,7 @@ cat >"$path_config" <<CONFIG
   "mode": "tcp_and_udp",
   "method": "$encrypt_method",
   "password": "$password",
+  "keep_alive": 25,
   "timeout": 300,
   "udp_timeout": 300,
   "udp_max_associations": 512,

@@ -1,6 +1,6 @@
 # WG-EASY-BASH
 
-# bash-cкрипт развертывания wg-easy + wg-easy через tun2socks прокси shasowsocks + caddy сервер
+### bash-cкрипт развертывания wg-easy + wg-easy через tun2socks прокси shasowsocks + caddy сервер
 
 ## Возможности:
 

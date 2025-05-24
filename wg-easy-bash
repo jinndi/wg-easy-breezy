@@ -235,7 +235,7 @@ show_spinner() {
 
   while kill -0 "$pid" 2>/dev/null; do
     for i in $(seq 0 3); do
-      printf "\r[%c] Выполняем, ожидайте...\n" "${spinner:$i:1}"
+      printf " [%c] Выполняем, ожидайте...\n" "${spinner:$i:1}"
       sleep "$delay"
     done
   done
@@ -264,7 +264,7 @@ install_pkgs() {
     sleep 3
   done
 
-  echomsg "Установка зависимостей..."
+  echomsg "Установка зависимостей"
   (
     (
       apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1

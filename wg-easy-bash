@@ -7,9 +7,6 @@
 # Released under the MIT License, see the accompanying file LICENSE
 # or https://opensource.org/licenses/MIT
 
-## Каждая выполняемая команда будет выводиться в терминал перед исполнением
-set -x
-
 ## Неинтерактивный режим установки APT
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
@@ -185,6 +182,7 @@ remove_install() {
 
   if [[ -n "$is_show_info" ]]; then
     echomsg "Удаляем предыдущую установку"
+    set -x
   fi
 
   # Остановка сервисов с удаление всех задействованных контейнеров и образов
@@ -223,6 +221,7 @@ remove_install() {
   fi
 
   if [[ -n "$is_show_info" ]]; then
+    set +x
     echook "Файлы и службы/сервисы удалены"
   fi
 }
@@ -246,11 +245,15 @@ install_pkgs() {
 
   # Установка зависимостей
   echomsg "Установка зависимостей"
-  apt-get -yqq update || apt-get -yqq update \
-  || exiterr "'apt-get update' ошибка."
-  apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed \
-  || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed \
-  || exiterr "'apt-get install' ошибка."
+  (
+    set -x
+    apt-get -yqq update || apt-get -yqq update
+  ) || exiterr "'apt-get update' ошибка."
+  (
+    set -x
+    apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed \
+    || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed
+  ) || exiterr "'apt-get install' ошибка."
 
   # Установка и запуск докера если ранее не установлен 
   if ! docker compose version &> /dev/null; then
@@ -608,8 +611,7 @@ download_tun2socks() {
   if [[ "$is_shadowsocks" ]]; then
     echomsg "Загружаем tun2socks $version_tun2socks, с скриптом поднятия tun интерфейса"
     (
-      set -e  # выйти при ошибке
-      
+      set -ex
       mkdir -p "$(dirname "$path_tun2socks")"
       curl -fsSL https://github.com/xjasonlyu/tun2socks/releases/download/${version_tun2socks}/tun2socks-linux-amd64.zip --output tun2socks-linux-amd64.zip
       unzip tun2socks-linux-amd64.zip
@@ -662,7 +664,7 @@ find_optimal_wg_mtu() {
 # Функция создания конфигов сервисов и служб
 create_services_config() {
 echomsg "Создаём конфиги Docker сервисов"
-
+set -x
 ## wg-easy:
 # - wg-easy дефолтный сервис docker compose
 cat <<WG_EASY_SERVICE  > "$path_docker_compose_file"
@@ -786,12 +788,15 @@ fi
 # -- закрываем основной блок хоста
 echo "}" >> "$path_caddyfile"
 fi
-
+set +x
 echook "Конфиги Docker сервисов созданы"
 }
 
 # Создание скриптов разрешения портов через iptables, при запуске/остановке службы
 create_iptables_scripts(){
+  echomsg "Создание скриптов разрешения портов через iptables"
+
+  set -x
   # порты для открытия
   local ports=(
     "$wg_port udp"
@@ -806,11 +811,6 @@ create_iptables_scripts(){
   if [[ "$is_shadowsocks" ]]; then
     ports+=("$wg_port_ss udp" "$port_ss tcp" "$port_ss udp")
   fi
-
-  echomsg "Создание скриптов разрешения портов через iptables: 
-  - при запуске служб разрешаем порты: 
-  -- ${ports[*]}, запрещаем: 80 tcp
-  - удаляем созданные правила при остановке"
 
   # Создать дирректорию для сохранения скриптов на запуск/остановку служб
   mkdir -p "$(dirname "$path_iptables_active_script")"
@@ -847,7 +847,7 @@ create_iptables_scripts(){
 
   # Делаем скрипты исполняемыми
   chmod +x "$path_iptables_active_script" "$path_iptables_delete_script"
-
+  set +x
   echook "Скрипты с правилами iptables созданы"
 }
 
@@ -859,11 +859,13 @@ create_sysctl_config (){
   - настройка сетевых буферов, ipv4 оптимизация
   - включение TCP BBR, если версия ядра >= 4.20" 
 
+  set -x
+
   # Создать дирректорию если нет
   mkdir -p "$(dirname "$path_sysctl_config")"
-
+  
   # Загружаем конфиг
-  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf -o "$path_sysctl_config" || exiterr "ошибка загрузки sysctl.conf"
+  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf -o "$path_sysctl_config"
 
   # Проверка что файл загружен
   if [ -f "$path_sysctl_config" ]; then
@@ -887,9 +889,10 @@ SYSCTL_CONF
     
     # Применяем полученный конфиг
     sysctl -e -q -p "$path_sysctl_config"
-
+    set +x
     echook "Конфиг sysctl создан и применен"
   else
+    set +x
     exiterr "Ошибка загрузки sysctl конфига"
   fi
 }
@@ -900,6 +903,7 @@ local working_dir
 working_dir="$(dirname "$path_docker_compose_file")"
 
 echomsg "Создание systemd unin службы"
+set -x
 cat <<SYSTEMD_UNIT > "$path_systemd_unit_file"
 [Unit]
 Description=wg-easy with iptables hooks via docker compose
@@ -921,6 +925,7 @@ WantedBy=multi-user.target
 SYSTEMD_UNIT
 
 systemctl daemon-reload
+set +x
 echook "Служба создана"
 }
 

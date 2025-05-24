@@ -7,6 +7,13 @@
 # Released under the MIT License, see the accompanying file LICENSE
 # or https://opensource.org/licenses/MIT
 
+## Каждая выполняемая команда будет выводиться в терминал перед исполнением
+set -x
+
+## Неинтерактивный режим установки APT
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+
 ## Пути исполняемых файлов
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -239,26 +246,21 @@ install_pkgs() {
 
   # Установка зависимостей
   echomsg "Установка зависимостей"
-  export DEBIAN_FRONTEND=noninteractive
-  (
-    set -x
-    apt-get -yqq update || apt-get -yqq update
-  ) || exiterr "'apt-get update' ошибка."
-  (
-    set -x
-    apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed \
-    || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed
-  ) || exiterr "'apt-get install' ошибка."
+  apt-get -yqq update || apt-get -yqq update \
+  || exiterr "'apt-get update' ошибка."
+  apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed \
+  || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed \
+  || exiterr "'apt-get install' ошибка."
 
   # Установка и запуск докера если ранее не установлен 
   if ! docker compose version &> /dev/null; then
-    curl -sSL https://get.docker.com | sh
+    curl -fsSL https://get.docker.com | bash -e || exiterr "ошибка установки docker"
   fi
   systemctl start docker
 
   # Спуллить образ wg-easy если его нет
   if ! docker image inspect "$wg_easy_image" > /dev/null 2>&1; then
-    docker pull "$wg_easy_image"
+    docker pull "$wg_easy_image" || exiterr "ошибка при скачивании $wg_easy_image"
   fi
 
   echook "Зависимости установлены"
@@ -605,10 +607,9 @@ input_ui_password() {
 download_tun2socks() {
   if [[ "$is_shadowsocks" ]]; then
     echomsg "Загружаем tun2socks $version_tun2socks, с скриптом поднятия tun интерфейса"
-    export DEBIAN_FRONTEND=noninteractive
     (
-      set -x
-    
+      set -e  # выйти при ошибке
+      
       mkdir -p "$(dirname "$path_tun2socks")"
       curl -fsSL https://github.com/xjasonlyu/tun2socks/releases/download/${version_tun2socks}/tun2socks-linux-amd64.zip --output tun2socks-linux-amd64.zip
       unzip tun2socks-linux-amd64.zip
@@ -862,7 +863,7 @@ create_sysctl_config (){
   mkdir -p "$(dirname "$path_sysctl_config")"
 
   # Загружаем конфиг
-  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf -o "$path_sysctl_config"
+  curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf -o "$path_sysctl_config" || exiterr "ошибка загрузки sysctl.conf"
 
   # Проверка что файл загружен
   if [ -f "$path_sysctl_config" ]; then

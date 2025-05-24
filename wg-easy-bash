@@ -190,6 +190,7 @@ remove_install() {
   if [[ -e "$path_docker_compose_file" ]]; then
     if systemctl is-active --quiet wg-easy; then
       systemctl disable --now wg-easy > /dev/null
+    fi
   fi
 
   # Удаление ранее заданных iptables правил 

@@ -104,21 +104,23 @@ EOF
 }
 # - стандартное через задержку
 echomsg() {
-  sleep 2; 
+  sleep 1; 
   echo
   echo "🟠 $1";
 }
 # - об успехе
 echook() {
+  sleep 1; 
   echo "🟢 $1"
 }
 # - об ошибке
 echoerr () {
+  sleep 1; 
   echo "🔴 $1"
 }
 # - об ошибке с выходом из скрипта
 exiterr() {
-  echo "🔴 Ошибка: $1" >&2
+  echo "❌ Ошибка: $1" >&2
   exit 1
 }
 
@@ -187,8 +189,7 @@ remove_install() {
   # Остановка сервисов с удаление всех задействованных контейнеров и образов
   if [[ -e "$path_docker_compose_file" ]]; then
     if systemctl is-active --quiet wg-easy; then
-      systemctl disable --now wg-easy
-    fi
+      systemctl disable --now wg-easy > /dev/null
   fi
 
   # Удаление ранее заданных iptables правил 
@@ -224,6 +225,27 @@ remove_install() {
   fi
 }
 
+# Функция анимации ожидания
+show_spinner() {
+  local pid=$1
+  local delay=0.1
+  local spinner='|/-\'
+  tput civis  # скрыть курсор
+
+  while kill -0 "$pid" 2>/dev/null; do
+    for i in $(seq 0 3); do
+      printf "\r[%c] Выполняем, ожидайте..." "${spinner:$i:1}"
+      sleep "$delay"
+    done
+  done
+
+  wait "$pid"
+  local status=$?
+  tput cnorm  # вернуть курсор
+
+  return $status
+}
+
 
 # Функция установки необходимых пакетов программ
 install_pkgs() {
@@ -241,26 +263,27 @@ install_pkgs() {
     sleep 3
   done
 
-  # Установка зависимостей
-  echomsg "Установка зависимостей"
+  echomsg "Установка зависимостей..."
   (
-    apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
-  ) || exiterr "'apt-get update' ошибка."
-  (
-    apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed > /dev/null 2>&1 \
-    || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed > /dev/null 2>&1
-  ) || exiterr "'apt-get install' ошибка."
+    (
+      apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
+    ) || exiterr "'apt-get update' ошибка."
+    (
+      apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed > /dev/null 2>&1 \
+      || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed > /dev/null 2>&1
+    ) || exiterr "'apt-get install' ошибка."
 
-  # Установка и запуск докера если ранее не установлен 
-  if ! docker compose version &> /dev/null; then
-    curl -fsSL https://get.docker.com | bash -e > /dev/null 2>&1 || exiterr "ошибка установки docker"
-  fi
-  systemctl start docker
+    # Установка и запуск докера если ранее не установлен 
+    if ! docker compose version &> /dev/null; then
+      curl -fsSL https://get.docker.com | bash -e > /dev/null 2>&1 || exiterr "ошибка установки docker"
+    fi
+    systemctl start docker
 
-  # Спуллить образ wg-easy если его нет
-  if ! docker image inspect "$wg_easy_image" > /dev/null 2>&1; then
-    docker pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $wg_easy_image"
-  fi
+    # Спуллить образ wg-easy если его нет
+    if ! docker image inspect "$wg_easy_image" > /dev/null 2>&1; then
+      docker pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $wg_easy_image"
+    fi
+  ) & show_spinner $!
 
   echook "Зависимости установлены"
 }
@@ -954,7 +977,7 @@ start_services() {
   echomsg "Запускаем сервисы"
 
   # Запускаем докер контейнеры
-  systemctl enable --now wg-easy
+  systemctl enable --now wg-easy > /dev/null
   #docker compose -f "$path_docker_compose_file" up -d --force-recreate
   local container status name
   for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
@@ -976,7 +999,7 @@ stop_services() {
 
   # Останавливаем и удаляем docker-контейнеры
   if [[ -f "$path_docker_compose_file" ]]; then
-    systemctl disable --now wg-easy
+    systemctl disable --now wg-easy > /dev/null
     #docker compose -f "$path_docker_compose_file" down --remove-orphans || {
     #  echoerr "Ошибка при остановке контейнеров через docker compose"
     #}

@@ -202,11 +202,13 @@ install_pkgs(){
 
   echomsg "Установка зависимостей"
   (
+    set -e
     apt-get -yqq update || apt-get -yqq update
   ) > /dev/null 2>&1 || exiterr "'apt-get update' ошибка."
   (
-    apt-get -yqq install iproute2 iptables wget tar lsof dnsutils grep \
-    || apt-get -yqq install iproute2 iptables wget tar lsof dnsutils grep
+    set -e
+    apt-get -yqq install iproute2 iptables wget tar xz-utils lsof dnsutils grep \
+    || apt-get -yqq install iproute2 iptables wget tar xz-utils lsof dnsutils grep
   ) > /dev/null 2>&1 || exiterr "'apt-get install' ошибка."
 
   echook "Зависимости установлены"

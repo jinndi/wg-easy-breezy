@@ -218,6 +218,7 @@ download_shadowsocks_rust(){
   mkdir -p "$path_shadowsocks_rust"
 
   (
+    set -e
     wget -q "https://github.com/shadowsocks/shadowsocks-rust/releases/download/${version}/shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz" && \
     tar -xf "shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz" -C "$path_shadowsocks_rust/" && \
     rm -r "shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz"

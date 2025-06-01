@@ -48,3 +48,7 @@ nohup tun2socks -interface "$DIF" -device "tun://$SS_TUN_NAME" \
   -proxy "$SS_LINK" > /tmp/tun2socks.log 2>&1 &
 
 echo "[tun2socks-init] Done."
+
+# Запуск основного процесса
+echo "[tun2socks-init] Starting wg-easy-ss..."
+exec /usr/bin/dumb-init node server/index.mjs

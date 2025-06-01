@@ -7,7 +7,7 @@ set -e
 SS_LINK="${SS_LINK:-''}"
 
 # Название для прокси интерфейса shadowsocks
-SS_TUN_NAME="${SS_TUN_NAME:-tun0}"
+SS_TUN_NAME="sstun"
 
 # Извлечение IP сервера из ссылки ss://...@IP:port
 SS_IP=$(echo "$SS_LINK" | awk -F'[@:]' '{print $(NF-1)}')

@@ -25,8 +25,6 @@ path_script_link="/usr/bin/wg-easy"
 path_tun2socks="$path_data_dir/tun2socks/tun2socks"
 # - скрипт инициализации интерфейса tun2socks
 path_tun2socks_init="$path_data_dir/tun2socks/tun2socks-init.sh"
-# - папка настроек wireguard
-path_data_wg_dir="$path_data_dir/wireguard"
 # - файл docker compose сервисов
 path_docker_compose_file="$path_data_dir/services.yml"
 # - ссылка на файл systemd unit службы
@@ -44,21 +42,14 @@ path_sysctl_config="/etc/sysctl.d/99-wg-easy-bash.conf"
 # https://github.com/xjasonlyu/tun2socks/releases
 version_tun2socks="v2.6.0-beta"
 
-## Переменные настройки shadowsocks прокси интерфейса через tun2socks:
-# - имя интерфейса
-ss_tun_name="sstun"
-
 # Ссылка на образ wg-easy
-wg_easy_image="ghcr.io/wg-easy/wg-easy:latest"
+wg_easy_image="ghcr.io/wg-easy/wg-easy:15"
 
 ## Пути в адресной строке браузера к UI интерфейсу (если указан домен):
 # - по умолчанию
 handle_path_ui="wg-easy"
 # - для WireGuard через shadowsocks
 handle_path_ui_ss="wg-easy-ss"
-
-# DNS адреса по умолчанию для клиентов WireGuard (через запятую)
-default_dns=1.1.1.1,8.8.8.8
 
 ## Объявление переменных задаваемых в процессе работы скрипта:
 # - доменное имя либо адрес IP-адрес хоста
@@ -75,18 +66,14 @@ port_ss=""
 wg_port=""
 # - udp порт WireGuard, shadowsocks тунннель
 wg_port_ss=""
-# - диапазон IP-адресов клиентов WireGuard
-default_address=""
-# - диапазон IP-адресов клиентов WireGuard, shadowsocks тунннель
-default_address_ss=""
-# - хеш пароля от UI интерфейса/ов wg-easy
-password_hash=""
 # - ссылка на UI интерфейс wg-easy
 link_ui=""
 # - ссылка на UI интерфейс wg-easy, shadowsocks тунннель
 link_ui_ss=""
 # - указал ли пользователя адрес домена
 is_domain=""
+# - если пользователь указал адрес домена то insecure=false, иначе true 
+insecure=""
 # - ввел ли пользователя ссылку на shadowsocks сервер
 is_shadowsocks=""
 
@@ -298,9 +285,11 @@ check_domain() {
   if [[ ! "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
     echoerr "Неккоректный адрес домена: $1"
     is_domain=""
+    insecure="true"
     return 1
   fi
   is_domain="true"
+  insecure="false"
   return 0
 }
 
@@ -407,32 +396,7 @@ input_wg_host() {
     
     # Проверка на пустой ввод
     if [ -z "$wg_host" ]; then
-      # IP текущего сервера
-      local public_ip
-
-      # ip route (локальный интерфейс)
-      public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
-
-      # через DNS (OpenDNS)
-      [ -z "$public_ip" ] && command -v dig >/dev/null && \
-        public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
-
-      # Проверка формата
-      if [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-        wg_host="$public_ip"
-      else
-        echoerr "Не удалось определить публичный IP"
-        while true; do
-          echomsg "Введите публичный IPv4 ардес этого сервера"
-          read -rp "IPv4 этого сервера: " wg_host
-
-          if check_IPv4 "$wg_host"; then
-            break
-          fi
-        done
-      fi
-
-      echook "IPv4: $wg_host принят"
+      wg_host="0.0.0.0"
       break
     fi
 
@@ -583,49 +547,6 @@ input_wg_port() {
   fi
 }
 
-# - диапазон адресов для клиентов WireGuard
-input_default_address() {
-  local default_value="10.0.0.x"
-  local default_value_ss="10.1.0.x"
-
-  echomsg "Диапазон адресов клиентов WireGuard"
-  echo "(нажмите Enter, чтобы оставить по умолчанию)"
-  read -r -e -i "$default_value" default_address
-  
-  default_address=${default_address:-$default_value}
-  echook "Задан диапазон адресов для клиентов: $default_address"
-
-  if [[ "$is_shadowsocks" ]]; then
-    echomsg "Диапазон адресов клиентов WireGuard через shadowsocks прокси"
-    echo "(нажмите Enter, чтобы оставить по умолчанию)"
-    read -r -e -i "$default_value_ss" default_address_ss
-    default_address_ss=${default_address_ss:-$default_value_ss}
-    echook "Задан диапазон адресов для клиентов WireGuard" 
-    echo "(shadowsocks прокси): $default_address_ss"
-  fi
-}
-
-# - пароль для входа в UI wg-easy
-input_ui_password() {
-  local password
-
-  while true; do
-    echomsg "Придумайте пароль для входа в веб-интерфейс (ввод скрыт)"
-    read -rsp " > Пароль веб интерфейса: " password
-    
-    # Проверка и обработка пароля
-    if check_password "$password"; then
-      # Запрашиваем хеша пароля
-      output_wgpw=$(docker run --rm -it ghcr.io/wg-easy/wg-easy wgpw "$password")
-      # Извлекаем и экранируем хеш пароля
-      password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
-
-      echook "Пароль веб интерфейса принят"
-      break
-    fi
-  done
-}
-
 # Загрузка tun2socks
 download_tun2socks() {
   if [[ "$is_shadowsocks" ]]; then
@@ -648,73 +569,41 @@ download_tun2socks() {
   fi
 }
 
-# Функция поиска оптимального MTU WireGuard
-find_optimal_wg_mtu() {
-  local target=8.8.8.8
-  local low=1300
-  local high=1500
-  local last_good=0
-
-  echomsg "Поиск оптимального MTU для WireGuard..."
-
-  while (( low <= high )); do
-    local mid=$(((low + high) / 2))
-    local size=$((mid - 28))  # 20 байт IP + 8 байт ICMP
-
-    if ping -c1 -W1 -M do -s "$size" "$target" &>/dev/null; then
-      last_good=$mid
-      low=$((mid + 1))
-    else
-      high=$((mid - 1))
-    fi
-  done
-
-  if [ "$last_good" -ge 1000 ] 2>/dev/null; then
-    # Рассчитываем MTU для WireGuard
-    wg_mtu=$((last_good - 80))
-    (( wg_mtu < 1200 )) && wg_mtu=1200
-
-    echook "Оптимальный MTU WireGuard: $wg_mtu"
-  else
-    wg_mtu=1420
-    echoerr "Значение не найдено, используем: 1420"
-  fi
-}
-
 # Функция создания конфигов сервисов и служб
 create_services_config() {
 echomsg "Создаём конфиги Docker сервисов"
 
-## wg-easy:
+## services:
 # - wg-easy дефолтный сервис docker compose
 cat <<WG_EASY_SERVICE  > "$path_docker_compose_file"
 services:
   wg-easy:
     environment:
-      - LANG=ru
-      - WG_HOST=$wg_host
-      - PASSWORD_HASH=$password_hash
       - PORT=$port
-      - WG_PORT=$wg_port
-      - WG_MTU=$wg_mtu
-      - WG_PERSISTENT_KEEPALIVE=25
-      - WG_DEFAULT_ADDRESS=$default_address
-      - WG_DEFAULT_DNS=$default_dns
-      - UI_TRAFFIC_STATS=true
+      - HOST=$wg_host
+      - INSECURE=$insecure
     image: $wg_easy_image
     container_name: wg-easy
-    hostname: wg-easy
+    networks:
+      wg:
+        ipv4_address: 10.42.42.42
+        ipv6_address: fdcc:ad94:bacf:61a3::2a
     volumes:
-      - $path_data_wg_dir/wg-easy:/etc/wireguard
+      - etc_wireguard:/etc/wireguard
+      - /lib/modules:/lib/modules:ro
     ports:
-      - $wg_port:$wg_port/udp
+      - $wg_port:51820/udp
       - $port:$port/tcp
+    restart: unless-stopped
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
     sysctls:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.all.forwarding=1
+      - net.ipv6.conf.default.forwarding=1
 
 WG_EASY_SERVICE
 
@@ -723,30 +612,26 @@ if [[ "$is_shadowsocks" ]]; then
 cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
   wg-easy-ss:
     environment:
-      - LANG=ru
-      - WG_HOST=$wg_host
-      - PASSWORD_HASH=$password_hash
       - PORT=$port_ss
-      - WG_DEVICE=$ss_tun_name
-      - WG_PORT=$wg_port_ss
-      - WG_MTU=$wg_mtu
-      - WG_PERSISTENT_KEEPALIVE=25
-      - WG_DEFAULT_ADDRESS=$default_address_ss
-      - WG_DEFAULT_DNS=$default_dns
-      - UI_TRAFFIC_STATS=true
-      - WG_POST_UP=/sbin/tun2socks-init.sh
-      - SS_TUN_NAME=$ss_tun_name
+      - HOST=$wg_host
+      - INSECURE=$insecure
       - SS_LINK=$ss_link
     image: $wg_easy_image
     container_name: wg-easy-ss
-    hostname: wg-easy-ss
+    networks:
+      wg-ss:
+        ipv4_address: 10.43.43.43
+        ipv6_address: fdcc:ad94:bacf:61a4::2a
     volumes:
-      - $path_data_wg_dir/wg-easy-ss:/etc/wireguard
+      - etc_wireguard_ss:/etc/wireguard
+      - /lib/modules:/lib/modules:ro
       - $path_tun2socks:/sbin/tun2socks
       - $path_tun2socks_init:/sbin/tun2socks-init.sh
+    command: ["/bin/bash", "/sbin/tun2socks-init.sh"]
     ports:
-      - $wg_port_ss:$wg_port_ss/udp
+      - $wg_port_ss:51820/udp
       - $port_ss:$port_ss/tcp
+    restart: unless-stopped
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -755,6 +640,9 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
     sysctls:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.all.forwarding=1
+      - net.ipv6.conf.default.forwarding=1
 
 WG_EASY_SS_SERVICE
 fi
@@ -776,10 +664,48 @@ cat <<CADDY_SERVICE >> "$path_docker_compose_file"
       - caddy_data:/data
       - caddy_config:/config
 
+CADDY_SERVICE
+
+## networks:
+cat <<WG_EASY_NETWORKS  >> "$path_docker_compose_file"
+networks:
+  wg:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.42.42.0/24
+        - subnet: fdcc:ad94:bacf:61a3::/64
+WG_EASY_NETWORKS
+if [[ "$is_shadowsocks" ]]; then
+cat <<WG_EASY_SS_NETWORKS  >> "$path_docker_compose_file"
+  wg-ss:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.43.43.0/24
+        - subnet: fdcc:ad94:bacf:61a4::/64
+
+WG_EASY_SS_NETWORKS
+
+## volumes:
+cat <<WG_EASY_VOLUMES  >> "$path_docker_compose_file"
 volumes:
+  etc_wireguard:
+WG_EASY_VOLUMES
+if [[ "$is_shadowsocks" ]]; then
+  echo "  etc_wireguard_ss:" >> "$path_docker_compose_file"
+fi
+if [[ "$is_domain" ]]; then
+# - docker compose сервис
+cat <<CADDY_VOLUMES >> "$path_docker_compose_file"
   caddy_data:
   caddy_config:
-CADDY_SERVICE
+CADDY_VOLUMES
+fi
 
 # - Caddyfile:
 mkdir -p "$(dirname "$path_caddyfile")"
@@ -1061,14 +987,9 @@ install_services() {
   input_email
   input_ss_link
   input_wg_port
-  input_default_address
-  input_ui_password
 
   # загрузка tun2socks
   download_tun2socks
-
-  # поиск оптимального MTU WireGuard
-  find_optimal_wg_mtu
 
   # создание конфига докер сервисов
   create_services_config

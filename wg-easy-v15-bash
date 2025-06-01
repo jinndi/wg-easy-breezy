@@ -563,7 +563,7 @@ download_tun2socks() {
       chmod +x "$path_tun2socks"
 
       mkdir -p "$(dirname "$path_tun2socks_init")"
-      curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init.sh -o "$path_tun2socks_init"
+      curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/tun2socks-init-v15.sh -o "$path_tun2socks_init"
       chmod +x "$path_tun2socks_init"
     ) > /dev/null 2>&1 || exiterr "Ошибка загрузки tun2socks файлов"
 

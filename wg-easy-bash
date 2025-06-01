@@ -690,6 +690,7 @@ cat <<WG_EASY_SS_NETWORKS  >> "$path_docker_compose_file"
         - subnet: fdcc:ad94:bacf:61a4::/64
 
 WG_EASY_SS_NETWORKS
+fi
 
 ## volumes:
 cat <<WG_EASY_VOLUMES  >> "$path_docker_compose_file"

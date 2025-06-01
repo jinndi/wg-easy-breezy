@@ -397,6 +397,8 @@ input_wg_host() {
     # Проверка на пустой ввод
     if [ -z "$wg_host" ]; then
       wg_host="0.0.0.0"
+      is_domain=""
+      insecure="true"
       break
     fi
 

@@ -666,6 +666,34 @@ cat <<CADDY_SERVICE >> "$path_docker_compose_file"
 
 CADDY_SERVICE
 
+# - Caddyfile:
+mkdir -p "$(dirname "$path_caddyfile")"
+
+# -- открываем основной блок хоста
+echo "$wg_host {" > "$path_caddyfile"
+# -- указываем email для успешного получения сертификата
+echo "  tls $email" >> "$path_caddyfile"
+# -- reverse_proxy на UI wg-easy
+cat <<CADDY_FILE_PROXY_WG_EASY >> "$path_caddyfile"
+
+  handle_path /$handle_path_ui/* {
+    reverse_proxy wg-easy:$port
+  }
+CADDY_FILE_PROXY_WG_EASY
+# -- reverse_proxy на UI wg-easy (если IP адрес shadowsocks сервера задан)
+if [[ "$is_shadowsocks" ]]; then
+cat <<CADDY_FILE_PROXY_WG_EASY_SS >> "$path_caddyfile"
+
+  handle_path /$handle_path_ui_ss/* {
+    reverse_proxy wg-easy-ss:$port_ss
+  }
+CADDY_FILE_PROXY_WG_EASY_SS
+fi
+
+# -- закрываем основной блок хоста
+echo "}" >> "$path_caddyfile"
+fi
+
 ## networks:
 cat <<WG_EASY_NETWORKS  >> "$path_docker_compose_file"
 networks:
@@ -701,39 +729,10 @@ if [[ "$is_shadowsocks" ]]; then
   echo "  etc_wireguard_ss:" >> "$path_docker_compose_file"
 fi
 if [[ "$is_domain" ]]; then
-# - docker compose сервис
 cat <<CADDY_VOLUMES >> "$path_docker_compose_file"
   caddy_data:
   caddy_config:
 CADDY_VOLUMES
-fi
-
-# - Caddyfile:
-mkdir -p "$(dirname "$path_caddyfile")"
-
-# -- открываем основной блок хоста
-echo "$wg_host {" > "$path_caddyfile"
-# -- указываем email для успешного получения сертификата
-echo "  tls $email" >> "$path_caddyfile"
-# -- reverse_proxy на UI wg-easy
-cat <<CADDY_FILE_PROXY_WG_EASY >> "$path_caddyfile"
-
-  handle_path /$handle_path_ui/* {
-    reverse_proxy wg-easy:$port
-  }
-CADDY_FILE_PROXY_WG_EASY
-# -- reverse_proxy на UI wg-easy (если IP адрес shadowsocks сервера задан)
-if [[ "$is_shadowsocks" ]]; then
-cat <<CADDY_FILE_PROXY_WG_EASY_SS >> "$path_caddyfile"
-
-  handle_path /$handle_path_ui_ss/* {
-    reverse_proxy wg-easy-ss:$port_ss
-  }
-CADDY_FILE_PROXY_WG_EASY_SS
-fi
-
-# -- закрываем основной блок хоста
-echo "}" >> "$path_caddyfile"
 fi
 
 echook "Конфиги Docker сервисов созданы"

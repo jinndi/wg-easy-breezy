@@ -2,10 +2,7 @@
 
 set -e
 
-# Ссылка (SIP002 URI scheme) для полкючение к серверу shadowsocks
-SS_LINK="${SS_LINK:-''}"
-
-# Если SS_LINK не пуст
+# Если SS_LINK (Ссылка SIP002 URI scheme для полкючение к серверу shadowsocks) не пуста
 if [ -n "$SS_LINK" ]; then
 
   # Название для прокси интерфейса shadowsocks
@@ -40,7 +37,7 @@ if [ -n "$SS_LINK" ]; then
   ip route add default dev "$SS_TUN_NAME" metric 50 
 
   # Запуск tun2socks в фоне
-  echo "[entrypoint.sh] Запускаем tun2socks proxy..."
+  echo "[entrypoint.sh] Запускаем tun2socks proxy к $SS_IP..."
   nohup /app/tun2socks -interface "$DIF" -device "tun://$SS_TUN_NAME" \
     -proxy "$SS_LINK" > /app/tun2socks.log 2>&1 &
 fi

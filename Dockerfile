@@ -30,7 +30,7 @@ RUN mkdir -p /etc/security && \
 
 # Загрузка конфига настройки сети sysctl.conf
 RUN curl -L https://raw.githubusercontent.com/jinndi/wg-easy-bash/main/entrypoint.sh > entrypoint.sh
-RUN chmod a+x start.sh
+RUN chmod a+x entrypoint.sh
 
 # Назначаем точку входа в приложение
 ENTRYPOINT [ "dumb-init", "/app/entrypoint.sh" ]

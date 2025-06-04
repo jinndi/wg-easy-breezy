@@ -665,6 +665,7 @@ fi
 cat <<WG_EASY_BREEZY_SERVICE  > "$path_docker_compose_file"
 services:
   wg-easy-breezy:
+    image: wg-easy-breezy
     build:
       context: .
       dockerfile: $path_dockerfile

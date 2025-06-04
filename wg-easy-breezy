@@ -654,6 +654,7 @@ create_services_config() {
 echomsg "Создаём конфиги Docker сервисов"
 
 ## Загрузка Dockerfile
+mkdir -p "$(dirname "$path_dockerfile")"
 curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/Dockerfile -o "$path_dockerfile"
 if [ -f "$path_dockerfile" ]; then
   exiterr "Не удалось загрузить Dockerfile"

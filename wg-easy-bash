@@ -25,8 +25,6 @@ path_script_link="/usr/bin/wg-easy"
 path_tun2socks="$path_data_dir/tun2socks/tun2socks"
 # - скрипт инициализации интерфейса tun2socks
 path_tun2socks_init="$path_data_dir/tun2socks/tun2socks-init.sh"
-# - папка настроек wireguard
-path_data_wg_dir="$path_data_dir/wireguard"
 # - файл docker compose сервисов
 path_docker_compose_file="$path_data_dir/services.yml"
 # - ссылка на файл systemd unit службы
@@ -34,11 +32,11 @@ path_systemd_unit_file="/etc/systemd/system/wg-easy.service"
 # - файл настройки Caddy сервера
 path_caddyfile="$path_data_dir/Caddyfile"
 # - файл скрипта c сетевыми правилами iptables на запуск служб
-path_iptables_active_script="$path_data_dir/iptables/active.sh"
+path_iptables_active_script="$path_data_dir/iptables/apply.sh"
 # - файл скрипта для удаления ранее созданных iptables правил
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
-# - файл конфига sysctl параметров 
-path_sysctl_config="/etc/sysctl.d/99-wg-easy-bash.conf"
+# - файл конфига sysctl параметров
+path_sysctl_config="$path_data_dir/sysctl.conf"
 
 ## Используемая версия tun2socks
 # https://github.com/xjasonlyu/tun2socks/releases
@@ -701,20 +699,19 @@ services:
       - WG_DEFAULT_ADDRESS=$default_address
       - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
+      - WG_PRE_UP="/sbin/sysctl -p /etc/sysctl_wg-easy.conf"
     image: $wg_easy_image
     container_name: wg-easy
     hostname: wg-easy
     volumes:
-      - $path_data_wg_dir/wg-easy:/etc/wireguard
+      - etc_wireguard:/etc/wireguard
+      - $path_sysctl_config:/etc/sysctl_wg-easy.conf
     ports:
       - $wg_port:$wg_port/udp
       - $port:$port/tcp
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SERVICE
 
@@ -734,6 +731,7 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - WG_DEFAULT_ADDRESS=$default_address_ss
       - WG_DEFAULT_DNS=$default_dns
       - UI_TRAFFIC_STATS=true
+      - WG_PRE_UP="/sbin/sysctl -p /etc/sysctl_wg-easy.conf"
       - WG_POST_UP=/sbin/tun2socks-init.sh
       - SS_TUN_NAME=$ss_tun_name
       - SS_LINK=$ss_link
@@ -741,7 +739,8 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
     container_name: wg-easy-ss
     hostname: wg-easy-ss
     volumes:
-      - $path_data_wg_dir/wg-easy-ss:/etc/wireguard
+      - etc_wireguard_ss:/etc/wireguard
+      - $path_sysctl_config:/etc/sysctl_wg-easy.conf
       - $path_tun2socks:/sbin/tun2socks
       - $path_tun2socks_init:/sbin/tun2socks-init.sh
     ports:
@@ -752,9 +751,6 @@ cat <<WG_EASY_SS_SERVICE >> "$path_docker_compose_file"
       - SYS_MODULE
     devices:
       - /dev/net/tun
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
 
 WG_EASY_SS_SERVICE
 fi
@@ -776,9 +772,6 @@ cat <<CADDY_SERVICE >> "$path_docker_compose_file"
       - caddy_data:/data
       - caddy_config:/config
 
-volumes:
-  caddy_data:
-  caddy_config:
 CADDY_SERVICE
 
 # - Caddyfile:
@@ -807,6 +800,21 @@ fi
 
 # -- закрываем основной блок хоста
 echo "}" >> "$path_caddyfile"
+fi
+
+## volumes:
+cat <<WG_EASY_VOLUMES  >> "$path_docker_compose_file"
+volumes:
+  etc_wireguard:
+WG_EASY_VOLUMES
+if [[ "$is_shadowsocks" ]]; then
+  echo "  etc_wireguard_ss:" >> "$path_docker_compose_file"
+fi
+if [[ "$is_domain" ]]; then
+cat <<CADDY_VOLUMES >> "$path_docker_compose_file"
+  caddy_data:
+  caddy_config:
+CADDY_VOLUMES
 fi
 
 echook "Конфиги Docker сервисов созданы"
@@ -894,10 +902,7 @@ create_sysctl_config (){
       fi
     fi
     
-    # Применяем полученный конфиг
-    sysctl -e -q -p "$path_sysctl_config"
-
-    echook "Конфиг sysctl создан и применен"
+    echook "Конфиг sysctl создан"
   else
     exiterr "Ошибка загрузки sysctl конфига"
   fi

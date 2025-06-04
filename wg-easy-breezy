@@ -684,12 +684,16 @@ services:
     hostname: wg-easy-breezy
     volumes:
       - etc_wireguard:/etc/wireguard
+      - /lib/modules:/lib/modules
     ports:
       - $wg_port:$wg_port/udp
       - $port:$port/tcp
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
+    privileged: true
+    security_opt:
+      - label=disable
 
 WG_EASY_BREEZY_SERVICE
 
@@ -716,12 +720,16 @@ cat <<WG_EASY_BREEZY_SS_SERVICE >> "$path_docker_compose_file"
     hostname: wg-easy-breezy-ss
     volumes:
       - etc_wireguard_ss:/etc/wireguard
+      - /lib/modules:/lib/modules
     ports:
       - $wg_port_ss:$wg_port_ss/udp
       - $port_ss:$port_ss/tcp
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
+    privileged: true
+    security_opt:
+      - label=disable
     devices:
       - /dev/net/tun
     depends_on:

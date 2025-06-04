@@ -165,8 +165,8 @@ check_os_ver() {
 
 # - поддержка версии ядра
 check_kernel() {
-  if [[ $(uname -r | cut -d "." -f 1) -eq 2 ]]; then
-    exiterr "В системе установлено старое ядро, несовместимое с данным установщиком."
+  if [[ $(uname -r | cut -d "." -f 1) -lt 5 ]]; then
+     exiterr "В системе установлено старое ядро, несовместимое с данным установщиком."
   fi
 }
 
@@ -882,22 +882,16 @@ create_sysctl_config (){
 
   # Проверка что файл загружен
   if [ -f "$path_sysctl_config" ]; then
-    # Добавляем если поддерживается модуль hybla контроля перегрузки 
-    # (для сетей с в сысокой задежкой) 
-    if modprobe -q tcp_hybla \
-      && printf '%s\n%s' "2.6.13" "$(uname -r)" | sort -C -V \
-      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
-      echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
-    fi
-
-    # включение TCP BBR контроля перегрузки, если версия ядра >= 4.20
-    if modprobe -q tcp_bbr \
-      && printf '%s\n%s' "4.20" "$(uname -r)" | sort -C -V \
-      && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]; then
-      cat >> "$path_sysctl_config" <<SYSCTL_CONF
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
-SYSCTL_CONF
+    # Включение TCP BBR контроля перегрузки, если не удачно, то пробуем hybla
+    if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
+    then
+      echo "net.core.default_qdisc = fq" >> "$path_sysctl_config"
+      echo "net.ipv4.tcp_congestion_control = bbr" >> "$path_sysctl_config"
+    else
+      if modprobe -q tcp_hybla && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
+      then
+        echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
+      fi
     fi
     
     # Применяем полученный конфиг

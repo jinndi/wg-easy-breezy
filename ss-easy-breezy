@@ -54,7 +54,7 @@ cat <<EOF
 
 ###################################################
 #             shadowsocks-rust server             #
-# GitHub: https://github.com/jinndi/wg-easy-bash  #
+# GitHub:https://github.com/jinndi/wg-easy-breezy #
 ###################################################
 
 EOF
@@ -236,7 +236,7 @@ create_sysctl_config (){
   mkdir -p "$(dirname "$path_sysctl_config")"
 
   # Загружаем конфиг
-  link_sysctl_config="https://raw.githubusercontent.com/jinndi/wg-easy-bash/refs/heads/main/sysctl.conf"
+  link_sysctl_config="https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf"
   wget -q "$link_sysctl_config" -O "$path_sysctl_config" > /dev/null 2>&1 \
   || exiterr "Ошибка загрузки sysctl конфига"
 

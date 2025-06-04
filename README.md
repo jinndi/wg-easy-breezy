@@ -1,6 +1,6 @@
-# WG-EASY-BASH
+# WG-EASY-BREEZY
 
-### bash-cкрипт развертывания wg-easy + wg-easy через tun2socks прокси shasowsocks + caddy сервер
+### bash-cкрипт развертывания wg-easy + wg-easy через tun2socks прокси shasowsocks + caddy реверс прокси
 
 
 ![Схема работы](https://github.com/user-attachments/assets/f041ac27-b01c-45e1-87c5-58f05bb432c3)
@@ -10,7 +10,7 @@
 
 Два WireGuard-а с интерфейсом wg-easy на одном хосте, второй опционален и настраивается на работу через прокси shasowsocks к другому серверу.
 
-Опционально: Быстрое создание shasowsocks сервера через скрипт `ss-server-bash` и получние ссылки для ее указания в `wg-easy-bash` скрипте (если нужно развернуть второй wg через прокси)
+Опционально: Быстрое создание shasowsocks сервера через скрипт `ss-easy-breezy` и получние ссылки для ее указания в `wg-easy-breezy` скрипте (если нужно развернуть второй wg через прокси)
 
 Опционально: Автонастройка Caddy веб сервера как реверс прокси с автопродляемым SSL сертификатом (необходимо купленное настроенное доменное имя с `A` записью на ip вашего сервера)
 
@@ -21,31 +21,31 @@
 
 ## Установка:
 
-### ss-server-bash
+### ss-easy-breezy
 
 Если есть 2 VPS сервера, допустим один `в вашей резиденции (сервер A)`, другой для обхода блокировок `за границей (сервер B)`, 
 то для начала установите на "B" shasowsocks сервер из ssh коммандой:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/main/ss-server-bash -o ss-server-bash && bash ss-server-bash
+curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy -o ss-easy-breezy && bash ss-easy-breezy
 ```
 В процессе установки вам нужно будет ввести только номер порта, после завершения вы получите ссылку для подлючения, сохраните её.
 
 Управление установленным сервером осуществляется по комманде ``ss-server``
 
-### wg-easy-bash
+### wg-easy-breezy
 
-На сервере "A" из под ssh выполните установку основного скрипта `wg-easy-bash`
+На сервере "A" из под ssh выполните установку основного скрипта `wg-easy-breezy`
 
 ```
-curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-bash/main/wg-easy-bash -o wg-easy-bash && bash wg-easy-bash
+curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy -o wg-easy-breezy && bash wg-easy-breezy
 ```
 
 Cледовать инстукциям на экране. Будут запросы на ввод данных:
 
  1. `имя домена` - впишите если он есть и хотите обезопасить вход в веб интерфейсы
  2. `ваш e-mail адрес` - если домен указали (нужно что-бы получить SSL сертификат)
- 3. `ссылка для подключения к shasowsocks` (если получали ее установкой `ss-server-bash`)
+ 3. `ссылка для подключения к shasowsocks` (если получали ее установкой `ss-easy-breezy`)
  4. `порт(ы) Wireguard` (для веб интерфейса(ов) будут на еденицу больше)
  5. `диапазон(ы) адресов клиентов Wireguard` Wireguard (можно просто нажать Enter)
  6. `пароль для входа в веб-интерфейс(ы)`

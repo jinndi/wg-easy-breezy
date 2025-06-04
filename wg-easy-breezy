@@ -185,6 +185,7 @@ remove_install() {
   # Остановка сервисов с удаление всех задействованных контейнеров и образов
   if [[ -e "$path_docker_compose_file" ]]; then
     if systemctl is-active --quiet wg-easy-breezy; then
+      docker compose -f $path_docker_compose_file down --remove-orphans --rmi all > /dev/null
       systemctl disable --now wg-easy-breezy > /dev/null
     fi
   fi

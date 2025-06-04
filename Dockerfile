@@ -18,8 +18,8 @@ RUN curl -L https://github.com/xjasonlyu/tun2socks/releases/download/${TUN2SOCKS
 # Добавлении таблицы маршрутизации "lip" в /etc/iproute2/rt_tables
 RUN mkdir -p /etc/iproute2 && echo "20 lip" >> /etc/iproute2/rt_tables
 
-# Загрузка конфига настройки сети sysctl.conf
-RUN curl -L https://raw.githubusercontent.com/jinndi/wg-easy-bash/main/sysctl.conf > /etc/sysctl.conf
+# Копирование конфига настройки сети sysctl.conf
+COPY ./sysctl.conf /etc/sysctl.conf
 
 # nofile 51200 для всех пользователей
 RUN mkdir -p /etc/security && \
@@ -29,7 +29,7 @@ RUN mkdir -p /etc/security && \
   " | sed -e 's/^\s\+//g' | tee -a /etc/security/limits.conf
 
 # Загрузка конфига настройки сети sysctl.conf
-RUN curl -L https://raw.githubusercontent.com/jinndi/wg-easy-bash/main/start.sh > start.sh
+RUN curl -L https://raw.githubusercontent.com/jinndi/wg-easy-bash/main/entrypoint.sh > entrypoint.sh
 RUN chmod a+x start.sh
 
 # Назначаем точку входа в приложение

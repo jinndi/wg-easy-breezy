@@ -1037,7 +1037,7 @@ restart_services() {
 rebuild_services() {
   systemctl stop wg-easy-breezy > /dev/null
   echomsg "Пересобираем докер образ wg-easy-breezy"
-  docker compose -f $path_docker_compose_file --build --no-cache
+  docker compose -f $path_docker_compose_file build --no-cache
   sysctl -e -q -p "$path_sysctl_config_link"
   systemctl start wg-easy-breezy > /dev/null
   select_menu_option

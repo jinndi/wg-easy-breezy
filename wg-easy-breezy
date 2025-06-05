@@ -33,8 +33,11 @@ path_caddyfile="$path_data_dir/Caddyfile"
 path_iptables_apply_script="$path_data_dir/iptables/apply.sh"
 # - файл скрипта для удаления ранее созданных iptables правил
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
-# - фременное расположение файла конфига sysctl параметров
+# - расположение файла конфига sysctl параметров
 path_sysctl_config="$path_data_dir/sysctl.conf"
+# - ссылка на файл конфига sysctl (path_sysctl_config)
+path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
+
 
 ## Используемая версия tun2socks
 # https://github.com/xjasonlyu/tun2socks/releases
@@ -202,6 +205,12 @@ remove_install() {
     rm -f "$path_script_link"
   fi
 
+  # Удаление ссылки на sysctl конфиг с применением изменений
+  if [[ -L "$path_sysctl_config_link" ]]; then
+    rm -f "$path_sysctl_config_link"
+    sysctl --system > /dev/null 2>&1
+  fi
+  
   # Удаление папки данных
   if [[ -d "$path_data_dir" ]]; then
     rm -rf "$path_data_dir"
@@ -261,8 +270,8 @@ install_pkgs() {
       apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
     ) || exiterr "'apt-get update' ошибка."
     (
-      apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed > /dev/null 2>&1 \
-      || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed > /dev/null 2>&1
+      apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed nano > /dev/null 2>&1 \
+      || apt-get -yqq install iproute2 iptables lsof dnsutils curl unzip grep sed nano > /dev/null 2>&1
     ) || exiterr "'apt-get install' ошибка."
 
     # Установка и запуск докера если ранее не установлен 
@@ -689,12 +698,11 @@ services:
     ports:
       - $wg_port:$wg_port/udp
       - $port:$port/tcp
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
     privileged: true
     security_opt:
       - label=disable
+    ulimit:
+      - nofile=51200:51200
 
 WG_EASY_BREEZY_SERVICE
 
@@ -725,12 +733,11 @@ cat <<WG_EASY_BREEZY_SS_SERVICE >> "$path_docker_compose_file"
     ports:
       - $wg_port_ss:$wg_port_ss/udp
       - $port_ss:$port_ss/tcp
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
     privileged: true
     security_opt:
       - label=disable
+    ulimit:
+      - nofile=51200:51200
     devices:
       - /dev/net/tun
     depends_on:
@@ -870,6 +877,8 @@ create_sysctl_config (){
 
   # Создать дирректорию если нет
   mkdir -p "$(dirname "$path_sysctl_config")"
+  mkdir -p "$(dirname "$path_sysctl_config_link")"
+  
   
   # Загружаем конфиг
   curl -fsSL https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf -o "$path_sysctl_config"
@@ -887,8 +896,14 @@ create_sysctl_config (){
         echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
       fi
     fi
+
+    # Создаем ссылку на файл
+    ln -s "$path_sysctl_config" "$path_sysctl_config_link"
+
+    # Применяем полученный конфиг
+    sysctl -e -q -p "$path_sysctl_config_link"
     
-    echook "Конфиг sysctl создан"
+    echook "Конфиг sysctl создан и применен"
   else
     exiterr "Ошибка загрузки sysctl конфига"
   fi
@@ -1015,6 +1030,16 @@ restart_services() {
   select_menu_option
 }
 
+# Функция перебилдинга образа wg-easy-breezy
+rebuild_services() {
+  systemctl stop wg-easy-breezy > /dev/null
+  echomsg "Пересобираем докер образ wg-easy-breezy"
+  docker compose -f $path_docker_compose_file --build --no-cache
+  sysctl -e -q -p "$path_sysctl_config_link"
+  systemctl start wg-easy-breezy > /dev/null
+  select_menu_option
+}
+
 # Функция установки приложения
 install_services() {
   # проверка поддержки
@@ -1118,11 +1143,12 @@ select_menu_option() {
     echo "  1) Включить"
   fi
   echo "  2) Перезапустить"
-  echo "  3) Удалить"
-  echo "  4) Выход"
+  echo "  3) Пересобрать"
+  echo "  4) Удалить"
+  echo "  5) Выход"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-4]$ ]]; do
+  until [[ "$option" =~ ^[1-5]$ ]]; do
     echo "$option: неккоректное значение."
     read -rp "Опция: " option
   done
@@ -1135,9 +1161,12 @@ select_menu_option() {
       restart_services
     ;;
     3)
-      remove_services
+      rebuild_services
     ;;
     4)
+      remove_services
+    ;;
+    5)
       exit 0
     ;;
   esac

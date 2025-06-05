@@ -2,6 +2,18 @@
 
 set -e
 
+# Загрузка модулей tcp_congestion_control
+for module in tcp_hybla tcp_bbr; do
+  if modprobe -q "$module"; then
+    echo "[entrypoint.sh] Модуль $module загружен"
+  else
+    echo "[entrypoint.sh] Ошибка загрузки модуля $module"
+  fi
+done
+
+# Применяем сетевые настройки из /etc/sysctl.conf
+/sbin/sysctl -p > /dev/null 2>&1
+
 # Если SS_LINK (Ссылка SIP002 URI scheme для полкючение к серверу shadowsocks) не пуста
 if [ -n "$SS_LINK" ]; then
 

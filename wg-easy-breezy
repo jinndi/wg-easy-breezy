@@ -700,8 +700,10 @@ services:
     privileged: true
     security_opt:
       - label=disable
-    ulimit:
-      - nofile=51200:51200
+    ulimits:
+      nofile:
+        soft: 51200
+        hard: 51200
 
 WG_EASY_BREEZY_SERVICE
 
@@ -735,8 +737,10 @@ cat <<WG_EASY_BREEZY_SS_SERVICE >> "$path_docker_compose_file"
     privileged: true
     security_opt:
       - label=disable
-    ulimit:
-      - nofile=51200:51200
+    ulimits:
+      nofile:
+        soft: 51200
+        hard: 51200
     devices:
       - /dev/net/tun
     depends_on:

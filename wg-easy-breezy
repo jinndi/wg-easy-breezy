@@ -280,10 +280,9 @@ install_pkgs() {
     fi
     systemctl start docker
 
-    # Спуллить образ wg-easy если его нет
-    if ! docker image inspect "$wg_easy_image" > /dev/null; then
-      docker pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $wg_easy_image"
-    fi
+    # Спуллить образ wg-easy
+    docker pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $wg_easy_image"
+
   ) & show_spinner $!
 
   echook "Зависимости установлены"

@@ -21,7 +21,7 @@ RUN mkdir -p /etc/iproute2 && echo "20 lip" >> /etc/iproute2/rt_tables
 # Копирование конфига настройки сети sysctl.conf
 COPY ./sysctl.conf /etc/sysctl.conf
 
-# Загрузка конфига настройки сети sysctl.conf
+# Загрузка entrypoint скрипта
 RUN curl -L https://raw.githubusercontent.com/jinndi/wg-easy-bash/main/entrypoint.sh > entrypoint.sh
 RUN chmod a+x entrypoint.sh
 

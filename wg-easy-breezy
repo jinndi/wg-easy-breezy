@@ -38,11 +38,6 @@ path_sysctl_config="$path_data_dir/sysctl.conf"
 # - ссылка на файл конфига sysctl (path_sysctl_config)
 path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
 
-
-## Используемая версия tun2socks
-# https://github.com/xjasonlyu/tun2socks/releases
-version_tun2socks="v2.6.0-beta"
-
 ## Переменные настройки shadowsocks прокси интерфейса через tun2socks:
 # - имя интерфейса
 ss_tun_name="sstun"

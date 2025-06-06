@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# https://github.com/jinndi/shadowsocks-tunnel-install
+# https://github.com/jinndi/wg-easy-breezy
 #
 # Copyright (c) 2025 Jinndi <alncores@gmail.ru>
 #
@@ -56,7 +56,7 @@ show_header() {
 cat <<EOF
 
 ###################################################
-#             shadowsocks-rust server             #
+#                  SS-EASY-BREEZY                 #
 # GitHub:https://github.com/jinndi/wg-easy-breezy #
 ###################################################
 

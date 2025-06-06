@@ -580,8 +580,8 @@ input_wg_port() {
 
 # - диапазон адресов для клиентов WireGuard
 input_default_address() {
-  local default_value="10.10.10.x"
-  local default_value_ss="10.11.11.x"
+  local default_value="10.0.0.x"
+  local default_value_ss="10.1.0.x"
 
   echomsg "Диапазон адресов клиентов WireGuard"
   echo "(нажмите Enter, чтобы оставить по умолчанию)"

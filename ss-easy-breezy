@@ -27,22 +27,22 @@ path_ssserver="$path_shadowsocks_rust/ssserver"
 path_ssservice="$path_shadowsocks_rust/ssservice"
 # - файл ssurl ( Shadowsocks-rust создание ссылок)
 path_ssurl="$path_shadowsocks_rust/ssurl"
-# - файл службы
+# - файл службы запуска shadowsocks-rust сервера
 path_service="/etc/systemd/system/ssserver.service"
 # - файл конфига shadowsocks-rust
-path_config="/etc/shadowsocks-rust/config.json"
+path_config="$path_shadowsocks_rust/config.json"
 # - файл конфига для генерации ссылки клиенту
-path_client_for_url_config="$path_shadowsocks_rust/for_url_config.json"
+path_client_for_url_config="$path_shadowsocks_rust/config_url_link.json"
 # - файл конфига sysctl
-path_sysctl_config="/etc/sysctl.d/99-shadowsocks.conf"
+path_sysctl_config="/etc/sysctl.d/99-ss-easy-breezy.conf"
 # - место сохранения текущего скрипта после установки сервера
-path_script="/sbin/ss-server"
+path_script="/usr/bin/sseb"
 
 ## Шифр, поддерживаются следующие в порядке увеличения нагрузки на процессор:
 # -- chacha20-ietf-poly1305
 # -- aes-128-gcm
 # -- aes-256-gcm
-encrypt_method="aes-256-gcm"
+encrypt_method="aes-128-gcm"
 
 ## Некодированный пароль сервера
 password=""

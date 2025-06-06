@@ -20,7 +20,7 @@ path_data_dir="/opt/wg-easy-breezy"
 # - файл текущего скрипта
 path_script="$path_data_dir/wg-easy-breezy"
 # - ссылка на файл текущего скрипта
-path_script_link="/usr/bin/wg-easy"
+path_script_link="/usr/bin/wgeb"
 # - файл Dockerfile создание образа wg-easy-breezy
 path_dockerfile="$path_data_dir/Dockerfile"
 # - файл docker compose настройки сервисов
@@ -57,7 +57,7 @@ handle_path_ui="wg-easy-breezy"
 handle_path_ui_ss="wg-easy-breezy-ss"
 
 # DNS адреса по умолчанию для клиентов WireGuard (через запятую)
-default_dns=1.1.1.1,8.8.8.8
+default_dns=1.1.1.1,1.0.0.1
 
 ## Объявление переменных задаваемых в процессе работы скрипта:
 # - доменное имя либо адрес IP-адрес хоста
@@ -216,9 +216,10 @@ remove_install() {
     rm -rf "$path_data_dir"
   fi
 
-  # Удаление файла systemd unit службы
+  # Удаление файла systemd службы
   if [[ -f "$path_systemd_unit_file" ]]; then
     rm -f "$path_systemd_unit_file"
+    systemctl daemon-reload
   fi
 
   if [[ -n "$is_show_info" ]]; then
@@ -917,7 +918,7 @@ create_systemd_unit(){
 local working_dir
 working_dir="$(dirname "$path_docker_compose_file")"
 
-echomsg "Создание systemd unin службы"
+echomsg "Создание systemd службы"
 
 cat <<SYSTEMD_UNIT > "$path_systemd_unit_file"
 [Unit]

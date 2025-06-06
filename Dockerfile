@@ -2,6 +2,7 @@ FROM ghcr.io/wg-easy/wg-easy:14
 LABEL maintainer="WG-EASY-BREEZY"
 
 # Используемая версия tun2socks
+# https://github.com/xjasonlyu/tun2socks/releases
 ARG TUN2SOCKS_RELEASE="v2.6.0-beta"
 
 RUN apk add --no-cache curl unzip bash nano dumb-init

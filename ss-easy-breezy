@@ -265,6 +265,7 @@ input_port(){
   while true; do
     read -rp " > Введите порт (от 49152 до 65535): " port
     if check_port "$port"; then
+      echook "Порт $port принят"
       break
     fi
   done
@@ -328,10 +329,12 @@ cat >"$path_client_for_url_config" <<CLIENT_CONFIG
   "password": "$password"
 }
 CLIENT_CONFIG
+
+echook "Конфиг создан"
 }
 
 create_service(){
-echomsg "Добавляем ssserver сервис"
+echomsg "Создаём systemd службу"
 
 # Путь к iptables
 local iptables_path
@@ -364,11 +367,16 @@ NoNewPrivileges=true
 [Install]
 WantedBy=multi-user.target
 CONFIG_SUSTEMD
+
+echook "Служба создана"
 }
 
 add_user(){
   echomsg "Добавляем пользователя 'shadowsocks' для запуска сервиса"
-  useradd --system --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin shadowsocks >/dev/null 2>&1
+  useradd --system --home-dir /nonexistent --no-create-home \
+  --shell /usr/sbin/nologin shadowsocks >/dev/null 2>&1 \
+  || exiterr "Ошибка при создании пользователя"
+  echook "Пользователь добавлен"
 }
 
 activate_ssserver(){
@@ -452,10 +460,10 @@ install_ssserver(){
 
   # Данные для подключения
   echo
-  echo "-------------------------------------------------------"
+  echo "-----------------------------------------------------------------------"
   echo "Ссылка для подключения к shadowsocks:"
   echo "$("$path_ssurl" --encode "$path_client_for_url_config")"
-  echo "-------------------------------------------------------"
+  echo "-----------------------------------------------------------------------"
   echo
 
   # перемещам текущий скрипт, добавляем на него права и ссылку

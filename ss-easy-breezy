@@ -36,7 +36,10 @@ path_client_for_url_config="$path_shadowsocks_rust/config_url_link.json"
 # - файл конфига sysctl
 path_sysctl_config="/etc/sysctl.d/99-ss-easy-breezy.conf"
 # - место сохранения текущего скрипта после установки сервера
-path_script="/usr/bin/sseb"
+path_script="$path_shadowsocks_rust/ss-easy-breezy"
+# - место сохранения ссылки на этот скрипт
+path_script_link="/usr/bin/sseb"
+
 
 ## Шифр, поддерживаются следующие в порядке увеличения нагрузки на процессор:
 # -- chacha20-ietf-poly1305
@@ -425,7 +428,8 @@ remove_shadowsocks_rust(){
     rm -f "$path_config"
     rm -f "$path_service"
     rm -f "$path_sysctl_config" 
-    rm -f "$path_script" 
+    rm -f "$path_script"
+    rm -f "$path_script_link" 
     rm -rf "$path_shadowsocks_rust"
     systemctl daemon-reload
     userdel shadowsocks
@@ -454,9 +458,10 @@ install_ssserver(){
   echo "-------------------------------------------------------"
   echo
 
-  # перемещам текущий скрипт, добавляем на него права
+  # перемещам текущий скрипт, добавляем на него права и ссылку
   mv "$(realpath "$0")" "$path_script"
   chmod +x "$path_script"
+  ln -s "$path_script" "$path_script_link"
 
   read -n1 -r -p "Нажмите любую клавишу чтобы отобразить меню..."
   select_menu_option

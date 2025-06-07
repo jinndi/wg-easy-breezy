@@ -199,8 +199,7 @@ install_pkgs(){
 
   while { [ "$has_fuser" ] && fuser "$apt_lk" "$pkg_lk" >/dev/null 2>&1; } \
     || { [ "$has_lsof" ] && lsof "$apt_lk" >/dev/null 2>&1; } \
-    || { [ "$has_lsof" ] && lsof "$pkg_lk" >/dev/null 2>&1; } \
-    || [ -e "$apt_lk" ] || [ -e "$pkg_lk" ]; do
+    || { [ "$has_lsof" ] && lsof "$pkg_lk" >/dev/null 2>&1; }; do
       [ "$count" = 0 ] && echo "Ожидаем, когда apt освободится..."
       [ "$count" -ge 100 ] && exiterr "Не удалось дождаться разблокировку apt/dpkg."
       count=$((count+1))

@@ -50,6 +50,7 @@ if [ -n "$SS_LINK" ]; then
   echo "/$SS_LINK/"
   echo "[entrypoint.sh] Запускаем sslocal proxy к $SS_IP..."
   nohup /app/sslocal --protocol tun --server-url $SS_LINK -U \
+    --server-addr "" --encrypt-method "" \
     --outbound-bind-interface $DIF --tun-interface-name $SS_TUN_NAME \
     --tcp-keep-alive 25 --timeout 300 --udp-timeout 300 \
     --udp-max-associations 512 --nofile 51200 --tcp-fast-open \

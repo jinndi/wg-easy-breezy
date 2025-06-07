@@ -5,16 +5,28 @@ LABEL maintainer="WG-EASY-BREEZY"
 # https://github.com/xjasonlyu/tun2socks/releases
 ARG TUN2SOCKS_RELEASE="v2.6.0-beta"
 
-RUN apk add --no-cache curl unzip bash nano dumb-init
+# Используемая версия shadowsocks-rust
+# https://github.com/shadowsocks/shadowsocks-rust/releases
+ARG SS_RUST_RELEASE="v1.23.4"
+
+
+RUN apk add --no-cache curl unzip tar xz-utils bash nano dumb-init
 RUN apk --update upgrade --no-cache
 
 WORKDIR /app
 
 # Загрузка tun2socks
-RUN curl -L https://github.com/xjasonlyu/tun2socks/releases/download/${TUN2SOCKS_RELEASE}/tun2socks-linux-amd64.zip > tun2socks-linux-amd64.zip;\
-  unzip tun2socks-linux-amd64.zip;\
-  mv tun2socks-linux-amd64 tun2socks;\
-  chmod a+x tun2socks;
+#RUN curl -L https://github.com/xjasonlyu/tun2socks/releases/download/${TUN2SOCKS_RELEASE}/tun2socks-linux-amd64.zip > tun2socks-linux-amd64.zip;\
+#  unzip tun2socks-linux-amd64.zip;\
+#  mv tun2socks-linux-amd64 tun2socks;\
+#  chmod a+x tun2socks;
+
+# Загрузка shadowsocks-rust sslocal
+RUN curl -L https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SS_RUST_RELEASE}/shadowsocks-${TUN2SOCKS_RELEASE}.x86_64-unknown-linux-gnu.tar.xz;\
+  tar -xf shadowsocks-${SS_RUST_RELEASE}.x86_64-unknown-linux-gnu.tar.xz;\
+  mv shadowsocks-${SS_RUST_RELEASE}.x86_64-unknown-linux-gnu.tar.xz/sslocal /app/sslocal;\
+  rm -r shadowsocks-${SS_RUST_RELEASE}.x86_64-unknown-linux-gnu.tar.xz;\
+  chmod a+x /app/sslocal;
 
 # Добавлении таблицы маршрутизации "lip" в /etc/iproute2/rt_tables
 RUN mkdir -p /etc/iproute2 && echo "20 lip" >> /etc/iproute2/rt_tables

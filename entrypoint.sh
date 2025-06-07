@@ -49,8 +49,7 @@ if [ -n "$SS_LINK" ]; then
   ip route add default dev "$SS_TUN_NAME" metric 50 
 
   echo "[entrypoint.sh] Запускаем sslocal proxy к $SS_IP..."
-  nohup /app/sslocal --protocol tun -U \
-    --server-url "$SS_LINK" \
+  nohup /app/sslocal --protocol tun --server-url "$SS_LINK" -U \
     --outbound-bind-interface "$DIF" \
     --tun-interface-name "$SS_TUN_NAME" \
     --tcp-keep-alive 25 \

@@ -17,11 +17,35 @@ done
 # Если SS_LINK (Ссылка SIP002 URI scheme для полкючение к серверу shadowsocks) не пуста
 if [ -n "$SS_LINK" ]; then
 
+  # Добавляем префикс ss://, если его нет
+  [[ "$SS_LINK" != ss://* ]] && SS_LINK="ss://${SS_LINK}"
+  # Удаляем префикс ss:// для извлечения данных
+  ss_clean_link="${SS_LINK#ss://}"
+  # Удаляем всё после # (коммент ссылки если есть)
+  ss_clean_link="${ss_clean_link%%#*}"
+
+  # Извлечение адреса сервера (IP:ПОРТ)
+  SS_SERVER_ADDR="${ss_clean_link#*@}"
+
+  # Извлечение IP сервера
+  SS_IP="${SS_SERVER_ADDR%%:*}"
+
+  # Извлекаем base64 кодированную строку
+  base64_part="${ss_clean_link%@*}"
+  # Декодирование base64 строки
+  decoded=$(echo "$base64_part" | base64 --decode 2>/dev/null); then
+    echo "[entrypoint.sh] Ошибка: base64 не удалось декодировать ссылку SS_LINK"
+    exit 1
+  fi
+
+  # Получаем метод шифра 
+  SS_ENCRYPT_METHOD="${decoded%%:*}"
+
+  # Получаем пароль
+  SS_PASSWORD="${decoded#*:}"; SS_PASSWORD="${SS_PASSWORD%@*}"
+
   # Название для прокси интерфейса shadowsocks
   SS_TUN_NAME="${SS_TUN_NAME:-tun0}"
-
-  # Извлечение IP сервера из ссылки ss://...@IP:port
-  SS_IP=$(echo "$SS_LINK" | awk -F'[@:]' '{print $(NF-1)}')
 
   # Получение имени интерфейса по умолчанию
   DIF=$(ip route | awk '/default/ {print $5}' | head -n1)
@@ -47,11 +71,11 @@ if [ -n "$SS_LINK" ]; then
   ip route add default via "$MIP" dev "$DIF" table lip
   ip route add "$SS_IP/32" via "$MIP" dev "$DIF"
   ip route add default dev "$SS_TUN_NAME" metric 50 
-  echo "/$SS_LINK/"
+
   echo "[entrypoint.sh] Запускаем sslocal proxy к $SS_IP..."
-  nohup /app/sslocal --protocol tun --server-url $SS_LINK -U \
-    --server-addr "" --encrypt-method "" \
-    --outbound-bind-interface $DIF --tun-interface-name $SS_TUN_NAME \
+  nohup /app/sslocal --protocol tun -U --server-addr "$SS_SERVER_ADDR" \
+    --encrypt-method "$SS_ENCRYPT_METHOD" --password "$SS_PASSWORD" \
+    --outbound-bind-interface $DIF --tun-interface-name "$SS_TUN_NAME" \
     --tcp-keep-alive 25 --timeout 300 --udp-timeout 300 \
     --udp-max-associations 512 --nofile 51200 --tcp-fast-open \
     > /app/sslocal.log 2>&1 &

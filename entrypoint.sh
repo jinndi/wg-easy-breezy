@@ -33,7 +33,7 @@ if [ -n "$SS_LINK" ]; then
   # Извлекаем base64 кодированную строку
   base64_part="${ss_clean_link%@*}"
   # Декодирование base64 строки
-  decoded=$(echo "$base64_part" | base64 --decode 2>/dev/null); then
+  if ! decoded=$(echo "$base64_part" | base64 --decode 2>/dev/null); then
     echo "[entrypoint.sh] Ошибка: base64 не удалось декодировать ссылку SS_LINK"
     exit 1
   fi

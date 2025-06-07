@@ -15,7 +15,7 @@ RUN apk --update upgrade --no-cache
 
 WORKDIR /app
 
-# Загрузка с sslocal
+# Загрузка shadowsocks-rust sslocal
 RUN curl -L -o /tmp/ss.tar.xz https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SS_RUST_RELEASE}/shadowsocks-${SS_RUST_RELEASE}.x86_64-unknown-linux-musl.tar.xz  && \
     mkdir -p /tmp/ss && \
     tar -xf /tmp/ss.tar.xz -C /tmp/ss && \

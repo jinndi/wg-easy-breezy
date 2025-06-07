@@ -27,7 +27,7 @@
 то для начала установите на "B" shasowsocks сервер из ssh коммандой:
 
 ```
-curl -fsSLO https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
+curl -fsSLO https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy?nc=$(date +%s) && bash ss-easy-breezy
 ```
 В процессе установки вам нужно будет ввести только номер порта, после завершения вы получите ссылку для подлючения, сохраните её.
 
@@ -38,7 +38,7 @@ curl -fsSLO https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy
 На сервере "A" из под ssh выполните установку основного скрипта `wg-easy-breezy`
 
 ```
-curl -fsSLO https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
+curl -fsSLO https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy?nc=$(date +%s) && bash wg-easy-breezy
 ```
 
 Cледовать инстукциям на экране. Будут запросы на ввод данных:

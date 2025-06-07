@@ -26,16 +26,13 @@ if [ -n "$SS_LINK" ]; then
   base64_part="${ss_clean_link%@*}"
 
   # Декодирование base64 строки
-  decoded=$(echo "$base64_part" | base64 --decode 2>/dev/null) || {
+  decoded=$(echo "$base64_part" | base64 -d 2>/dev/null) || {
     echo "[entrypoint.sh] Ошибка: base64 не удалось декодировать ссылку SS_LINK"
     exit 1
   }
 
   # Извлечение адреса сервера (IP:ПОРТ)
-  SS_SERVER_ADDR="${ss_clean_link#*@}"
-
-  # Удаляем всё после # (коммент ссылки если есть)
-  SS_SERVER_ADDR="${SS_SERVER_ADDR%%#*}"
+  SS_SERVER_ADDR="${ss_clean_link#*@}"; SS_SERVER_ADDR="${SS_SERVER_ADDR%%#*}"
 
   # Извлечение IP сервера
   SS_IP="${SS_SERVER_ADDR%%:*}"

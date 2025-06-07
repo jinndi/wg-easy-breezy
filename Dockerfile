@@ -15,12 +15,6 @@ RUN apk --update upgrade --no-cache
 
 WORKDIR /app
 
-# Загрузка tun2socks
-#RUN curl -L https://github.com/xjasonlyu/tun2socks/releases/download/${TUN2SOCKS_RELEASE}/tun2socks-linux-amd64.zip > tun2socks-linux-amd64.zip;\
-#  unzip tun2socks-linux-amd64.zip;\
-#  mv tun2socks-linux-amd64 tun2socks;\
-#  chmod a+x tun2socks;
-
 # Загрузка с sslocal
 RUN curl -L -o /tmp/ss.tar.xz https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SS_RUST_RELEASE}/shadowsocks-${SS_RUST_RELEASE}.x86_64-unknown-linux-musl.tar.xz  && \
     mkdir -p /tmp/ss && \
@@ -28,6 +22,12 @@ RUN curl -L -o /tmp/ss.tar.xz https://github.com/shadowsocks/shadowsocks-rust/re
     mv /tmp/ss/sslocal /app/sslocal && \
     chmod +x /app/sslocal && \
     rm -rf /tmp/ss /tmp/ss.tar.xz
+
+# Альтернатива tun2socks
+#RUN curl -L https://github.com/xjasonlyu/tun2socks/releases/download/${TUN2SOCKS_RELEASE}/tun2socks-linux-amd64.zip > tun2socks-linux-amd64.zip;\
+#  unzip tun2socks-linux-amd64.zip;\
+#  mv tun2socks-linux-amd64 tun2socks;\
+#  chmod a+x tun2socks;
 
 # Добавлении таблицы маршрутизации "lip" в /etc/iproute2/rt_tables
 RUN mkdir -p /etc/iproute2 && echo "20 lip" >> /etc/iproute2/rt_tables

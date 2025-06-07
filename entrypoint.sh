@@ -48,12 +48,12 @@ if [ -n "$SS_LINK" ]; then
   ip route add "$SS_IP/32" via "$MIP" dev "$DIF"
   ip route add default dev "$SS_TUN_NAME" metric 50 
 
-  echo "[entrypoint.sh] Запускаем sslocal proxy к $SS_IP..."
-  nohup /app/sslocal --protocol tun --server-url "$SS_LINK" -U \
-    --outbound-bind-interface "$DIF" --tun-interface-name "$SS_TUN_NAME" \
-    --tcp-keep-alive 25 --timeout 300 --udp-timeout 300 \
-    --udp-max-associations 512 --nofile 51200 --tcp-fast-open \
-    > /app/sslocal.log 2>&1 &
+  # echo "[entrypoint.sh] Запускаем sslocal proxy к $SS_IP..."
+  # nohup /app/sslocal --protocol tun --server-url "$SS_LINK" -U \
+  #   --outbound-bind-interface "$DIF" --tun-interface-name "$SS_TUN_NAME" \
+  #   --tcp-keep-alive 25 --timeout 300 --udp-timeout 300 \
+  #   --udp-max-associations 512 --nofile 51200 --tcp-fast-open \
+  #   > /app/sslocal.log 2>&1 &
 
   # Пример через tun2socks
   #echo "[entrypoint.sh] Запускаем tun2socks proxy к $SS_IP..."

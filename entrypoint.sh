@@ -50,14 +50,9 @@ if [ -n "$SS_LINK" ]; then
 
   echo "[entrypoint.sh] Запускаем sslocal proxy к $SS_IP..."
   nohup /app/sslocal --protocol tun --server-url "$SS_LINK" -U \
-    --outbound-bind-interface "$DIF" \
-    --tun-interface-name "$SS_TUN_NAME" \
-    --tcp-keep-alive 25 \
-    --timeout 300 \
-    --udp-timeout 300 \
-    --udp-max-associations 512 \
-    --nofile 51200 \
-    --tcp-fast-open \
+    --outbound-bind-interface "$DIF" --tun-interface-name "$SS_TUN_NAME" \
+    --tcp-keep-alive 25 --timeout 300 --udp-timeout 300 \
+    --udp-max-associations 512 --nofile 51200 --tcp-fast-open \
     > /app/sslocal.log 2>&1 &
 
   # Пример через tun2socks

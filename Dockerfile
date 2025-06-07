@@ -1,14 +1,13 @@
 FROM ghcr.io/wg-easy/wg-easy:14
 LABEL maintainer="WG-EASY-BREEZY"
 
-# Используемая версия tun2socks
-# https://github.com/xjasonlyu/tun2socks/releases
-ARG TUN2SOCKS_RELEASE="v2.6.0-beta"
-
 # Используемая версия shadowsocks-rust
 # https://github.com/shadowsocks/shadowsocks-rust/releases
 ARG SS_RUST_RELEASE="v1.23.4"
 
+# Альтернатива. Используемая версия tun2socks
+# https://github.com/xjasonlyu/tun2socks/releases
+# ARG TUN2SOCKS_RELEASE="v2.6.0-beta"
 
 RUN apk add --no-cache curl unzip tar xz-utils base64 bash nano dumb-init
 RUN apk --update upgrade --no-cache

@@ -9,7 +9,7 @@ ARG SS_RUST_RELEASE="v1.23.4"
 # https://github.com/xjasonlyu/tun2socks/releases
 # ARG TUN2SOCKS_RELEASE="v2.6.0-beta"
 
-RUN apk add --no-cache curl unzip tar xz-utils base64 bash nano dumb-init
+RUN apk add --no-cache curl unzip tar base64 bash nano dumb-init
 RUN apk --update upgrade --no-cache
 
 WORKDIR /app

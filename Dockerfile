@@ -21,8 +21,8 @@ WORKDIR /app
 #  mv tun2socks-linux-amd64 tun2socks;\
 #  chmod a+x tun2socks;
 
-# Загрузка shadowsocks-rust sslocal
-RUN curl -L -o /tmp/ss.tar.xz https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SS_RUST_RELEASE}/shadowsocks-${SS_RUST_RELEASE}.x86_64-unknown-linux-gnu.tar.xz && \
+# Загрузка с sslocal
+RUN curl -L -o /tmp/ss.tar.xz https://github.com/shadowsocks/shadowsocks-rust/releases/download/${SS_RUST_RELEASE}/shadowsocks-${SS_RUST_RELEASE}.x86_64-unknown-linux-musl.tar.xz  && \
     mkdir -p /tmp/ss && \
     tar -xf /tmp/ss.tar.xz -C /tmp/ss && \
     mv /tmp/ss/sslocal /app/sslocal && \

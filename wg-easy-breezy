@@ -1,0 +1,1184 @@
+#!/bin/bash
+#
+# https://github.com/jinndi/wg-easy-breezy
+#
+# Copyright (c) 2025 Jinndi <alncores@gmail.ru>
+#
+# Released under the MIT License, see the accompanying file LICENSE
+# or https://opensource.org/licenses/MIT
+
+## Неинтерактивный режим установки APT
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+
+## Пути исполняемых файлов
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+## Пути файлов:
+# - папка в которую будет произведена установка
+path_data_dir="/opt/wg-easy-breezy"
+# - файл текущего скрипта
+path_script="$path_data_dir/wg-easy-breezy"
+# - ссылка на файл текущего скрипта
+path_script_link="/usr/bin/wgeb"
+# - файл Dockerfile создание образа wg-easy-breezy
+path_dockerfile="$path_data_dir/Dockerfile"
+# - файл entrypoint.sh для докер image wg-easy-breezy
+path_entrypoint="$path_data_dir/entrypoint.sh"
+# - файл docker compose настройки сервисов
+path_docker_compose_file="$path_data_dir/services.yml"
+# - ссылка на файл systemd unit службы
+path_systemd_unit_file="/etc/systemd/system/wg-easy-breezy.service"
+# - файл настройки Caddy сервера
+path_caddyfile="$path_data_dir/Caddyfile"
+# - файл скрипта c сетевыми правилами iptables на запуск wg-easy-breezy
+path_iptables_apply_script="$path_data_dir/iptables/apply.sh"
+# - файл скрипта для удаления ранее созданных iptables правил
+path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
+# - расположение файла конфига sysctl параметров
+path_sysctl_config="$path_data_dir/sysctl.conf"
+# - ссылка на файл конфига sysctl (path_sysctl_config)
+path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
+
+## Переменные настройки shadowsocks прокси:
+# - имя интерфейса
+ss_tun_name="sstun"
+
+# Ссылка на образ wg-easy
+wg_easy_image="ghcr.io/wg-easy/wg-easy:14"
+
+## Пути в адресной строке браузера к UI интерфейсу (если указан домен):
+# - по умолчанию
+handle_path_ui="wg-easy-breezy"
+# - для WireGuard через shadowsocks
+handle_path_ui_ss="wg-easy-breezy-ss"
+
+# DNS адреса по умолчанию для клиентов WireGuard (через запятую)
+default_dns=1.1.1.1,1.0.0.1
+
+## Объявление переменных задаваемых в процессе работы скрипта:
+# - доменное имя либо адрес IP-адрес хоста
+wg_host=""
+# - e-mail адрес необходимый для получения SSL сертификата домена
+email=""
+# - ссылка (SIP002 URI scheme) для подключения к shadowsocks серверу
+ss_link=""
+# - tcp порт доступа к UI интерфейсу wg-easy
+port=""
+# - tcp порт доступа к UI интерфейсу wg-easy, shadowsocks тунннель
+port_ss=""
+# - udp порт WireGuard
+wg_port=""
+# - udp порт WireGuard, shadowsocks тунннель
+wg_port_ss=""
+# - диапазон IP-адресов клиентов WireGuard
+default_address=""
+# - диапазон IP-адресов клиентов WireGuard, shadowsocks тунннель
+default_address_ss=""
+# - хеш пароля от UI интерфейса/ов wg-easy
+password_hash=""
+# - ссылка на UI интерфейс wg-easy
+link_ui=""
+# - ссылка на UI интерфейс wg-easy, shadowsocks тунннель
+link_ui_ss=""
+# - указал ли пользователя адрес домена
+is_domain=""
+# - ввел ли пользователя ссылку на shadowsocks сервер
+is_shadowsocks=""
+
+## Функции вывода сообщений:
+# - шапка установщика
+show_header() {
+echo -e "\033[1;35m"
+cat <<EOF
+###################################################
+#                  WG-EASY-BREEZY                 #
+# GitHub:https://github.com/jinndi/wg-easy-breezy #
+###################################################
+EOF
+echo -e "\033[0m"
+}
+# - стандартное
+echomsg() {
+  if [ -n "$2" ]; then
+    echo
+  fi
+  echo -e "\033[1;34m$1\033[0m"
+}
+# - об успехе
+echook() {
+  echo -e "\033[1;32m$1\033[0m"
+}
+# - об ошибке
+echoerr () {
+  echo -e "\033[1;31m$1\033[0m"
+}
+# - об ошибке с выходом из скрипта
+exiterr() {
+  echo -e "\033[1;31m Ошибка: $1\033[0m" >&2
+  exit 1
+}
+
+
+## Функции проверок возможности установки:
+# - рут права
+check_root() {
+  if [ "$(id -u)" != 0 ]; then
+    exiterr "Этот установщик должен быть запущен от имени root. Попробуйте 'sudo bash $0'"
+  fi
+}
+
+# - способ запуска скрипта через bash а не sh
+check_shell() {
+  if readlink /proc/$$/exe | grep -q "dash"; then
+    exiterr 'Этот установщик необходимо запускать с помощью «bash», а не «sh».'
+  fi
+}
+
+# - вид дистрибутива ОС
+check_os() {
+  if grep -qs "ubuntu" /etc/os-release; then
+    os="ubuntu"
+    os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
+  elif [[ -e /etc/debian_version ]]; then
+    os="debian"
+    os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
+  else
+    exiterr "Этот установщик поддерживает только дистрибутивы Ubuntu и Debian!"
+  fi
+}
+
+# - версия дистрибутива ОС
+check_os_ver() {
+  if [[ "$os" == "ubuntu" && "$os_version" -lt 2004 ]]; then
+    exiterr "Для использования этого установщика требуется Ubuntu 20.04 или более поздняя версия."
+  fi
+  if [[ "$os" == "debian" && "$os_version" -lt 11 ]]; then
+    exiterr "Для использования этого установщика требуется Debian 11 или более поздняя версия."
+  fi
+}
+
+# - поддержка версии ядра
+check_kernel() {
+  if [[ $(uname -r | cut -d "." -f 1) -lt 5 ]]; then
+     exiterr "В системе установлено старое ядро, несовместимое с данным установщиком."
+  fi
+}
+
+# - среда работы ОС (запрет установки из контейнера, например докер)
+check_container() {
+  if systemd-detect-virt -cq 2>/dev/null; then
+    exiterr "Установка внути контейнера не поддерживается данным установщиком."
+  fi
+}
+
+# Функция удаления предыдущих установок (без докера)
+remove_install() {
+  local is_show_info
+  is_show_info="$1"
+
+  if [[ -n "$is_show_info" ]]; then
+    echomsg "Удаляем предыдущую установку" 1
+  fi
+
+  # Остановка сервисов с удаление всех задействованных контейнеров и образов
+  if [[ -e "$path_docker_compose_file" ]]; then
+    if systemctl is-active --quiet wg-easy-breezy; then
+      docker compose -f $path_docker_compose_file down --remove-orphans --rmi all > /dev/null 2>&1
+      systemctl disable --now wg-easy-breezy > /dev/null 2>&1
+    fi
+  fi
+
+  # Деактивация ранее заданных iptables правил 
+  if [[ -f "$path_iptables_delete_script" ]]; then
+    if systemctl is-active --quiet wg-easy-breezy; then
+      bash "$path_iptables_delete_script"
+    fi
+  fi
+
+  # Удаление ссылки на скрипт управления
+  if [[ -L "$path_script_link" ]]; then
+    rm -f "$path_script_link"
+  fi
+
+  # Удаление ссылки на sysctl конфиг с применением изменений
+  if [[ -L "$path_sysctl_config_link" ]]; then
+    rm -f "$path_sysctl_config_link"
+    sysctl --system > /dev/null 2>&1
+  fi
+  
+  # Удаление папки данных
+  if [[ -d "$path_data_dir" ]]; then
+    rm -rf "$path_data_dir"
+  fi
+
+  # Удаление файла systemd службы
+  if [[ -f "$path_systemd_unit_file" ]]; then
+    rm -f "$path_systemd_unit_file"
+    systemctl daemon-reload
+  fi
+
+  if [[ -n "$is_show_info" ]]; then
+    echook "Файлы и службы/сервисы удалены"
+  fi
+}
+
+# Функция анимации ожидания
+show_spinner() {
+  local pid=$1
+  local delay=0.1
+  local spinner='|/-\'
+  tput civis  # скрыть курсор
+
+  while kill -0 "$pid" 2>/dev/null; do
+    for i in $(seq 0 3); do
+      printf "\r[%c] Выполняем, ожидайте..." "${spinner:$i:1}"
+      sleep "$delay"
+    done
+  done
+
+  wait "$pid"
+  local status=$?
+  tput cnorm  # вернуть курсор
+  echo
+  return $status
+}
+
+
+# Функция установки необходимых пакетов программ
+install_pkgs() {
+  # ожидания пока система освободит блокировку пакетного менеджера (apt/dpkg)
+  local count apt_lk apt_lk
+  count=0
+  apt_lk="/var/lib/apt/lists/lock"
+  pkg_lk="/var/lib/dpkg/lock"
+  has_fuser=$(command -v fuser)
+  has_lsof=$(command -v lsof)
+
+  while { [ "$has_fuser" ] && fuser "$apt_lk" "$pkg_lk" >/dev/null 2>&1; } \
+    || { [ "$has_lsof" ] && lsof "$apt_lk" >/dev/null 2>&1; } \
+    || { [ "$has_lsof" ] && lsof "$pkg_lk" >/dev/null 2>&1; }; do
+      [ "$count" = 0 ] && echo "Ожидаем, когда apt освободится..."
+      [ "$count" -ge 100 ] && exiterr "Не удалось дождаться разблокировку apt/dpkg."
+      count=$((count+1))
+      printf '%s' '.'
+      sleep 3
+  done
+
+  echomsg "Установка зависимостей" 1
+  (
+    (
+      apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
+    ) || exiterr "'apt-get update' ошибка."
+    (
+      apt-get -yqq install iproute2 iptables openssl lsof dnsutils curl unzip grep sed nano > /dev/null 2>&1 \
+      || apt-get -yqq install iproute2 iptables openssl lsof dnsutils curl unzip grep sed nano > /dev/null 2>&1
+    ) || exiterr "'apt-get install' ошибка."
+
+    # Установка и запуск докера если ранее не установлен 
+    if ! docker compose version &> /dev/null; then
+      curl -fsSL https://get.docker.com | bash -e > /dev/null 2>&1 || exiterr "ошибка установки docker"
+    fi
+    systemctl start docker
+
+    # Спуллить образ wg-easy
+    docker pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $wg_easy_image"
+
+  ) & show_spinner $!
+
+  echook "Зависимости установлены"
+}
+
+
+## Фунции проверок введенных данных пользователем:
+
+# - имя домена
+check_domain() {
+  # Если строка не является доменом
+  if [[ ! "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
+    echoerr "Неккоректный адрес домена: $1"
+    is_domain=""
+    return 1
+  fi
+  is_domain="true"
+  return 0
+}
+
+# - IPv4 адрес
+check_IPv4() {
+  # Проверка на формат IPv4
+  if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    echoerr "Неверный формат IPv4: $1"
+    return 1
+  fi
+
+  # Проверка на диапазон для каждого октета IP
+  IFS='.' read -r -a octets <<< "$1"
+  for octet in "${octets[@]}"; do
+    # Проверка на ведущие нули (например, 01, 001)
+    if [[ "$octet" != "0" && "$octet" =~ ^0 ]]; then
+      echoerr "Октет IPv4 с ведущим нулём недопустим: $octet"
+      return 1
+    fi
+
+    # Преобразуем явно в десятичное значение и проверим диапазон
+    dec_octet=$((10#$octet))
+    if ((dec_octet < 0 || dec_octet > 255)); then
+      echoerr "Неверный диапазон октета IPv4: $octet"
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+# - e-mail адрес
+check_email() {
+  # Если строка не является доменом
+  if [[ ! "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+    echoerr "Некорректный email: $1"
+    return 1
+  fi
+
+  return 0
+}
+
+# - пароль
+check_password() {
+  # Проверка на пустой ввод
+  if [ -z "$1" ]; then
+    echoerr "Пароль не может быть пустым"
+    return 1
+  fi
+
+  # Проверка длины пароля (минимум 6 символов)
+  if [ "${#1}" -lt 6 ]; then
+    echoerr "Пароль должен быть не короче 6 символов"
+    return 1
+  fi
+
+  # Проверка наличия хотя бы одной буквы
+  if ! echo "$1" | grep -q '[a-zA-Z]'; then
+    echoerr "Пароль должен содержать хотя бы одну букву"
+    return 1
+  fi
+
+  # Проверка наличия хотя бы одной цифры
+  if ! echo "$1" | grep -q '[0-9]'; then
+    echoerr "Пароль должен содержать хотя бы одну цифру"
+    return 1
+  fi
+
+  return 0
+}
+
+# - порт
+check_port() {
+  # Проверка, является ли порт числом
+  if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+    echoerr "Порт должен быть числом"
+    return 1
+  fi
+
+  # Проверка диапазона порта (49152–65534)
+  if [ "$1" -lt 49152 ] || [ "$1" -gt 65534 ]; then
+    echoerr "Порт должен быть в диапазоне от 49152 до 65534"
+    return 1
+  fi
+
+  # Проверка, занят ли порт
+  if lsof -i :"$1" >/dev/null ; then
+    echoerr "Порт $1 уже занят"
+    return 1
+  fi
+
+  return 0
+}
+
+
+## Функции ввода, проверки данных:
+
+# - имя домена
+input_wg_host() {
+  while true; do
+    echomsg "Введите доменное имя этого сервера, например mydomain.com" 1
+    echomsg "Если его нет просто нажмите клавишу Enter"
+    read -rp " > " wg_host
+    
+    # Проверка на пустой ввод
+    if [ -z "$wg_host" ]; then
+      # IP текущего сервера
+      local public_ip
+
+      # ip route (локальный интерфейс)
+      public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
+
+      # через DNS (OpenDNS)
+      [ -z "$public_ip" ] && command -v dig >/dev/null && \
+        public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
+
+      # Проверка формата
+      if [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        wg_host="$public_ip"
+      else
+        echoerr "Не удалось определить публичный IP"
+        while true; do
+          echomsg "Введите публичный IPv4 ардес этого сервера"
+          read -rp "IPv4 этого сервера: " wg_host
+
+          if check_IPv4 "$wg_host"; then
+            break
+          fi
+        done
+      fi
+
+      echook "Используем IPv4: $wg_host"
+      break
+    fi
+
+    # Проверка имени
+    if check_domain "$wg_host"; then
+      echook "Доменное имя: $wg_host принято"
+      break
+    fi
+  done
+}
+
+# - e-mail для полученя SSL сертификата домена
+input_email() {
+  if [[ "$is_domain" ]]; then
+    while true; do
+      echomsg "Введите e-mail для получения SSL сертификата домена $wg_host:" 1
+      read -rp " > " email
+
+      # Проверка ввода
+      if check_email "$email"; then
+        echook "E-mail: $email принят"
+        break
+      fi
+    done
+  fi
+}
+
+# - ссылка на подключение к shadowsocks (SIP002 URI scheme)
+input_ss_link() {
+  local ss_clean base64_part ip_port_part public_ip port decoded password method
+
+  while true; do
+    echomsg "Введите ссылку подключения по shadowsocks," 1
+    echomsg "если нужен прокси Wrireguard через shadowsocks,"
+    echomsg "либо нажмите Enter чтобы пропустить настроку"
+    read -rp " > " ss_link
+    
+    # Проверка на пустой ввод
+    if [ -z "$ss_link" ]; then
+      is_shadowsocks=""
+      break
+    fi
+
+    # Добавляем префикс ss://, если его нет
+    [[ "$ss_link" != ss://* ]] && ss_link="ss://${ss_link}"
+
+    # Удаляем префикс
+    ss_clean="${ss_link#ss://}"
+
+    # Извлекаем base64, IP и порт
+    base64_part="${ss_clean%@*}"
+    ip_port_part="${ss_clean#*@}"
+    public_ip="${ip_port_part%%:*}"
+    port="${ip_port_part##*:}"
+
+    # Декодируем base64 строку
+    if ! decoded=$(echo "$base64_part" | openssl base64 -d 2>/dev/null); then
+      echoerr "Ошибка: base64 не удалось декодировать"
+      continue
+    fi
+
+    # Получаем и проверяем метод шифра 
+    method="${decoded%%:*}"
+    case "$method" in
+      chacha20-ietf-poly1305|aes-128-gcm|aes-256-gcm)
+        # Всё ок
+        ;;
+      *)
+        echoerr "Ошибка: недопустимый метод шифрования: $method"
+        continue
+        ;;
+    esac
+
+    # Проверка IPv4
+    if check_IPv4 "$public_ip"; then
+      # Проверка порта
+      if ! [[ "$port" =~ ^[0-9]+$ ]] || (( port < 49152 || port > 65535 )); then
+        echoerr "Ошибка: порт $port вне диапазона 49152–65535"
+        continue
+      fi
+
+      is_shadowsocks="true"
+      echook "Ссылка shadowsocks принята"
+      break
+    fi
+  done
+}
+
+# - порт WireGuard сервера
+input_wg_port() {
+  while true; do
+    echomsg "Введите порт WireGuard от 49152 до 65534" 1
+    echomsg "(Для веб интерфейса будет увеличен на 1)"
+    read -rp " > " wg_port
+
+    # Увеличиваем порт на 1 (для UI интерфейса)
+    port=$((wg_port + 1))
+
+    # Проверка портов
+    if check_port "$wg_port" && check_port "$port"; then
+      echook "Заданы порты:"
+      echook " - WireGuard: $wg_port"
+      echook " - Веб интерфейс: $port"
+      # Cсылка на UI интерфейс wg-easy
+      link_ui="http://$wg_host:$port"
+      if [[ "$is_domain" ]]; then
+        link_ui="https://$wg_host/$handle_path_ui/"
+      fi
+      break
+    fi
+  done
+
+  if [[ "$is_shadowsocks" ]]; then
+    while true; do
+      echomsg "Введите порт WireGuard (shadowsocks прокси) от 49152 до 65534" 1
+      echomsg "(Для веб интерфейса будет увеличен на 1)"
+      read -rp " > " wg_port_ss
+      
+      # Увеличиваем порт на 1 (для UI интерфейса)
+      port_ss=$((wg_port_ss + 1))
+
+      # Проверка портов
+      if check_port "$wg_port_ss" && check_port "$port_ss"; then
+        echook "Заданы порты:"
+        echook " - WireGuard (shadowsocks прокси): $wg_port_ss"
+        echook " - Веб интерфейс (shadowsocks прокси): $port_ss"
+        # Cсылка на UI интерфейс wg-easy, shadowsocks тунннель
+        link_ui_ss="http://$wg_host:$port_ss"
+        if [[ "$is_domain" ]]; then
+          link_ui_ss="https://$wg_host/$handle_path_ui_ss/"
+        fi
+        break
+      fi
+    done
+  fi
+}
+
+# - диапазон адресов для клиентов WireGuard
+input_default_address() {
+  local default_value="10.0.0.x"
+  local default_value_ss="10.1.0.x"
+
+  echomsg "Диапазон адресов клиентов WireGuard" 1
+  echomsg "(нажмите Enter, чтобы оставить по умолчанию)"
+  read -r -e -i "$default_value" default_address
+  
+  default_address=${default_address:-$default_value}
+  echook "Задан диапазон адресов для клиентов: $default_address"
+
+  if [[ "$is_shadowsocks" ]]; then
+    echomsg "Диапазон адресов клиентов WireGuard через shadowsocks прокси" 1
+    echomsg "(нажмите Enter, чтобы оставить по умолчанию)"
+    read -r -e -i "$default_value_ss" default_address_ss
+    default_address_ss=${default_address_ss:-$default_value_ss}
+    echook "Задан диапазон адресов для клиентов WireGuard" 
+    echook "(shadowsocks прокси): $default_address_ss"
+  fi
+}
+
+# - пароль для входа в UI wg-easy
+input_ui_password() {
+  local password
+
+  while true; do
+    echomsg "Придумайте пароль для входа в веб-интерфейс (ввод скрыт)" 1
+    read -rsp " > " password
+    
+    # Проверка и обработка пароля
+    if check_password "$password"; then
+      # Запрашиваем хеша пароля
+      output_wgpw=$(docker run --rm -it $wg_easy_image wgpw "$password")
+      # Извлекаем и экранируем хеш пароля
+      password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
+      echo
+      echook "Пароль веб интерфейса принят"
+      break
+    fi
+  done
+}
+
+# Функция поиска оптимального MTU WireGuard
+find_optimal_wg_mtu() {
+  local target=8.8.8.8
+  local low=1300
+  local high=1500
+  local last_good=0
+
+  echomsg "Поиск оптимального MTU для WireGuard..." 1
+
+  while (( low <= high )); do
+    local mid=$(((low + high) / 2))
+    local size=$((mid - 28))  # 20 байт IP + 8 байт ICMP
+
+    if ping -c1 -W1 -M do -s "$size" "$target" &>/dev/null; then
+      last_good=$mid
+      low=$((mid + 1))
+    else
+      high=$((mid - 1))
+    fi
+  done
+
+  if [ "$last_good" -ge 1000 ] 2>/dev/null; then
+    # Рассчитываем MTU для WireGuard
+    wg_mtu=$((last_good - 80))
+    (( wg_mtu < 1200 )) && wg_mtu=1200
+
+    echook "Оптимальный MTU WireGuard: $wg_mtu"
+  else
+    wg_mtu=1420
+    echoerr "Значение не найдено, используем: 1420"
+  fi
+}
+
+# Функция создания конфигов сервисов и служб
+create_services_config() {
+echomsg "Создаём конфиги Docker сервисов" 1
+
+## Загрузка Dockerfile
+mkdir -p "$(dirname "$path_dockerfile")"
+curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+  https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/Dockerfile \
+  -o "$path_dockerfile" || {
+  exiterr "Не удалось загрузить Dockerfile"
+}
+
+## Загрузка entrypoint.sh
+mkdir -p "$(dirname "$path_entrypoint")"
+curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+  https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/entrypoint.sh \
+  -o "$path_entrypoint" || {
+  exiterr "Не удалось загрузить entrypoint.sh"
+}
+
+## Сервис wg-easy-breezy:
+# - wg-easy-breezy дефолтный сервис docker compose
+cat <<WG_EASY_BREEZY_SERVICE  > "$path_docker_compose_file"
+services:
+  wg-easy-breezy:
+    image: wg-easy-breezy
+    container_name: wg-easy-breezy
+    build:
+      context: .
+      dockerfile: $path_dockerfile
+    environment:
+      - LANG=ru
+      - WG_HOST=$wg_host
+      - PASSWORD_HASH=$password_hash
+      - PORT=$port
+      - WG_PORT=$wg_port
+      - WG_MTU=$wg_mtu
+      - WG_PERSISTENT_KEEPALIVE=25
+      - WG_DEFAULT_ADDRESS=$default_address
+      - WG_DEFAULT_DNS=$default_dns
+      - UI_TRAFFIC_STATS=true
+    volumes:
+      - etc_wireguard:/etc/wireguard
+      - /lib/modules:/lib/modules
+    ports:
+      - $wg_port:$wg_port/udp
+      - $port:$port/tcp
+    privileged: true
+    ulimits:
+      nofile:
+        soft: 51200
+        hard: 51200
+
+WG_EASY_BREEZY_SERVICE
+
+# - Сервис wg-easy-breezy-ss, wg-easy через tun2socks shadowsocks прокси
+if [[ "$is_shadowsocks" ]]; then
+cat <<WG_EASY_BREEZY_SS_SERVICE >> "$path_docker_compose_file"
+  wg-easy-breezy-ss:
+    image: wg-easy-breezy
+    container_name: wg-easy-breezy-ss
+    environment:
+      - LANG=ru
+      - WG_HOST=$wg_host
+      - PASSWORD_HASH=$password_hash
+      - PORT=$port_ss
+      - WG_DEVICE=$ss_tun_name
+      - WG_PORT=$wg_port_ss
+      - WG_MTU=$wg_mtu
+      - WG_PERSISTENT_KEEPALIVE=25
+      - WG_DEFAULT_ADDRESS=$default_address_ss
+      - WG_DEFAULT_DNS=$default_dns
+      - UI_TRAFFIC_STATS=true
+      - SS_TUN_NAME=$ss_tun_name
+      - SS_LINK=$ss_link
+    volumes:
+      - etc_wireguard_ss:/etc/wireguard
+      - /lib/modules:/lib/modules
+    ports:
+      - $wg_port_ss:$wg_port_ss/udp
+      - $port_ss:$port_ss/tcp
+    privileged: true
+    ulimits:
+      nofile:
+        soft: 51200
+        hard: 51200
+    devices:
+      - /dev/net/tun
+    depends_on:
+      - wg-easy-breezy
+
+WG_EASY_BREEZY_SS_SERVICE
+fi
+
+## Сервис Caddy сервера (если указан домен):
+if [[ "$is_domain" ]]; then
+# - docker compose сервис
+cat <<CADDY_SERVICE >> "$path_docker_compose_file"
+  caddy:
+    image: caddy
+    container_name: caddy
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 443:443/tcp
+      - 443:443/udp
+    volumes:
+      - $path_caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - wg-easy-breezy
+
+CADDY_SERVICE
+
+# - Caddyfile для настройки реверс прокси с сертификатом сервера:
+mkdir -p "$(dirname "$path_caddyfile")"
+
+# -- открываем основной блок хоста
+echo "$wg_host {" > "$path_caddyfile"
+# -- указываем email для успешного получения сертификата
+echo "  tls $email" >> "$path_caddyfile"
+# -- reverse_proxy на UI wg-easy-breezy
+cat <<CADDY_FILE_PROXY_WG_EASY >> "$path_caddyfile"
+
+  handle_path /$handle_path_ui/* {
+    reverse_proxy wg-easy-breezy:$port
+  }
+CADDY_FILE_PROXY_WG_EASY
+# -- reverse_proxy на UI wg-easy-breezy-ss (если IP адрес shadowsocks сервера задан)
+if [[ "$is_shadowsocks" ]]; then
+cat <<CADDY_FILE_PROXY_WG_EASY_SS >> "$path_caddyfile"
+
+  handle_path /$handle_path_ui_ss/* {
+    reverse_proxy wg-easy-breezy-ss:$port_ss
+  }
+CADDY_FILE_PROXY_WG_EASY_SS
+fi
+
+# -- закрываем основной блок хоста
+echo "}" >> "$path_caddyfile"
+fi
+
+## volumes:
+cat <<WG_EASY_BREEZY_VOLUMES  >> "$path_docker_compose_file"
+volumes:
+  etc_wireguard:
+    name: etc_wireguard
+WG_EASY_BREEZY_VOLUMES
+if [[ "$is_shadowsocks" ]]; then
+cat <<WG_EASY_BREEZY_SS_VOLUMES  >> "$path_docker_compose_file"
+  etc_wireguard_ss:
+    name: etc_wireguard_ss
+WG_EASY_BREEZY_SS_VOLUMES
+fi
+if [[ "$is_domain" ]]; then
+cat <<CADDY_VOLUMES >> "$path_docker_compose_file"
+  caddy_data:
+    name: caddy_data
+  caddy_config:
+    name: caddy_config
+CADDY_VOLUMES
+fi
+
+echook "Конфиги Docker сервисов созданы"
+}
+
+# Создание скриптов разрешения портов через iptables, при запуске/остановке службы
+create_iptables_scripts(){
+  echomsg "Создание скриптов разрешения портов через iptables" 1
+
+  # порты для открытия
+  local ports=(
+    "$wg_port udp"
+    "$port tcp"
+    "$port udp"
+  )
+
+  if [[ "$is_domain" ]]; then
+    ports+=("443 tcp" "443 udp")
+  fi
+
+  if [[ "$is_shadowsocks" ]]; then
+    ports+=("$wg_port_ss udp" "$port_ss tcp" "$port_ss udp")
+  fi
+
+  # Создать дирректорию для сохранения скриптов на запуск/остановку служб
+  mkdir -p "$(dirname "$path_iptables_apply_script")"
+  mkdir -p "$(dirname "$path_iptables_delete_script")"
+
+  # Очистка/создание файлов перед формированием конфигов
+  : > "$path_iptables_apply_script"
+  : > "$path_iptables_delete_script"
+
+  # Путь к iptables
+  local iptables_path
+  iptables_path=$(command -v iptables)
+  if [[ $(systemd-detect-virt) == "openvz" ]] && \
+    readlink -f "$(command -v iptables)" | grep -q "nft" && \
+    hash iptables-legacy 2>/dev/null
+  then
+    iptables_path=$(command -v iptables-legacy)
+  fi
+
+  # Формируем скрипты с правилами:
+  {
+    echo "#!/bin/bash"
+    echo ""
+  } | tee "$path_iptables_apply_script" "$path_iptables_delete_script" > /dev/null
+
+  for p in "${ports[@]}"; do
+    read -r port proto <<< "$p"
+    echo "$iptables_path -w 5 -I INPUT -p $proto --dport $port -j ACCEPT" >> "$path_iptables_apply_script"
+    echo "$iptables_path -w 5 -D INPUT -p $proto --dport $port -j ACCEPT" >> "$path_iptables_delete_script"
+  done
+
+  echo "$iptables_path -w 5 -I INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_apply_script"
+  echo "$iptables_path -w 5 -D INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_delete_script"
+
+  # Завершаем скрипты
+  echo "exit 0" | tee -a "$path_iptables_apply_script" "$path_iptables_delete_script" > /dev/null
+
+  # Делаем скрипты исполняемыми
+  chmod +x "$path_iptables_apply_script" "$path_iptables_delete_script"
+
+  echook "Скрипты с правилами iptables созданы"
+}
+
+# Функция создания конфига sysctl настроек сети
+create_sysctl_config (){
+  echomsg "Создание конфига sysctl" 1
+
+  # Создать дирректорию если нет
+  mkdir -p "$(dirname "$path_sysctl_config")"
+  mkdir -p "$(dirname "$path_sysctl_config_link")"
+  
+  
+  # Загружаем конфиг
+  curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+    https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf \
+    -o "$path_sysctl_config"
+
+  # Проверка что файл загружен
+  if [ -f "$path_sysctl_config" ]; then
+    # Включение TCP BBR контроля перегрузки, если не удачно, то пробуем hybla
+    if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
+    then
+      echo "net.core.default_qdisc = fq" >> "$path_sysctl_config"
+      echo "net.ipv4.tcp_congestion_control = bbr" >> "$path_sysctl_config"
+    else
+      if modprobe -q tcp_hybla && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
+      then
+        echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
+      fi
+    fi
+
+    # Создаем ссылку на файл
+    ln -s "$path_sysctl_config" "$path_sysctl_config_link"
+
+    # Применяем полученный конфиг
+    sysctl -e -q -p "$path_sysctl_config_link"
+    
+    echook "Конфиг sysctl создан и применен"
+  else
+    exiterr "Ошибка загрузки sysctl конфига"
+  fi
+}
+
+# Функция создания systemd unit службы управления сервисами
+create_systemd_unit(){
+local working_dir
+working_dir="$(dirname "$path_docker_compose_file")"
+
+echomsg "Создание systemd службы" 1
+
+cat <<SYSTEMD_UNIT > "$path_systemd_unit_file"
+[Unit]
+Description=wg-easy-breezy with iptables hooks via docker compose
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$working_dir
+ExecStartPre=$path_iptables_apply_script
+ExecStart=/usr/bin/docker compose -f $path_docker_compose_file up -d --force-recreate
+ExecStop=/usr/bin/docker compose -f $path_docker_compose_file down --remove-orphans
+ExecStopPost=$path_iptables_delete_script
+TimeoutStartSec=0
+LimitNOFILE=51200
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_UNIT
+
+systemctl daemon-reload
+
+echook "Служба создана"
+}
+
+# Функция проверки что все сервисы запущены и работают корректно
+is_all_ok_services() {
+  # если файл docker compose не существует — false
+  if [[ ! -e "$path_docker_compose_file" ]]; then
+    return 1
+  fi
+
+  # проверка что systemd служба активна 
+  if ! systemctl is-active --quiet wg-easy-breezy; then
+    return 1
+  fi
+
+  # проверка наличия контейнеров
+  local containers
+  containers=$(docker compose -f "$path_docker_compose_file" ps -q)
+  if [[ -z "$containers" ]]; then
+    return 1
+  fi
+
+  # проверка каждого контейнера
+  while read -r container; do
+    local status
+    status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)
+    if [[ "$status" != "true 0" ]]; then
+      return 1
+    fi
+  done <<< "$containers"
+
+  return 0
+}
+
+
+# Функция запуска всех сервисов
+start_services() {
+  echomsg "Запускаем сервисы" 1
+
+  # Запускаем докер контейнеры
+  systemctl enable --now wg-easy-breezy > /dev/null 2>&1
+  #docker compose -f "$path_docker_compose_file" up -d --force-recreate
+  local container status name
+  for container in $(docker compose -f "$path_docker_compose_file" ps -q); do
+    status=$(docker inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)
+    name=$(docker inspect -f '{{.Name}}' "$container" 2>/dev/null | sed 's|^/||')
+    if [[ "$status" != "true 0" ]]; then
+      echoerr "Контейнер $name ($container) не работает! docker logs -f --tail 100 $name"
+    fi
+  done
+
+  if ! systemctl is-active --quiet wg-easy-breezy; then
+    echoerr "Запуск не удался"
+  fi
+}
+
+# Функция остановки всех сервисов и служб
+stop_services() {
+  echomsg "Останавливаем сервисы" 1
+
+  # Останавливаем и удаляем docker-контейнеры
+  if [[ -f "$path_docker_compose_file" ]]; then
+    systemctl stop wg-easy-breezy > /dev/null 2>&1
+    systemctl disable --now wg-easy-breezy > /dev/null 2>&1
+    if systemctl is-active --quiet wg-easy-breezy; then
+      echoerr "Остановка не удалась"
+    fi
+  else
+    echoerr "Файл docker-compose не найден: $path_docker_compose_file"
+  fi
+}
+
+# Функция переключения статуса активности сервисов
+switch_active_services() {
+  # Если все сервисы и службы работают
+  if is_all_ok_services; then
+    stop_services
+  else
+    start_services
+  fi
+
+  select_menu_option
+}
+
+# Функция перезапуска  сервисов
+restart_services() {
+  echomsg "Перезапускаем сервисы" 1
+  systemctl restart wg-easy-breezy > /dev/null 2>&1
+  select_menu_option
+}
+
+# Функция перебилдинга образа wg-easy-breezy
+rebuild_services() {
+  systemctl stop wg-easy-breezy > /dev/null 2>&1
+  echomsg "Пересобираем докер образ wg-easy-breezy" 1
+  docker compose -f $path_docker_compose_file build --no-cache
+  sysctl -e -q -p "$path_sysctl_config_link"
+  systemctl start wg-easy-breezy > /dev/null 2>&1
+  select_menu_option
+}
+
+# Функция установки приложения
+install_services() {
+  # проверка поддержки
+  check_root
+  check_shell
+  check_kernel
+  check_os
+  check_os_ver
+  check_container
+
+  # приветсвие
+  show_header
+  read -n1 -r -p "Нажмите любую клавишу, чтобы начать установку..."
+
+  # удаление предущей установки если была
+  # и остались файлы после неудачной
+  remove_install
+
+  # создаем необходимы папки
+  mkdir -p "$path_data_dir"
+  mkdir -p "$(dirname "$path_script")"
+
+  # установка зависимостей
+  install_pkgs
+
+  # считывание вода пользователя
+  input_wg_host
+  input_email
+  input_ss_link
+  input_wg_port
+  input_default_address
+  input_ui_password
+
+  # поиск оптимального MTU WireGuard
+  find_optimal_wg_mtu
+
+  # создание конфига докер сервисов
+  create_services_config
+
+  # создание скриптов iptables настроек
+  create_iptables_scripts
+
+  # создание sysctl конфига
+  create_sysctl_config
+
+  # создание systemd unit службы управления сервисами
+  create_systemd_unit
+
+  # запуск сервисов
+  start_services
+
+  echo 
+  echo "Веб интерфейс: $link_ui"
+  if [[ "$is_shadowsocks" ]]; then
+    echo "Веб интерфейс (shadowsocks): $link_ui_ss"
+  fi
+  echo
+
+  # перемещам текущий скрипт, добавляем на него права и ссылку
+  mv "$(realpath "$0")" "$path_script"
+  chmod +x "$path_script"
+  ln -s "$path_script" "$path_script_link"
+
+  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
+
+  # отображение меню опций
+  select_menu_option
+}
+
+# Функция подтверждения удаления приложения
+remove_services() {
+  echo
+  local msg
+  msg="Удалить приложение? [y/N]: "
+  read -rp "$msg" remove
+
+  until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
+    echo "$remove: неверная опция."
+    read -rp "$msg" remove
+  done
+
+  if [[ "$remove" =~ ^[yYnNдДнН]$ ]]; then
+    remove_install "1"
+    exit 0
+  else
+    select_menu_option
+  fi
+}
+
+select_menu_option() {
+  local select_option
+  select_option="Выберите опцию:"
+  show_header
+  if is_all_ok_services; then
+    echo "Статус: ✅ Все сервисы работают"
+    echo "$select_option"
+    echo "  1) Выключить"
+  else
+    echo "Статус: ❌ Не активно"
+    echo "$select_option"
+    echo "  1) Включить"
+  fi
+  echo "  2) Перезапустить"
+  echo "  3) Пересобрать"
+  echo "  4) Удалить"
+  echo "  5) Выход (Ctrl+C)"
+
+  read -rp "Опция: " option
+  until [[ "$option" =~ ^[1-5]$ ]]; do
+    echoerr "$option: неккоректное значение."
+    read -rp "Опция: " option
+  done
+
+  case "$option" in
+    1)
+      switch_active_services
+    ;;
+    2)
+      restart_services
+    ;;
+    3)
+      rebuild_services
+    ;;
+    4)
+      remove_services
+    ;;
+    5)
+      exit 0
+    ;;
+  esac
+}
+
+if [[ -d "$path_data_dir" ]]; then
+  select_menu_option
+else
+  install_services
+fi

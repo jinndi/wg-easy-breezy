@@ -23,8 +23,8 @@ path_script="$path_data_dir/wg-easy-breezy"
 path_script_link="/usr/bin/wgeb"
 # - файл Dockerfile создание образа wg-easy-breezy
 path_dockerfile="$path_data_dir/Dockerfile"
-# - файл entrypoint.sh для докер image wg-easy-breezy
-path_entrypoint="$path_data_dir/entrypoint.sh"
+# - файл start.sh для докер image wg-easy-breezy
+path_start_sh="$path_data_dir/start.sh"
 # - файл docker compose настройки сервисов
 path_docker_compose_file="$path_data_dir/services.yml"
 # - ссылка на файл systemd unit службы
@@ -661,12 +661,11 @@ curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
   exiterr "Не удалось загрузить Dockerfile"
 }
 
-## Загрузка entrypoint.sh
-mkdir -p "$(dirname "$path_entrypoint")"
+## Загрузка start.sh
+mkdir -p "$(dirname "$start_sh")"
 curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-  https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/entrypoint.sh \
-  -o "$path_entrypoint" || {
-  exiterr "Не удалось загрузить entrypoint.sh"
+  https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/start.sh -o "$start_sh" || {
+  exiterr "Не удалось загрузить start.sh"
 }
 
 ## Сервис wg-easy-breezy:

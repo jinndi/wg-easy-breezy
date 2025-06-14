@@ -662,9 +662,10 @@ curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
 }
 
 ## Загрузка start.sh
-mkdir -p "$(dirname "$start_sh")"
+mkdir -p "$(dirname "$path_start_sh")"
 curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-  https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/start.sh -o "$start_sh" || {
+  https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/start.sh \
+  -o "$path_start_sh" || {
   exiterr "Не удалось загрузить start.sh"
 }
 

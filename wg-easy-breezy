@@ -153,15 +153,15 @@ check_os_ver() {
   if [[ "$os" == "ubuntu" && "$os_version" -lt 2004 ]]; then
     exiterr "Для использования этого установщика требуется Ubuntu 20.04 или более поздняя версия."
   fi
-  if [[ "$os" == "debian" && "$os_version" -lt 11 ]]; then
-    exiterr "Для использования этого установщика требуется Debian 11 или более поздняя версия."
+  if [[ "$os" == "debian" && "$os_version" -lt 12 ]]; then
+    exiterr "Для использования этого установщика требуется Debian 12 или более поздняя версия."
   fi
 }
 
 # - поддержка версии ядра
 check_kernel() {
-  if [[ $(uname -r | cut -d "." -f 1) -lt 5 ]]; then
-     exiterr "В системе установлено старое ядро, несовместимое с данным установщиком."
+  if [[ $(uname -r | cut -d "." -f 1) -lt 6 ]]; then
+     exiterr "Для установки необходимо ядро ОС версии >=6"
   fi
 }
 
@@ -274,18 +274,14 @@ install_pkgs() {
       apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
     ) || exiterr "'apt-get update' ошибка."
     (
-      apt-get -yqq install podman iproute2 iptables openssl lsof dnsutils curl unzip grep sed nano > /dev/null 2>&1 \
-      || apt-get -yqq install podman iproute2 iptables openssl lsof dnsutils curl unzip grep sed nano > /dev/null 2>&1
+      apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade > /dev/null 2>&1
+    ) || exiterr "'apt-get upgrade' ошибка."
+    (
+      apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
+        dnsutils curl unzip grep sed nano > /dev/null 2>&1 \
+      || apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
+        dnsutils curl unzip grep sed nano > /dev/null 2>&1
     ) || exiterr "'apt-get install' ошибка."
-
-    # Установка и запуск podman-compose если ранее не установлен 
-    if ! command -v podman-compose >/dev/null 2>&1; then
-      (
-        apt-get -yqq install python3 python3-pip > /dev/null 2>&1 \
-        || apt-get -yqq install python3 python3-pip > /dev/null 2>&1
-        pip install podman-compose --break-system-packages > /dev/null 2>&1
-      ) || exiterr "'podman-compose' ошибка установки."
-    fi
 
     # Спуллить образ wg-easy
     podman pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $wg_easy_image"
@@ -943,10 +939,10 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=exec
+Type=simple
 WorkingDirectory=$working_dir
 ExecStartPre=$path_iptables_apply_script
-ExecStart=$path_podman_compose -f $path_docker_compose_file up -d --force-recreate
+ExecStart=$path_podman_compose -f $path_docker_compose_file up --force-recreate
 ExecStop=$path_podman_compose -f $path_docker_compose_file down --remove-orphans
 ExecStopPost=$path_iptables_delete_script
 Restart=on-failure

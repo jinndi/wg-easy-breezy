@@ -283,7 +283,7 @@ install_pkgs() {
       (
         apt-get -yqq install python3 python3-pip > /dev/null 2>&1 \
         || apt-get -yqq install python3 python3-pip > /dev/null 2>&1
-        pip3 install podman-compose > /dev/null 2>&1
+        pip install podman-compose --break-system-packages > /dev/null 2>&1
       ) || exiterr "'podman-compose' ошибка установки."
     fi
 

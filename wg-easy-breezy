@@ -284,7 +284,7 @@ install_pkgs() {
         apt-get -yqq install python3 python3-pip > /dev/null 2>&1 \
         || apt-get -yqq install python3 python3-pip > /dev/null 2>&1
         pip3 install podman-compose > /dev/null 2>&1
-      ) || exiterr "'apt-get install' ошибка."
+      ) || exiterr "'podman-compose' ошибка установки."
     fi
 
     # Спуллить образ wg-easy
@@ -693,6 +693,8 @@ services:
     volumes:
       - etc_wireguard:/etc/wireguard
       - /lib/modules:/lib/modules
+    networks:
+      - wg_easy_breezy
     ports:
       - $wg_port:$wg_port/udp
       - $port:$port/tcp
@@ -727,6 +729,8 @@ cat <<WG_EASY_BREEZY_SS_SERVICE >> "$path_docker_compose_file"
     volumes:
       - etc_wireguard_ss:/etc/wireguard
       - /lib/modules:/lib/modules
+    networks:
+      - wg_easy_breezy
     ports:
       - $wg_port_ss:$wg_port_ss/udp
       - $port_ss:$port_ss/tcp
@@ -746,7 +750,7 @@ if [[ "$is_domain" ]]; then
 # - docker compose сервис
 cat <<CADDY_SERVICE >> "$path_docker_compose_file"
   caddy:
-    image: caddy
+    image: docker.io/caddy/caddy:latest
     container_name: caddy
     cap_add:
       - NET_ADMIN
@@ -757,6 +761,8 @@ cat <<CADDY_SERVICE >> "$path_docker_compose_file"
       - $path_caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - wg_easy_breezy
 
 CADDY_SERVICE
 
@@ -806,8 +812,18 @@ cat <<CADDY_VOLUMES >> "$path_docker_compose_file"
     name: caddy_data
   caddy_config:
     name: caddy_config
+
 CADDY_VOLUMES
 fi
+
+## networks:
+cat <<NETWORKS >> "$path_docker_compose_file"
+networks:
+  wg_easy_breezy:
+    name: wg_easy_breezy
+    driver: bridge
+
+NETWORKS
 
 echook "Конфиги Docker сервисов созданы"
 }
@@ -960,22 +976,6 @@ is_all_ok_services() {
     return 1
   fi
 
-  # проверка наличия контейнеров
-  local containers
-  containers=$(podman-compose -f "$path_docker_compose_file" ps -q)
-  if [[ -z "$containers" ]]; then
-    return 1
-  fi
-
-  # проверка каждого контейнера
-  while read -r container; do
-    local status
-    status=$(podman inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)
-    if [[ "$status" != "true 0" ]]; then
-      return 1
-    fi
-  done <<< "$containers"
-
   return 0
 }
 
@@ -986,16 +986,6 @@ start_services() {
 
   # Запускаем докер контейнеры
   systemctl enable --now wg-easy-breezy > /dev/null 2>&1
-  sleep 3
-
-  local container status name
-  for container in $(podman-compose -f "$path_docker_compose_file" ps -q); do
-    status=$(podman inspect -f '{{.State.Running}} {{.State.ExitCode}}' "$container" 2>/dev/null)
-    name=$(podman inspect -f '{{.Name}}' "$container" 2>/dev/null | sed 's|^/||')
-    if [[ "$status" != "true 0" ]]; then
-      echoerr "Контейнер $name ($container) не работает! podman logs -f --tail 100 $name"
-    fi
-  done
 
   if ! systemctl is-active --quiet wg-easy-breezy; then
     echoerr "Запуск не удался"
@@ -1009,7 +999,6 @@ stop_services() {
   # Останавливаем и удаляем docker-контейнеры
   if [[ -f "$path_docker_compose_file" ]]; then
     systemctl stop wg-easy-breezy > /dev/null 2>&1
-    sleep 3
     systemctl disable --now wg-easy-breezy > /dev/null 2>&1
     if systemctl is-active --quiet wg-easy-breezy; then
       echoerr "Остановка не удалась"

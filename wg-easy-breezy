@@ -1126,7 +1126,7 @@ remove_services() {
     read -rp "$msg" remove
   done
 
-  if [[ "$remove" =~ ^[yYnNдДнН]$ ]]; then
+  if [[ "$remove" =~ ^[yYдД]$ ]]; then
     remove_install "1"
     exit 0
   else
@@ -1148,14 +1148,13 @@ select_menu_option() {
     echo "  1) Включить"
   fi
   echo "  2) Перезапустить"
-  echo "  3) Перейти в папку"
-  echo "  4) Статус systemd службы"
-  echo "  5) Пересобрать образ"
-  echo "  6) Удаление программы"
-  echo "  7) Выход из меню (Ctrl+C)"
+  echo "  3) Статус systemd службы"
+  echo "  4) Пересобрать образ"
+  echo "  5) Удаление программы"
+  echo "  6) Выход из меню (Ctrl+C)"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-7]$ ]]; do
+  until [[ "$option" =~ ^[1-6]$ ]]; do
     echoerr "$option: неккоректное значение."
     read -rp "Опция: " option
   done
@@ -1168,18 +1167,15 @@ select_menu_option() {
       restart_services
     ;;
     3)
-      cd "$path_data_dir" && ls
-    ;;
-    4)
       systemctl status wg-easy-breezy
     ;;
-    5)
+    4)
       rebuild_services
     ;;
-    6)
+    5)
       remove_services
     ;;
-    7)
+    6)
       exit 0
     ;;
   esac

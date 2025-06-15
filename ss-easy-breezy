@@ -527,11 +527,12 @@ select_menu_option() {
     echo "  1) Включить"
   fi
   echo "  2) Перезапустить"
-  echo "  3) Удаление программы"
-  echo "  4) Выход из меню (Ctrl+C)"
+  echo "  3) Статус systemd службы"
+  echo "  4) Удаление программы"
+  echo "  5) Выход из меню (Ctrl+C)"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-4]$ ]]; do
+  until [[ "$option" =~ ^[1-5]$ ]]; do
     echoerr "$option: неверная опция."
     read -rp "Опция: " option
   done
@@ -544,9 +545,12 @@ select_menu_option() {
       reload_service
     ;;
     3)
-      remove_shadowsocks_rust
+      systemctl status ssserver
     ;;
     4)
+      remove_shadowsocks_rust
+    ;;
+    5)
       exit 0
     ;;
   esac

@@ -1168,7 +1168,7 @@ select_menu_option() {
       restart_services
     ;;
     3)
-      cd $path_data_dir && ls
+      cd "$path_data_dir" && ls
     ;;
     4)
       systemctl status wg-easy-breezy

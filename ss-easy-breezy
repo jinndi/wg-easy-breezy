@@ -545,7 +545,7 @@ select_menu_option() {
       reload_service
     ;;
     3)
-      cd $path_shadowsocks_rust && ls
+      cd "$path_shadowsocks_rust" && ls
     ;;
     4)
       remove_shadowsocks_rust

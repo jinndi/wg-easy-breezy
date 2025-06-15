@@ -23,8 +23,11 @@ RUN mkdir -p /etc/iproute2 && echo "20 lip" >> /etc/iproute2/rt_tables
 COPY ./sysctl.conf /etc/sysctl.conf
 
 # Копирование entrypoint.sh скрипта
-COPY ./entrypoint.sh entrypoint.sh
-RUN chmod a+x entrypoint.sh
+COPY ./start.sh start.sh
+RUN chmod a+x start.sh
 
-# Назначаем точку входа в приложение
-ENTRYPOINT [ "dumb-init", "/app/entrypoint.sh" ]
+# Устанавливаем dumb-init как init-процесс (PID 1)
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+# Команда при запуске контейнера
+CMD ["/app/start.sh"]

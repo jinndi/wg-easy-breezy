@@ -115,18 +115,18 @@ check_os() {
 
 # - версия дистрибутива ОС
 check_os_ver() {
-  if [[ "$os" == "ubuntu" && "$os_version" -lt 2004 ]]; then
-    exiterr "Для использования этого установщика требуется Ubuntu 20.04 или более поздняя версия."
+  if [[ "$os" == "ubuntu" && "$os_version" -lt 2404 ]]; then
+    exiterr "Для использования этого установщика требуется Ubuntu 24.04 или более поздняя версия."
   fi
-  if [[ "$os" == "debian" && "$os_version" -lt 11 ]]; then
-    exiterr "Для использования этого установщика требуется Debian 11 или более поздняя версия."
+  if [[ "$os" == "debian" && "$os_version" -lt 12 ]]; then
+    exiterr "Для использования этого установщика требуется Debian 12 или более поздняя версия."
   fi
 }
 
 # - поддержка версии ядра
 check_kernel() {
-  if [[ $(uname -r | cut -d "." -f 1) -lt 5 ]]; then
-     exiterr "В системе установлено старое ядро, несовместимое с данным установщиком."
+  if [[ $(uname -r | cut -d "." -f 1) -lt 6 ]]; then
+     exiterr "Для установки необходимо ядро ОС версии >=6"
   fi
 }
 
@@ -189,6 +189,26 @@ check_IPv4() {
   return 0
 }
 
+# Функция анимации ожидания
+show_spinner() {
+  local pid=$1
+  local delay=0.1
+  local spinner="|/-\\"
+  tput civis  # скрыть курсор
+
+  while kill -0 "$pid" 2>/dev/null; do
+    for i in $(seq 0 3); do
+      printf "\r[%c] Выполняем, ожидайте..." "${spinner:$i:1}"
+      sleep "$delay"
+    done
+  done
+
+  wait "$pid"
+  local status=$?
+  tput cnorm  # вернуть курсор
+  echo
+  return $status
+}
 
 install_pkgs(){
   # ожидания пока система освободит блокировку пакетного менеджера (apt/dpkg)
@@ -212,18 +232,21 @@ install_pkgs(){
     sleep 3
   done
 
-  echomsg "Установка зависимостей" 1
+  echomsg "Обновление пакетов и установка зависимостей, ожидайте..." 1
   (
-    set -e
-    apt-get -yqq update || apt-get -yqq update
-  ) > /dev/null 2>&1 || exiterr "'apt-get update' ошибка."
-  (
-    set -e
-    apt-get -yqq install iproute2 iptables curl tar xz-utils lsof dnsutils grep \
-    || apt-get -yqq install iproute2 iptables curl tar xz-utils lsof dnsutils grep
-  ) > /dev/null 2>&1 || exiterr "'apt-get install' ошибка."
+    (
+      apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
+    ) || exiterr "'apt-get update' ошибка."
+    (
+      apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade > /dev/null 2>&1
+    ) || exiterr "'apt-get upgrade' ошибка."
+    (
+      apt-get -yqq install iproute2 iptables curl tar xz-utils lsof dnsutils grep nano htop > /dev/null 2>&1 \
+      || apt-get -yqq install iproute2 iptables curl tar xz-utils lsof dnsutils grep nano htop > /dev/null 2>&1
+    ) || exiterr "'apt-get install' ошибка."
+  ) & show_spinner $!
 
-  echook "Зависимости установлены"
+  echook "Пакеты обновлены, зависимости установлены"
 }
 
 download_shadowsocks_rust(){
@@ -317,11 +340,8 @@ public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i==
   public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
 
 # Проверка формата
-if [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-  wg_host="$public_ip"
-else
+if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   public_ip=""
-
   echoerr "Не удалось определить публичный IP"
   while true; do
     echomsg "Введите публичный IPv4 ардес этого сервера"
@@ -494,24 +514,25 @@ install_ssserver(){
 }
 
 select_menu_option() {
-  local select_option="Выберите опцию:"
-  sleep 2
+  local select_option="Меню опций:"
+
   show_header
   if systemctl is-active --quiet ssserver; then
     echo "Статус: ✅ Работает"
     echo "$select_option"
-    echo "  1) Остановить"
+    echo "  1) Выключить"
   else
     echo "Статус: ❌ Не активно"
     echo "$select_option"
-    echo "  1) Запустить"
+    echo "  1) Включить"
   fi
   echo "  2) Перезапустить"
-  echo "  3) Удалить"
-  echo "  4) Выход (Ctrl+C)"
-
+  echo "  3) Перейти в папку"
+  echo "  4) Удаление программы"
+  echo "  5) Выход из меню (Ctrl+C)"
+в
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-4]$ ]]; do
+  until [[ "$option" =~ ^[1-5]$ ]]; do
     echoerr "$option: неверная опция."
     read -rp "Опция: " option
   done
@@ -524,9 +545,12 @@ select_menu_option() {
       reload_service
     ;;
     3)
-      remove_shadowsocks_rust
+      cd $path_shadowsocks_rust && ls
     ;;
     4)
+      remove_shadowsocks_rust
+    ;;
+    5)
       exit 0
     ;;
   esac

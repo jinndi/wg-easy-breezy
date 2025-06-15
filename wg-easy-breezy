@@ -227,7 +227,7 @@ remove_install() {
 show_spinner() {
   local pid=$1
   local delay=0.1
-  local spinner='|/-\'
+  local spinner="|/-\\"
   tput civis  # скрыть курсор
 
   while kill -0 "$pid" 2>/dev/null; do
@@ -268,7 +268,7 @@ install_pkgs() {
     sleep 3
   done
 
-  echomsg "Установка зависимостей" 1
+  echomsg "Обновление пакетов и установка зависимостей" 1
   (
     (
       apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
@@ -278,9 +278,9 @@ install_pkgs() {
     ) || exiterr "'apt-get upgrade' ошибка."
     (
       apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
-        dnsutils curl unzip grep sed nano > /dev/null 2>&1 \
+        dnsutils curl unzip grep sed nano htop > /dev/null 2>&1 \
       || apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
-        dnsutils curl unzip grep sed nano > /dev/null 2>&1
+        dnsutils curl unzip grep sed nano htop > /dev/null 2>&1
     ) || exiterr "'apt-get install' ошибка."
 
     # Спуллить образ wg-easy
@@ -288,7 +288,7 @@ install_pkgs() {
 
   ) & show_spinner $!
 
-  echook "Зависимости установлены"
+  echook "Пакеты обновлены, зависимости установлены"
 }
 
 
@@ -628,7 +628,7 @@ find_optimal_wg_mtu() {
     local mid=$(((low + high) / 2))
     local size=$((mid - 28))  # 20 байт IP + 8 байт ICMP
 
-    if ping -c1 -W1 -M do -s "$size" "$target" &>/dev/null; then
+    if ping -c1 -W1 -M "do" -s "$size" "$target" &>/dev/null; then
       last_good=$mid
       low=$((mid + 1))
     else
@@ -975,7 +975,6 @@ is_all_ok_services() {
   return 0
 }
 
-
 # Функция запуска всех сервисов
 start_services() {
   echomsg "Запускаем сервисы" 1
@@ -985,6 +984,8 @@ start_services() {
 
   if ! systemctl is-active --quiet wg-easy-breezy; then
     echoerr "Запуск не удался"
+  else
+    echook "Служба успешно запущена!"
   fi
 }
 
@@ -998,6 +999,8 @@ stop_services() {
     systemctl disable --now wg-easy-breezy > /dev/null 2>&1
     if systemctl is-active --quiet wg-easy-breezy; then
       echoerr "Остановка не удалась"
+    else
+      echook "Служба успешно остановлена!"
     fi
   else
     echoerr "Файл docker-compose не найден: $path_docker_compose_file"
@@ -1020,9 +1023,12 @@ switch_active_services() {
 restart_services() {
   echomsg "Перезапускаем сервисы" 1
   systemctl stop wg-easy-breezy > /dev/null 2>&1
-  sleep 3
   systemctl start wg-easy-breezy > /dev/null 2>&1
-  sleep 3
+  if is_all_ok_services; then
+    echook "Служба успешно перезапущена!"
+  else
+    echoerr "Ошибка перезапуска! Введите 'journalctl -u wg-easy-breezy -n 30' для просмотра лога"
+  fi
   select_menu_option
 }
 
@@ -1091,9 +1097,9 @@ install_services() {
   start_services
 
   echo 
-  echo "Веб интерфейс: $link_ui"
+  echo -e "\033[0;36mВеб интерфейс: $link_ui \033[0m"
   if [[ "$is_shadowsocks" ]]; then
-    echo "Веб интерфейс (shadowsocks): $link_ui_ss"
+    echo -e "\033[0;36mВеб интерфейс (shadowsocks): $link_ui_ss \033[0m"
   fi
   echo
 
@@ -1129,8 +1135,8 @@ remove_services() {
 }
 
 select_menu_option() {
-  local select_option
-  select_option="Выберите опцию:"
+  local select_option="Меню опций:"
+
   show_header
   if is_all_ok_services; then
     echo "Статус: ✅ Все сервисы работают"
@@ -1142,12 +1148,14 @@ select_menu_option() {
     echo "  1) Включить"
   fi
   echo "  2) Перезапустить"
-  echo "  3) Пересобрать"
-  echo "  4) Удалить"
-  echo "  5) Выход (Ctrl+C)"
+  echo "  3) Перейти в папку"
+  echo "  4) Статус systemd службы"
+  echo "  5) Пересобрать образ"
+  echo "  6) Удаление программы"
+  echo "  7) Выход из меню (Ctrl+C)"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-5]$ ]]; do
+  until [[ "$option" =~ ^[1-7]$ ]]; do
     echoerr "$option: неккоректное значение."
     read -rp "Опция: " option
   done
@@ -1160,12 +1168,18 @@ select_menu_option() {
       restart_services
     ;;
     3)
-      rebuild_services
+      cd $path_data_dir && ls
     ;;
     4)
-      remove_services
+      systemctl status wg-easy-breezy
     ;;
     5)
+      rebuild_services
+    ;;
+    6)
+      remove_services
+    ;;
+    7)
       exit 0
     ;;
   esac

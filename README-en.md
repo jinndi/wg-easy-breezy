@@ -17,7 +17,7 @@ Optional: Automatic configuration of the Caddy web server as a reverse proxy wit
 
 ## Requirements:
 
-1. VPS server from 1GB RAM with OS Linux Ubuntu 20.04+ or Debian 11+ (2 pcs if you want to deploy shasowsocks server on another)
+1. VPS server from 1GB RAM with OS Linux Ubuntu 24.04+ or Debian 12+, kernel version >=6 (2 pcs if you want to deploy shasowsocks server on another)
 2. Root user rights
 
 ## Installation:

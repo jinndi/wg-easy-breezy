@@ -232,7 +232,7 @@ install_pkgs(){
     sleep 3
   done
 
-  echomsg "Обновление пакетов и установка зависимостей, ожидайте..." 1
+  echomsg "Обновление пакетов и установка зависимостей" 1
   (
     (
       apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1

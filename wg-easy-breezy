@@ -713,7 +713,6 @@ add_wg_service() {
     }
   }" "$path_docker_compose_file"
 
-
   # Если ss_link передана
   if [ -n "$ss_link" ]; then
     # Добавить devices
@@ -731,7 +730,7 @@ add_wg_service() {
 
   # Добавить volumes как service_name
   yq e -i ".volumes += {
-    \"${service_name}\": { name: \"${service_name}\" }
+    \"${service_name}\": { \"name\": \"${service_name}\" }
   }" "$path_docker_compose_file"
 }
 

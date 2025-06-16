@@ -241,7 +241,7 @@ show_spinner() {
 # Функция установки необходимых пакетов программ
 install_pkgs() {
   # ожидания пока система освободит блокировку пакетного менеджера (apt/dpkg)
-  local count apt_lk apt_lk frontend_lk has_fuser has_lsof
+  local count apt_lk apt_lk frontend_lk has_fuser has_lsof yq_path
   count=0
   apt_lk="/var/lib/apt/lists/lock"
   pkg_lk="/var/lib/dpkg/lock"
@@ -277,7 +277,8 @@ install_pkgs() {
     ) || exiterr "'apt-get install' ошибка."
 
     # mikefarah yq
-    if command -v yq >/dev/null; then
+    yq_path=$(command -v yq)
+    if [[ -n "$yq_path" ]]; then
       if ! yq --version 2>/dev/null | grep -q 'mikefarah'; then
         rm -f "$yq_path"
         hash -r 2>/dev/null

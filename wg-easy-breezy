@@ -745,6 +745,10 @@ create_services_config()
     exiterr "Не удалось загрузить start.sh"
   }
 
+  # Инициализируем файл docker compose
+  mkdir -p "$(dirname "$path_docker_compose_file")"
+  echo -e "services: {}\nvolumes: {}\nnetworks: {}" > "$path_docker_compose_file"
+
   ## Сервис(ы) wg-easy-breezy:
   # - wg-easy-breezy дефолтный сервис docker compose
   add_wg_service  "wg-easy-breezy" \

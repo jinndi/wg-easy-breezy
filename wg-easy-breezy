@@ -681,9 +681,9 @@ add_wg_service() {
   
   # Добавление сервиса
   yq e -i ".services.${service_name} = {
-    image: \"wg-easy-breezy\",
-    container_name: \"${service_name}\",
-    environment: [
+    \"image\": \"wg-easy-breezy\",
+    \"container_name\": \"${service_name}\",
+    \"environment\": [
       \"LANG=ru\",
       \"WG_HOST=${host}\",
       \"PASSWORD_HASH=${password}\",
@@ -692,23 +692,23 @@ add_wg_service() {
       \"WG_MTU=${mtu}\",
       \"WG_PERSISTENT_KEEPALIVE=25\",
       \"WG_DEFAULT_ADDRESS=${address}\",
-      \"WG_DEFAULT_DNS=1.1.1.1\",
+      \"WG_DEFAULT_DNS=1.1.1.1,1.0.0.1\",
       \"UI_TRAFFIC_STATS=true\"
     ],
-    volumes: [
+    \"volumes\": [
       \"${service_name}:/etc/wireguard\",
       \"/lib/modules:/lib/modules\"
     ],
-    networks: [\"wg_easy_breezy\"],
-    ports: [
+    \"networks\": [\"wg_easy_breezy\"],
+    \"ports\": [
       \"${wg_port}:${wg_port}/udp\",
       \"${ui_port}:${ui_port}/tcp\"
     ],
-    privileged: true,
-    ulimits: {
-      nofile: {
-        soft: 51200,
-        hard: 51200
+    \"privileged\": true,
+    \"ulimits\": {
+      \"nofile\": {
+        \"soft\": 51200,
+        \"hard\": 51200
       }
     }
   }" "$path_docker_compose_file"
@@ -731,7 +731,7 @@ add_wg_service() {
 
   # Добавить volumes как service_name
   yq e -i ".volumes += {
-    ${service_name}: { name: \"${service_name}\" }
+    \"${service_name}\": { name: \"${service_name}\" }
   }" "$path_docker_compose_file"
 }
 
@@ -786,24 +786,24 @@ create_services_config()
   if [[ "$is_domain" ]]; then
     # - services
     yq e -i ".services.caddy = {
-      image: \"docker.io/caddy/caddy:latest\",
-      container_name: \"caddy\",
-      cap_add: [\"NET_ADMIN\"],
-      ports: [
+      \"image\": \"docker.io/caddy/caddy:latest\",
+      \"container_name\": \"caddy\",
+      \"cap_add\": [\"NET_ADMIN\"],
+      \"ports\": [
         \"443:443/tcp\",
         \"443:443/udp\"
       ],
-      volumes: [
+      \"volumes\": [
         \"${path_caddyfile}:/etc/caddy/Caddyfile\",
         \"caddy_data:/data\",
         \"caddy_config:/config\"
       ],
-      networks: [\"wg_easy_breezy\"]
+      \"networks\": [\"wg_easy_breezy\"]
     }" "$path_docker_compose_file"
     # - volumes
     yq e -i '.volumes += {
-      caddy_data: { name: "caddy_data" },
-      caddy_config: { name: "caddy_config" }
+      "caddy_data": { "name": "caddy_data" },
+      "caddy_config": { "name": "caddy_config" }
     }' "$path_docker_compose_file"
 
     # - Caddyfile для настройки реверс прокси с сертификатом сервера:
@@ -831,9 +831,9 @@ create_services_config()
   ## networks:
   yq e -i '
     .networks += {
-      wg_easy_breezy: {
-        name: "wg_easy_breezy",
-        driver: "bridge"
+      "wg_easy_breezy": {
+        "name": "wg_easy_breezy",
+        "driver": "bridge"
       }
     }
   ' "$path_docker_compose_file"

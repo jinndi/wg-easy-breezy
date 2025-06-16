@@ -661,6 +661,16 @@ find_optimal_wg_mtu() {
   echo "WG_MTU=$wg_mtu" >> $path_env_file 
 }
 
+# Функция загрузки переменных из .env (если он существует)
+load_env() {
+  if [ -f "$path_env_file" ]; then
+    set -o allexport
+    # shellcheck disable=SC1090
+    source "$path_env_file"
+    set +o allexport
+  fi
+}
+
 # Функция добавления сервиса wg
 add_wg_service() {
   local service_name="$1"
@@ -668,12 +678,6 @@ add_wg_service() {
   local ui_port="$3"
   local address="${4:-10.8.1.x}"
   local ss_link="${5:-}"
-
-  # Загружаем переменные из .env (если он существует)
-  if [ -f ".env" ]; then
-    export $(grep -v '^#' .env | xargs)
-  fi
-
   # Переменные из .env
   local host="${WG_HOST:-vpn.example.com}"
   local password="${PASSWORD_HASH:-changeme}"
@@ -760,6 +764,9 @@ create_services_config()
     -o "$path_start_sh" || {
     exiterr "Не удалось загрузить start.sh"
   }
+
+  # Загружаем переменные из .env файла
+  load_env
 
   # Инициализируем файл docker compose
   mkdir -p "$(dirname "$path_docker_compose_file")"

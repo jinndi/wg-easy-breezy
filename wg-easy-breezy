@@ -270,11 +270,27 @@ install_pkgs() {
       apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade > /dev/null 2>&1
     ) || exiterr "'apt-get upgrade' ошибка."
     (
-      apt-get -yqq install podman podman-compose yq iproute2 iptables openssl lsof \
+      apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
         dnsutils curl unzip grep sed nano htop > /dev/null 2>&1 \
-      || apt-get -yqq install podman podman-compose yq iproute2 iptables openssl lsof \
+      || apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
         dnsutils curl unzip grep sed nano htop > /dev/null 2>&1
     ) || exiterr "'apt-get install' ошибка."
+
+    # mikefarah yq
+    if command -v yq >/dev/null; then
+      if ! yq --version 2>/dev/null | grep -q 'mikefarah'; then
+        rm -f "$yq_path"
+        hash -r 2>/dev/null
+      fi
+    fi
+    if ! command -v yq >/dev/null; then
+      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+        https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
+        -o /usr/local/bin/yq || {
+        exiterr "Не удалось загрузить mikefarah/yq"
+      }
+      chmod +x /usr/local/bin/yq
+    fi
 
     # Спуллить образ wg-easy
     podman pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $wg_easy_image"

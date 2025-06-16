@@ -703,7 +703,7 @@ add_wg_service() {
       \"${service_name}:/etc/wireguard\",
       \"/lib/modules:/lib/modules\"
     ],
-    \"networks\": [\"wg_easy_breezy\"],
+    \"networks\": [\"wg-easy-breezy\"],
     \"ports\": [
       \"${wg_port}:${wg_port}/udp\",
       \"${ui_port}:${ui_port}/tcp\"
@@ -804,7 +804,7 @@ create_services_config()
         \"caddy_data:/data\",
         \"caddy_config:/config\"
       ],
-      \"networks\": [\"wg_easy_breezy\"]
+      \"networks\": [\"wg-easy-breezy\"]
     }" "$path_docker_compose_file"
     # - volumes
     yq e -i '.volumes += {
@@ -837,8 +837,8 @@ create_services_config()
   ## networks:
   yq e -i '
     .networks += {
-      "wg_easy_breezy": {
-        "name": "wg_easy_breezy",
+      "wg-easy-breezy": {
+        "name": "wg-easy-breezy",
         "driver": "bridge"
       }
     }

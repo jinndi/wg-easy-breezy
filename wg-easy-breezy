@@ -680,7 +680,7 @@ add_wg_service() {
   local mtu="${WG_MTU:-1420}"
   
   # Добавление сервиса
-  yq -i -y ".services.${service_name} = {
+  yq e -i ".services.${service_name} = {
     image: \"wg-easy-breezy\",
     container_name: \"${service_name}\",
     environment: [
@@ -716,12 +716,12 @@ add_wg_service() {
   # Если ss_link передана
   if [ -n "$ss_link" ]; then
     # Добавить devices
-    yq -i -y "
+    yq e -i "
       .services.${service_name}.devices = [\"/dev/net/tun\"]
     " "$path_docker_compose_file"
 
     # Добавить переменные в environment
-    yq -i -y ".services.${service_name}.environment += [
+    yq e -i ".services.${service_name}.environment += [
       \"WG_DEVICE=sstun\",
       \"SS_TUN_NAME=sstun\",
       \"SS_LINK=${ss_link}\"
@@ -729,7 +729,7 @@ add_wg_service() {
   fi
 
   # Добавить volumes как service_name
-  yq -i -y ".volumes += {
+  yq e -i ".volumes += {
     ${service_name}: { name: \"${service_name}\" }
   }" "$path_docker_compose_file"
 }
@@ -784,7 +784,7 @@ create_services_config()
   ## Сервис Caddy сервера (если указан домен):
   if [[ "$is_domain" ]]; then
     # - services
-    yq -i -y ".services.caddy = {
+    yq e -i ".services.caddy = {
       image: \"docker.io/caddy/caddy:latest\",
       container_name: \"caddy\",
       cap_add: [\"NET_ADMIN\"],
@@ -800,7 +800,7 @@ create_services_config()
       networks: [\"wg_easy_breezy\"]
     }" "$path_docker_compose_file"
     # - volumes
-    yq -i -y '.volumes += {
+    yq e -i '.volumes += {
       caddy_data: { name: "caddy_data" },
       caddy_config: { name: "caddy_config" }
     }' "$path_docker_compose_file"
@@ -828,7 +828,7 @@ create_services_config()
   fi
 
   ## networks:
-  yq -i -y '
+  yq e -i '
     .networks += {
       wg_easy_breezy: {
         name: "wg_easy_breezy",

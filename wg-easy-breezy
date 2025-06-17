@@ -1123,9 +1123,9 @@ show_services_list() {
       fi
 
       if [[ "$wg_host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
-        echo "Веб интерфейс: https://${host}/${service}/"
+        echo "Веб интерфейс: https://${wg_host}/${service}/"
       else
-        echo "Веб интерфейс: http://${host}:${port_ui}"
+        echo "Веб интерфейс: http://${wg_host}:${port_ui}"
       fi
     fi
 

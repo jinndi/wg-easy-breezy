@@ -1268,7 +1268,7 @@ remove_services() {
 select_install_mode() {
   echo
   echo "Выберите режим установки"
-  echo " 1) Обычный wg-easy"
+  echo " 1) Стандартный wg-easy"
   echo " 2) Прокси wg-easy -> shasowsocks"
 
   read -rp "Выбор: " mode
@@ -1291,15 +1291,16 @@ select_install_mode() {
 select_menu_option() {
   show_header
   show_services_list
+  echo
 
   local select_option="Меню опций:"
 
   if is_all_ok_services; then
-    echo "✅ Все сервисы работают"
+    echo "✅ Сервис активен"
     echo "$select_option"
     echo " 1) Остановить"
   else
-    echo "❌ Не все сервисы работают"
+    echo "❌ Сервис остановлен"
     echo "$select_option"
     echo " 1) Запустить"
   fi

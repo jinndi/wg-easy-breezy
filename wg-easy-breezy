@@ -736,9 +736,6 @@ add_wg_service() {
   local host="${WG_HOST:-vpn.example.com}"
   local password="${PASSWORD_HASH:-changeme}"
   local mtu="${WG_MTU:-1420}"
-  echo "$password"
-  echo "$PASSWORD_HASH"
-  echo "$PASSWORD_HASH" | od -c
 
   # добавление сервиса
   yq e -i ".services.${service_name} = {

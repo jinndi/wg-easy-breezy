@@ -847,8 +847,8 @@ add_wg_service() {
   add_iptables_rule "$port_wg" "udp"
   add_iptables_rule "$port_ui" "tcp"
 
-  # если установлено доменное имя сайта
-  if [[ "$host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+  # если файл caddyfile существует
+  if [[ -f "$path_caddyfile" ]]; then
     # reverse_proxy в caddyfile 
     echo "handle_path /$service_name/* { reverse_proxy $service_name:$port_ui }" >> "$path_caddyfile"
     # cсылка на UI интерфейс wg-easy
@@ -1252,6 +1252,9 @@ remove_wg_service() {
   port_ui=$(get_env_var_from_service "$service_name" "PORT" "")
   remove_iptables_rule "$port_wg" "udp"
   remove_iptables_rule "$port_ui" "tcp"
+
+  # реверс прокси в caddyfile
+  [[ -f "$path_caddyfile" ]] && sed -i "/$service_name/d" "$path_caddyfile"
 
   # запускаем службу
   systemctl start wg-easy-breezy > /dev/null 2>&1

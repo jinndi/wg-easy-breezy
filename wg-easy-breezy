@@ -1072,22 +1072,16 @@ rebuild_services() {
 
 # Функция вывода списка служб на основе compose yml файла
 show_services_list() {
-
-  printf "%-15s | %-25s | %-10s\n" "Служба" "Порты" "Статус"
-  printf "%s\n" "-------------------------------------------------------------"
-  
   # Получаем список сервисов
   yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
-    # Порты из compose
-    ports=$(yq -r ".services.\"$service\".ports[]?" "$path_docker_compose_file" | paste -sd "," -)
-    [ -z "$ports" ] && ports="—"
+    local container_status ports wg_host port_ui link_ui 
 
     # Получаем статус контейнера по имени сервиса (по части имени)
     container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n 1)
 
     if [[ "$container_status" == "" ]]; then
       status="не найден"
-    elif echo "$container_status" | grep -q "^${service}_"; then
+    elif echo "$container_status" | grep -q "^${service}"; then
       if echo "$container_status" | grep -q "Up"; then
         status="работает"
       else
@@ -1097,11 +1091,30 @@ show_services_list() {
       status="неизвестный"
     fi
 
-    printf "%-15s | %-25s | %-10s\n" "$service" "$ports" "$status"
-  done
+    # Порты из compose
+    ports=$(yq -r ".services.\"$service\".ports[]?" "$path_docker_compose_file" | paste -sd "," -)
+    [ -z "$ports" ] && ports="—"
 
-  # отображение меню опций
-  select_menu_option
+    echo
+    echo "Имя сервиса/контейнера: $service"
+    echo "Статус: $status"
+    echo "Проброс портов: $ports"
+
+    # Ссылка для входа в веб-интерфейс wg-easy
+    if [[ "$service" == "${service_prefix}*" ]]; then
+      wg_host=$(yq -r ".services.\"$service\".environment.WG_HOST // \"—\"" "$path_docker_compose_file")
+      port_ui=$(yq -r ".services.\"$service\".environment.PORT // \"—\"" "$path_docker_compose_file")
+
+      if [[ "$wg_host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+        link_ui="https://${host}/${service}/"
+      else
+        link_ui="http://${host}:${port_ui}"
+      fi
+      echo "Веб интерфейс: $status"
+    fi
+
+    echo
+  done
 }
 
 # Функция добавления нового сервиса wg-easy
@@ -1162,7 +1175,7 @@ install() {
   # создаем необходимы папки
   mkdir -p "$path_data_dir"
   mkdir -p "$(dirname "$path_script")"
-  
+
   # считывание вода пользователя
   input_tag
   input_domain
@@ -1254,25 +1267,26 @@ select_install_mode() {
 
 # Функция выбора опций
 select_menu_option() {
+  show_header
+  show_services_list
+
   local select_option="Меню опций:"
 
-  show_header
   if is_all_ok_services; then
-    echo "Статус: ✅ Все сервисы работают"
+    echo "✅ Все сервисы работают"
     echo "$select_option"
     echo " 1) Остановить"
   else
-    echo "Статус: ❌ Не активно / не все работает"
+    echo "❌ Не все сервисы работают"
     echo "$select_option"
     echo " 1) Запустить"
   fi
   echo " 2) Перезапустить"
   echo " 3) Добавить wg-easy"
-  echo " 4) Список сервисов"
-  echo " 5) Статус службы"
-  echo " 6) Пересобрать образ"
-  echo " 7) Удаление программы"
-  echo " 8) Выход из меню (Ctrl+C)"
+  echo " 4) Статус службы"
+  echo " 5) Пересобрать образ"
+  echo " 6) Удаление программы"
+  echo " 7) Выход из меню (Ctrl+C)"
 
   read -rp "Опция: " option
   until [[ "$option" =~ ^[1-8]$ ]]; do
@@ -1291,18 +1305,15 @@ select_menu_option() {
       add_new_wg_service
     ;;
     4)
-      show_services_list
-    ;;
-    5)
       systemctl status wg-easy-breezy
     ;;
-    6)
+    5)
       rebuild_services
     ;;
-    7)
+    6)
       remove_services
     ;;
-    8)
+    7)
       exit 0
     ;;
   esac

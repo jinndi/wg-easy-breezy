@@ -305,105 +305,105 @@ input_port(){
   done
 }
 
-create_config(){
-echomsg "Формируем конфиг shadowsocks-rust сервера" 1
+create_config() {
+  echomsg "Формируем конфиг shadowsocks-rust сервера" 1
 
-mkdir -p "$(dirname "$path_config")"
+  mkdir -p "$(dirname "$path_config")"
 
-password=$($path_ssservice genkey -m "$encrypt_method")
+  password=$($path_ssservice genkey -m "$encrypt_method")
 
-cat >"$path_config" <<CONFIG
-{
-  "server": "::",
-  "server_port": $port,
-  "mode": "tcp_and_udp",
-  "method": "$encrypt_method",
-  "password": "$password",
-  "keep_alive": 25,
-  "timeout": 300,
-  "udp_timeout": 300,
-  "udp_max_associations": 512,
-  "nofile": 51200,
-  "fast_open": true,
-  "no_delay": true
-}
-CONFIG
+  {
+    echo "{"
+    echo "  \"server\": \"::\","
+    echo "  \"server_port\": $port,"
+    echo "  \"mode\": \"tcp_and_udp\","
+    echo "  \"method\": \"$encrypt_method\","
+    echo "  \"password\": \"$password\","
+    echo "  \"keep_alive\": 25,"
+    echo "  \"timeout\": 300,"
+    echo "  \"udp_timeout\": 300,"
+    echo "  \"udp_max_associations\": 512,"
+    echo "  \"nofile\": 51200,"
+    echo "  \"fast_open\": true,"
+    echo "  \"no_delay\": true"
+    echo "}"
+  } > "$path_config"
 
-# IP текущего сервера
-local public_ip
+  # IP текущего сервера
+  local public_ip
 
-# ip route (локальный интерфейс)
-public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
+  # ip route (локальный интерфейс)
+  public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
 
-# через DNS (OpenDNS)
-[ -z "$public_ip" ] && command -v dig >/dev/null && \
-  public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
+  # через DNS (OpenDNS)
+  [ -z "$public_ip" ] && command -v dig >/dev/null && \
+    public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
 
-# Проверка формата
-if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-  public_ip=""
-  echoerr "Не удалось определить публичный IP"
-  while true; do
-    echomsg "Введите публичный IPv4 ардес этого сервера"
-    read -rp "IPv4 этого сервера: " public_ip
+  # Проверка формата
+  if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    public_ip=""
+    echoerr "Не удалось определить публичный IP"
+    while true; do
+      echomsg "Введите публичный IPv4 ардес этого сервера"
+      read -rp "IPv4 этого сервера: " public_ip
 
-    if check_IPv4 "$public_ip"; then
-      break
-    fi
-  done
-fi
+      if check_IPv4 "$public_ip"; then
+        break
+      fi
+    done
+  fi
 
-cat >"$path_client_for_url_config" <<CLIENT_CONFIG
-{
-  "server": "$public_ip",
-  "server_port": $port,
-  "method": "$encrypt_method",
-  "password": "$password"
-}
-CLIENT_CONFIG
+  {
+    echo "{"
+    echo "  \"server\": \"$public_ip\","
+    echo "  \"server_port\": $port,"
+    echo "  \"method\": \"$encrypt_method\","
+    echo "  \"password\": \"$password\""
+    echo "}"
+  } > "$path_client_for_url_config"
 
-echook "Конфиг создан"
+  echook "Конфиг создан"
 }
 
 create_service(){
-echomsg "Создаём systemd службу" 1
+  echomsg "Создаём systemd службу" 1
 
-# Путь к iptables
-local iptables_path
-iptables_path=$(command -v iptables)
-if [[ $(systemd-detect-virt) == "openvz" ]] && \
-  readlink -f "$(command -v iptables)" | grep -q "nft" && \
-  hash iptables-legacy 2>/dev/null
-then
-  iptables_path=$(command -v iptables-legacy)
-fi
+  # Путь к iptables
+  local iptables_path
+  iptables_path=$(command -v iptables)
+  if [[ $(systemd-detect-virt) == "openvz" ]] && \
+    readlink -f "$(command -v iptables)" | grep -q "nft" && \
+    hash iptables-legacy 2>/dev/null
+  then
+    iptables_path=$(command -v iptables-legacy)
+  fi
 
-cat >"$path_service" <<CONFIG_SUSTEMD
-[Unit]
-Description=Shadowsocks-rust ssserver
-Documentation=https://github.com/shadowsocks/shadowsocks/wiki
-After=network.target
-Wants=network.target
+  {
+    echo "[Unit]"
+    echo "Description=Shadowsocks-rust ssserver"
+    echo "Documentation=https://github.com/shadowsocks/shadowsocks/wiki"
+    echo "After=network.target"
+    echo "Wants=network.target"
+    echo
+    echo "[Service]"
+    echo "PermissionsStartOnly=true"
+    echo "ExecStartPre=${iptables_path} -I INPUT -p tcp --dport ${port} -j ACCEPT"
+    echo "ExecStartPre=${iptables_path} -I INPUT -p udp --dport ${port} -j ACCEPT"
+    echo "ExecStart=${path_ssserver} -c ${path_config}"
+    echo "ExecStopPost=${iptables_path} -D INPUT -p tcp --dport ${port} -j ACCEPT"
+    echo "ExecStopPost=${iptables_path} -D INPUT -p udp --dport ${port} -j ACCEPT"
+    echo "Restart=on-failure"
+    echo "User=shadowsocks"
+    echo "LimitNOFILE=51200"
+    echo "CapabilityBoundingSet=CAP_NET_BIND_SERVICE"
+    echo "AmbientCapabilities=CAP_NET_BIND_SERVICE"
+    echo "NoNewPrivileges=true"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } > "$path_service"
 
-[Service]
-PermissionsStartOnly=true
-ExecStartPre=${iptables_path} -I INPUT -p tcp --dport ${port} -j ACCEPT
-ExecStartPre=${iptables_path} -I INPUT -p udp --dport ${port} -j ACCEPT
-ExecStart=${path_ssserver} -c ${path_config}
-ExecStopPost=${iptables_path} -D INPUT -p tcp --dport ${port} -j ACCEPT
-ExecStopPost=${iptables_path} -D INPUT -p udp --dport ${port} -j ACCEPT
-Restart=on-failure
-User=shadowsocks
-LimitNOFILE=51200
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-NoNewPrivileges=true
-
-[Install]
-WantedBy=multi-user.target
-CONFIG_SUSTEMD
-
-echook "Служба создана"
+  echook "Служба создана"
 }
 
 add_user(){
@@ -496,12 +496,11 @@ install_ssserver(){
   create_sysctl_config
   activate_ssserver
 
-  # Данные для подключения
   echo
-  echo "-----------------------------------------------------------------------"
-  echo "Ссылка для подключения к shadowsocks:"
+  echo -e "\033[1;32m🎉 shadowsocks-rust сервер установлен! \033[0m"
+  echo
+  echo "Ссылка для подключения:"
   echo -e "\033[0;36m$("$path_ssurl" --encode "$path_client_for_url_config") \033[0m"
-  echo "-----------------------------------------------------------------------"
   echo
 
   # перемещам текущий скрипт, добавляем на него права и ссылку
@@ -518,21 +517,25 @@ select_menu_option() {
 
   show_header
   if systemctl is-active --quiet ssserver; then
-    echo "Статус: ✅ Работает"
+    echo "shadowsocks-rust server $version"
+    echo "🟢 Служба systemctl активна"
+    echo
     echo "$select_option"
-    echo "  1) Выключить"
+    echo " 1) ❌ Остановить"
   else
-    echo "Статус: ❌ Не активно"
+    echo "🔴 Служба systemctl не активна"
+    echo
     echo "$select_option"
-    echo "  1) Включить"
+    echo " 1) 🚀 Запустить"
   fi
-  echo "  2) Перезапустить"
-  echo "  3) Статус systemd службы"
-  echo "  4) Удаление программы"
-  echo "  5) Выход из меню (Ctrl+C)"
+  echo " 2) 🌀 Перезапустить"
+  echo " 3) 🧿 Статус службы"
+  echo " 4) 📜 Последние логи"
+  echo " 5) 🪣 Удаление программы"
+  echo " 6) 🚪 Выход из меню (Ctrl+C)"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-5]$ ]]; do
+  until [[ "$option" =~ ^[1-6]$ ]]; do
     echoerr "$option: неверная опция."
     read -rp "Опция: " option
   done
@@ -545,12 +548,17 @@ select_menu_option() {
       reload_service
     ;;
     3)
-      systemctl status ssserver
+      systemctl status ssserver --no-pager -l
+      select_menu_option
     ;;
     4)
-      remove_shadowsocks_rust
+      journalctl -u ssserver -n 100 --no-pager
+      select_menu_option
     ;;
     5)
+      remove_shadowsocks_rust
+    ;;
+    6)
       exit 0
     ;;
   esac

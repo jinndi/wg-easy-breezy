@@ -1006,7 +1006,7 @@ start_services() {
 
   # Запускаем докер контейнеры
   systemctl enable --now wg-easy-breezy > /dev/null 2>&1
-  sleep 3
+  sleep 5
   if ! systemctl is-active --quiet wg-easy-breezy; then
     echoerr "Запуск не удался"
   else
@@ -1021,7 +1021,6 @@ stop_services() {
   # Останавливаем и удаляем docker-контейнеры
   if [[ -f "$path_docker_compose_file" ]]; then
     systemctl disable --now wg-easy-breezy > /dev/null 2>&1
-    sleep 3
     if systemctl is-active --quiet wg-easy-breezy; then
       echoerr "Остановка не удалась"
     else
@@ -1049,7 +1048,7 @@ restart_services() {
   echomsg "Перезапускаем сервисы" 1
   systemctl stop wg-easy-breezy > /dev/null 2>&1
   systemctl start wg-easy-breezy > /dev/null 2>&1
-  sleep 3
+  sleep 5
   if is_all_ok_services; then
     echook "Служба успешно перезапущена!"
   else

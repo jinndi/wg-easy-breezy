@@ -1227,7 +1227,7 @@ remove_wg_service() {
       return
     fi
 
-    if yq e ".services.\"$service_name\"" "$path_docker_compose_file" > /dev/null 2>&1; then
+    if [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]]; then
       echomsg "Удаляем сервис $service_name" 1
       break
     else

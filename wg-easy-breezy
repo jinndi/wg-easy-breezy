@@ -309,7 +309,7 @@ check_tag() {
   fi
 
   if [[ -f "$path_docker_compose_file" ]] && \
-    yq e ".services.\"$service_name\"" "$path_docker_compose_file" > /dev/null 2>&1
+    [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]]
   then
     echoerr "Ошибка: Сервис под тегом '$tag' уже существует"
     return 1

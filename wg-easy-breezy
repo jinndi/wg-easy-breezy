@@ -1070,6 +1070,19 @@ rebuild_services() {
   select_menu_option
 }
 
+# Функция извлечения переменной из environmen по имени сервиса 
+get_env_var_from_service() {
+  local service="$1"
+  local var_name="$2"
+  local default_value="${3:-}"
+
+  yq -r '
+    .services."'$service'".environment
+    | (map(split("=")) | from_entries // .)
+    | .["'$var_name'"] // "'"$default_value"'"
+  ' "$path_docker_compose_file"
+}
+
 # Функция вывода списка служб на основе compose yml файла
 show_services_list() {
   # Получаем список сервисов
@@ -1102,9 +1115,9 @@ show_services_list() {
 
     # Если это контейнер wg-easy
     if [[ "$service" == "${service_prefix}-"* ]]; then
-      ss_link=$(yq -r ".services.\"$service\".environment.SS_LINK // \"\"" "$path_docker_compose_file")
-      wg_host=$(yq -r ".services.\"$service\".environment.WG_HOST // \"—\"" "$path_docker_compose_file")
-      port_ui=$(yq -r ".services.\"$service\".environment.PORT // \"—\"" "$path_docker_compose_file")
+      ss_link=$(get_env_var_from_service "$service" "SS_LINK" "")
+      wg_host=$(get_env_var_from_service "$service" "WG_HOST" "—")
+      port_ui=$(get_env_var_from_service "$service" "PORT" "—")
 
       if [[ "$ss_link" ]]; then
         echo "Прокси режим: да, к ${ss_link#*@}"

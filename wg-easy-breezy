@@ -1070,7 +1070,7 @@ rebuild_services() {
   select_menu_option
 }
 
-# Функция извлечения переменной из environmen по имени сервиса 
+# Функция извлечения переменной из environment по имени сервиса 
 get_env_var_from_service() {
   local service="$1"
   local var_name="$2"

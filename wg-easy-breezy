@@ -1241,8 +1241,8 @@ remove_wg_service() {
   systemctl stop wg-easy-breezy > /dev/null 2>&1
 
   # services.yml записи services и volumes
-  yq -i -y "del(.services.${service_name})" "$path_docker_compose_file"
-  yq -i -y "del(.volumes.${service_name})" "$path_docker_compose_file"
+  yq e -i "del(.services.${service_name})" "$path_docker_compose_file"
+  yq e -i "del(.volumes.${service_name})" "$path_docker_compose_file"
 
   # volume том
   podman volume rm "$service_name" > /dev/null 2>&1
@@ -1257,7 +1257,7 @@ remove_wg_service() {
   systemctl start wg-easy-breezy > /dev/null 2>&1
   sleep 5
 
-  echook "👨🏻‍🔧 Сервис $service_name удален!"
+  echook "🎈 Сервис $service_name удален!"
   echo
   read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
   # отображение меню опций

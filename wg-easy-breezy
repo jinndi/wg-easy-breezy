@@ -164,7 +164,7 @@ remove_install() {
   is_show_info="$1"
 
   if [[ -n "$is_show_info" ]]; then
-    echomsg "Удаляем предыдущую установку" 1
+    echomsg "Удаляем программу" 1
   fi
 
   # Остановка сервисов с удаление всех задействованных контейнеров и образов
@@ -1086,52 +1086,55 @@ get_env_var_from_service() {
 show_services_list() {
   # Получаем список сервисов
   yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
-    local container_status ports wg_host port_ui ss_link
+    local container_status ports wg_host port_ui address ss_link 
 
     # Получаем статус контейнера по имени сервиса (по части имени)
     container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n 1)
 
     if [[ "$container_status" == "" ]]; then
-      status="не запущен"
+      status="\033[1;34mне запущен\033[0m"
     elif echo "$container_status" | grep -q "^${service}"; then
       if echo "$container_status" | grep -q "Up"; then
-        status="работает"
+        status="\033[1;32mработает\033[0m"
       else
-        status="не работает"
+        status="\033[1;31mне работает\033[0m"
       fi
     else
       status="неизвестный"
     fi
 
     # Порты из compose
-    ports=$(yq -r ".services.\"$service\".ports[]?" "$path_docker_compose_file" | paste -sd ", " -)
+    ports=$(yq -r ".services.\"$service\".ports | join(\", \")" "$path_docker_compose_file")
     [ -z "$ports" ] && ports="—"
 
     echo
-    echo "Имя сервиса/контейнера: $service"
-    echo "Статус: $status"
-    echo "Проброс портов: $ports"
+    echo -e "\033[0;36mИмя сервиса:\033[0m $service"
+    echo -e "\033[0;36mСтатус:\033[0m $status"
+    echo -e "\033[0;36mПроброс портов:\033[0m $ports"
 
     # Если это контейнер wg-easy
     if [[ "$service" == "${service_prefix}-"* ]]; then
       ss_link=$(get_env_var_from_service "$service" "SS_LINK" "")
-      wg_host=$(get_env_var_from_service "$service" "WG_HOST" "пусто")
-      port_ui=$(get_env_var_from_service "$service" "PORT" "пусто")
+      wg_host=$(get_env_var_from_service "$service" "WG_HOST" "-")
+      port_ui=$(get_env_var_from_service "$service" "PORT" "-")
+      address=$(get_env_var_from_service "$service" "WG_DEFAULT_ADDRESS" "-")
 
       if [[ "$ss_link" ]]; then
-        echo "Прокси режим: да, к ${ss_link#*@}"
+        echo -e "\033[0;36mПрокси режим:\033[0m да, shadowsosks -> ${ss_link#*@}"
       else
-        echo "Прокси режим: нет"
+        echo -e "\033[0;36mПрокси режим:\033[0m нет"
       fi
 
+      echo -e "\033[0;36mАдреса клиентов wg:\033[0m $address"
+      
       if [[ "$wg_host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
-        echo "Веб интерфейс: https://${wg_host}/${service}/"
+        echo -e "\033[0;36mВеб интерфейс:\033[0m https://${wg_host}/${service}/"
       else
-        echo "Веб интерфейс: http://${wg_host}:${port_ui}"
+        echo -e "\033[0;36mВеб интерфейс:\033[0m http://${wg_host}:${port_ui}"
       fi
     fi
 
-    echo
+    echo "___________________________________________________"
   done
 }
 

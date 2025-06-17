@@ -1107,7 +1107,6 @@ show_services_list() {
       port_ui=$(yq -r ".services.\"$service\".environment.PORT // \"—\"" "$path_docker_compose_file")
 
       if [[ "$ss_link" ]]; then
-        ss_link
         echo "Прокси режим: да, к ${ss_link#*@}"
       else
         echo "Прокси режим: нет"

@@ -741,18 +741,18 @@ add_wg_service() {
   yq e -i ".services.${service_name} = {
     \"image\": \"wg-easy-breezy\",
     \"container_name\": \"${service_name}\",
-    \"environment\": [
-      \"LANG=ru\",
-      \"WG_HOST=${host}\",
-      \"PASSWORD_HASH=${password}\",
-      \"PORT=${port_ui}\",
-      \"WG_PORT=${port_wg}\",
-      \"WG_MTU=${mtu}\",
-      \"WG_PERSISTENT_KEEPALIVE=25\",
-      \"WG_DEFAULT_ADDRESS=${address}\",
-      \"WG_DEFAULT_DNS=1.1.1.1,1.0.0.1\",
-      \"UI_TRAFFIC_STATS=true\"
-    ],
+    \"environment\": {
+      \"LANG\": \"ru\",
+      \"WG_HOST\": \"${host}\",
+      \"PASSWORD_HASH\": \"${password}\",
+      \"PORT\": \"${port_ui}\",
+      \"WG_PORT\": \"${port_wg}\",
+      \"WG_MTU\": \"${mtu}\",
+      \"WG_PERSISTENT_KEEPALIVE\": \"25\",
+      \"WG_DEFAULT_ADDRESS\": \"${address}\",
+      \"WG_DEFAULT_DNS\": \"1.1.1.1,1.0.0.1\",
+      \"UI_TRAFFIC_STATS\": \"true\"
+    },
     \"volumes\": [
       \"${service_name}:/etc/wireguard\",
       \"/lib/modules:/lib/modules\"
@@ -779,11 +779,12 @@ add_wg_service() {
     " "$path_docker_compose_file"
 
     # переменные в environment
-    yq e -i ".services.${service_name}.environment += [
-      \"WG_DEVICE=sstun\",
-      \"SS_TUN_NAME=sstun\",
-      \"SS_LINK=${ss_link}\"
-    ]" "$path_docker_compose_file"
+    yq e -i ".services.${service_name}.environment += {
+        \"WG_DEVICE\": \"sstun\",
+        \"SS_TUN_NAME\": \"sstun\",
+        \"SS_LINK\": \"${ss_link}\"
+      }
+    " "$path_docker_compose_file"
   fi
 
   # volumes как service_name
@@ -1076,11 +1077,7 @@ get_env_var_from_service() {
   local var_name="$2"
   local default_value="${3:-}"
 
-  yq -r '
-    .services."'$service'".environment
-    | (map(split("=")) | from_entries // .)
-    | .["'$var_name'"] // "'"$default_value"'"
-  ' "$path_docker_compose_file"
+  yq -r ".services.\"$service\".environment.\"$var_name\" // \"$default_value\"" "$path_docker_compose_file"
 }
 
 # Функция вывода списка служб на основе compose yml файла
@@ -1105,7 +1102,7 @@ show_services_list() {
     fi
 
     # Порты из compose
-    ports=$(yq -r ".services.\"$service\".ports[]?" "$path_docker_compose_file" | paste -sd "," -)
+    ports=$(yq -r ".services.\"$service\".ports[]?" "$path_docker_compose_file" | paste -sd ", " -)
     [ -z "$ports" ] && ports="—"
 
     echo
@@ -1116,8 +1113,8 @@ show_services_list() {
     # Если это контейнер wg-easy
     if [[ "$service" == "${service_prefix}-"* ]]; then
       ss_link=$(get_env_var_from_service "$service" "SS_LINK" "")
-      wg_host=$(get_env_var_from_service "$service" "WG_HOST" "—")
-      port_ui=$(get_env_var_from_service "$service" "PORT" "—")
+      wg_host=$(get_env_var_from_service "$service" "WG_HOST" "пусто")
+      port_ui=$(get_env_var_from_service "$service" "PORT" "пусто")
 
       if [[ "$ss_link" ]]; then
         echo "Прокси режим: да, к ${ss_link#*@}"

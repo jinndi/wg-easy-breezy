@@ -1074,7 +1074,7 @@ rebuild_services() {
 show_services_list() {
   # Получаем список сервисов
   yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
-    local container_status ports wg_host port_ui link_ui 
+    local container_status ports wg_host port_ui ss_link
 
     # Получаем статус контейнера по имени сервиса (по части имени)
     container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n 1)
@@ -1100,17 +1100,24 @@ show_services_list() {
     echo "Статус: $status"
     echo "Проброс портов: $ports"
 
-    # Ссылка для входа в веб-интерфейс wg-easy
-    if [[ "$service" == "${service_prefix}*" ]]; then
+    # Если это контейнер wg-easy
+    if [[ "$service" == "${service_prefix}-"* ]]; then
+      ss_link=$(yq -r ".services.\"$service\".environment.SS_LINK // \"\"" "$path_docker_compose_file")
       wg_host=$(yq -r ".services.\"$service\".environment.WG_HOST // \"—\"" "$path_docker_compose_file")
       port_ui=$(yq -r ".services.\"$service\".environment.PORT // \"—\"" "$path_docker_compose_file")
 
-      if [[ "$wg_host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
-        link_ui="https://${host}/${service}/"
+      if [[ "$ss_link" ]]; then
+        ss_link
+        echo "Прокси режим: да, к ${ss_link#*@}"
       else
-        link_ui="http://${host}:${port_ui}"
+        echo "Прокси режим: нет"
       fi
-      echo "Веб интерфейс: $status"
+
+      if [[ "$wg_host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+        echo "Веб интерфейс: https://${host}/${service}/"
+      else
+        echo "Веб интерфейс: http://${host}:${port_ui}"
+      fi
     fi
 
     echo

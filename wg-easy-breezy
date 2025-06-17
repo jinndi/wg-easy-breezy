@@ -1159,6 +1159,10 @@ install() {
   # выбор режима установки
   select_install_mode
 
+  # создаем необходимы папки
+  mkdir -p "$path_data_dir"
+  mkdir -p "$(dirname "$path_script")"
+  
   # считывание вода пользователя
   input_tag
   input_domain
@@ -1167,10 +1171,6 @@ install() {
   input_port
   input_address
   input_password
-
-  # создаем необходимы папки
-  mkdir -p "$path_data_dir"
-  mkdir -p "$(dirname "$path_script")"
 
   # поиск оптимального MTU WireGuard
   find_optimal_wg_mtu

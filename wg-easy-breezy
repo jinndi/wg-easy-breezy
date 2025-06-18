@@ -665,11 +665,12 @@ input_password() {
       # Запрашиваем хеша пароля
       output_wgpw=$(podman run --rm -it $wg_easy_image wgpw "$password")
       # Извлекаем и экранируем хеш пароля
-      password_hash=$(echo "$output_wgpw" | cut -d "'" -f2 | sed 's/\$/\$\$/g' | tr -d '\r')
+      password_hash=$(echo "$output_wgpw" | tr -d '\r\n')
       if grep -q '^PASSWORD_HASH=' "$path_env_file"; then
-        sed -i '/^PASSWORD_HASH=/d' "$path_env_file"
+        sed -i "s|^PASSWORD_HASH=.*|$password_hash|" "$path_env_file"
+      else
+        echo "$password_hash" >> "$path_env_file"
       fi
-      printf "PASSWORD_HASH='%s'\n" "$password_hash" >> "$path_env_file"
       echo
       echook "Пароль веб интерфейса установлен"
       break

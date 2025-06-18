@@ -1188,7 +1188,7 @@ show_services_list() {
 
       echo -e "\033[0;36mАдреса клиентов wg:\033[0m $address"
       
-      if [[ -f "$path_caddyfile"]]; then
+      if [[ -f "$path_caddyfile" ]]; then
         echo -e "\033[0;36mВеб интерфейс:\033[0m https://${WG_HOST}/${service}/"
       else
         echo -e "\033[0;36mВеб интерфейс:\033[0m http://${WG_HOST}:${port_ui}"

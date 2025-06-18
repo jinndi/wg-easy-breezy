@@ -857,7 +857,10 @@ add_wg_service() {
   # если файл caddyfile существует
   if [[ -f "$path_caddyfile" ]]; then
     # reverse_proxy в caddyfile 
-    echo "handle_path /$service_name/* { reverse_proxy $service_name:$port_ui }" >> "$path_caddyfile"
+    {
+      echo "handle_path /$service_name/* {" 
+      echo "с $service_name:$port_ui }"
+    } >> "$path_caddyfile"
     # cсылка на UI интерфейс wg-easy
     link_ui="https://${WG_HOST}/${service_name}/"
   else
@@ -910,7 +913,10 @@ add_caddy_service() {
     if [[ "$service" == "${service_prefix}-"* ]]; then
       local port_ui
       port_ui=$(get_env_var_from_service "$service" "PORT" "not_found")
-      echo "handle_path /$service/* { reverse_proxy $service:$port_ui }" >> "$path_caddyfile"
+      {
+        echo "handle_path /$service/* {" 
+        echo "reverse_proxy $service:$port_ui }"
+      } >> "$path_caddyfile"
     fi
   done
 }

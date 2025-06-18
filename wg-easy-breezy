@@ -1553,6 +1553,16 @@ change_password() {
   select_menu_option
 }
 
+# Функция вывод последних логов по контейнерам
+show_podman_logs() {
+  for name in $(podman ps --format '{{.Names}}' | grep "$service_prefix"); do
+    echo -e "\n\033[1;34m=== Логи $name ===\033[0m"
+    podman logs --tail 50 "$name"
+  done
+  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
+  select_menu_option
+}
+
 # Функция выбора опций
 select_menu_option() {
   show_header
@@ -1578,7 +1588,7 @@ select_menu_option() {
   echo " 5) 🌐 Управление доменным именем"
   echo " 6) 🔑 Сменить пароль веб интерфейса"
   echo " 7) 🧿 Статус systemctl службы"
-  echo " 8) 📜 Последние логи journalctl"
+  echo " 8) 📜 Последние логи контейнеров"
   echo " 9) 🔮 Пересобрать образ wg-easy"
   echo " 10) 🪣 Удаление программы"
   echo " 11) 🚪 Выход из меню (Ctrl+C)"
@@ -1613,8 +1623,7 @@ select_menu_option() {
       select_menu_option
     ;;
     8)
-      journalctl -u wg-easy-breezy -n 60 --no-pager
-      select_menu_option
+      show_podman_logs
     ;;
     9)
       rebuild_services

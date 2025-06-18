@@ -866,7 +866,7 @@ add_wg_service() {
     # reverse_proxy в caddyfile 
     {
       echo "handle_path /$service_name/* {" 
-      echo "с $service_name:$port_ui }"
+      echo "reverse_proxy $service_name:$port_ui }"
     } >> "$path_caddyfile"
     # cсылка на UI интерфейс wg-easy
     link_ui="https://${WG_HOST}/${service_name}/"

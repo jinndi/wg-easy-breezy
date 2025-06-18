@@ -424,7 +424,7 @@ check_port() {
   if [[ -f "$path_docker_compose_file" ]]; then
     yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
       if [[ "$service" == "${service_prefix}-"* ]]; then
-        local wg_port ui_port
+        local port_wg port_ui
         port_wg=$(get_env_var_from_service "$service" "WG_PORT" "")
         port_ui=$(get_env_var_from_service "$service" "PORT" "")
         if [[ "$port" == "$port_wg" ]] || [[ "$port" == "$port_ui" ]]; then
@@ -908,7 +908,7 @@ add_caddy_service() {
   # - handle_path, если добавляем Caddy после установок wg
   yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
     if [[ "$service" == "${service_prefix}-"* ]]; then
-      local ui_port
+      local port_ui
       port_ui=$(get_env_var_from_service "$service" "PORT" "not_found")
       echo "handle_path /$service/* { reverse_proxy $service:$port_ui }" >> "$path_caddyfile"
     fi
@@ -1148,7 +1148,7 @@ get_env_var_from_service() {
 show_services_list() {
   # Получаем список сервисов
   yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
-    local container_status ports wg_host port_ui address ss_link 
+    local container_status ports port_ui address ss_link 
 
     # Получаем статус контейнера по имени сервиса (по части имени)
     container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n 1)

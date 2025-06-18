@@ -1563,6 +1563,13 @@ show_podman_logs() {
   select_menu_option
 }
 
+# Функция вывод статуса systemctl службы
+show_systemctl_status() {
+  systemctl status wg-easy-breezy --no-pager -l
+  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
+  select_menu_option
+}
+
 # Функция выбора опций
 select_menu_option() {
   show_header
@@ -1619,8 +1626,7 @@ select_menu_option() {
       change_password
     ;;
     7)
-      systemctl status wg-easy-breezy --no-pager -l
-      select_menu_option
+      show_systemctl_status
     ;;
     8)
       show_podman_logs

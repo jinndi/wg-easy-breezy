@@ -458,8 +458,8 @@ input_tag() {
 # - имя домена (либо IPv4 если нет)
 input_domain() {
   while true; do
-    echomsg "Доменное имя этого сервера, например mydomain.com," 1
-    echomsg "если его нет нажмите клавишу Enter"
+    echomsg "Доменное имя этого сервера, например mydomain.com" 1
+    echomsg "(нажмите клавишу Enter чтобы задать позже)"
     read -rp " > " host
     
     # Проверка на пустой ввод
@@ -489,10 +489,6 @@ input_domain() {
         done
       fi
 
-      grep -q '^WG_HOST=' "$path_env_file" && \
-        sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file" || \
-        echo "WG_HOST=$host" >> "$path_env_file"
-
       echook "Используем IPv4: $host"
       break
     else
@@ -500,15 +496,18 @@ input_domain() {
       host=$(idn "$host" | tr '[:upper:]' '[:lower:]')
       # проверка имени
       if check_domain "$host"; then
-        grep -q '^WG_HOST=' "$path_env_file" && \
-          sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file" || \
-          echo "WG_HOST=$host" >> "$path_env_file"
-
         echook "Доменное имя: $host принято"
         break
       fi
     fi
   done
+
+  # заменяем/добавляем значение в .env
+  if grep -q '^WG_HOST=' "$path_env_file"; then
+    sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file"
+  else
+    echo "WG_HOST=$host" >> "$path_env_file"
+  fi
 }
 
 # - e-mail для полученя SSL сертификата домена
@@ -790,26 +789,22 @@ add_wg_service() {
   local port_ui="$3"
   local address="${4:-10.8.1.x}"
   local ss_link="${5:-}"
-  # переменные из .env
-  local host="${WG_HOST:-vpn.example.com}"
-  local password="${PASSWORD_HASH:-changeme}"
-  local mtu="${WG_MTU:-1420}"
 
   # добавление сервиса
   yq e -i ".services.${service_name} = {
     \"image\": \"wg-easy-breezy\",
     \"container_name\": \"${service_name}\",
     \"environment\": {
-      \"LANG\": \"ru\",
-      \"WG_HOST\": \"${host}\",
-      \"PASSWORD_HASH\": \"${password}\",
+      \"LANG\": \"\${LANG}\",
+      \"WG_HOST\": \"\${WG_HOST}\",
+      \"PASSWORD_HASH\": \"\${PASSWORD_HASH}\",
       \"PORT\": \"${port_ui}\",
       \"WG_PORT\": \"${port_wg}\",
-      \"WG_MTU\": \"${mtu}\",
-      \"WG_PERSISTENT_KEEPALIVE\": \"25\",
+      \"WG_MTU\": \"\${WG_MTU}\",
+      \"WG_PERSISTENT_KEEPALIVE\": \"\${WG_PERSISTENT_KEEPALIVE}\",
       \"WG_DEFAULT_ADDRESS\": \"${address}\",
-      \"WG_DEFAULT_DNS\": \"1.1.1.1,1.0.0.1\",
-      \"UI_TRAFFIC_STATS\": true
+      \"WG_DEFAULT_DNS\": \"\${WG_DEFAULT_DNS}\",
+      \"UI_TRAFFIC_STATS\": \"\${UI_TRAFFIC_STATS}\",
     },
     \"volumes\": [
       \"${service_name}:/etc/wireguard\",
@@ -859,9 +854,9 @@ add_wg_service() {
     # reverse_proxy в caddyfile 
     echo "handle_path /$service_name/* { reverse_proxy $service_name:$port_ui }" >> "$path_caddyfile"
     # cсылка на UI интерфейс wg-easy
-    link_ui="https://${host}/${service_name}/"
+    link_ui="https://${WG_HOST}/${service_name}/"
   else
-    link_ui="http://${host}:${port_ui}"
+    link_ui="http://${WG_HOST}:${port_ui}"
   fi
 }
 
@@ -932,6 +927,9 @@ create_wg_install_mode() {
 
 # Функция создания конфигов сервисов и служб
 create_services_config() {
+  # Подгружаем .env
+  load_env
+
   echomsg "Создаём и загружаем конфиги сервисов" 1
 
   # Dockerfile
@@ -949,9 +947,6 @@ create_services_config() {
     -o "$path_start_sh" || {
     exiterr "Не удалось загрузить start.sh"
   }
-
-  # .env
-  load_env
 
   # services.yml шаблон
   mkdir -p "$(dirname "$path_docker_compose_file")"
@@ -1029,8 +1024,9 @@ create_systemd_unit() {
     echo "[Service]"
     echo "Type=simple"
     echo "WorkingDirectory=$working_dir"
+    echo "EnvironmentFile=$path_env_file"
     echo "ExecStartPre=$path_iptables_apply_script"
-    echo "ExecStart=$path_podman_compose -f $path_docker_compose_file up --force-recreate"
+    echo "ExecStart=$path_podman_compose -f $path_docker_compose_file up --force-recreate --remove-orphans"
     echo "ExecStop=$path_podman_compose -f $path_docker_compose_file down --timeout 5"
     echo "ExecStopPost=$path_iptables_delete_script"
     echo "Restart=on-failure"
@@ -1312,7 +1308,11 @@ install() {
   mkdir -p "$path_data_dir"
   mkdir -p "$(dirname "$path_script")"
   mkdir -p "$(dirname "$path_env_file")"
-  > $path_env_file
+  {
+    echo "LANG=ru"
+    echo "WG_DEFAULT_DNS=1.1.1.1"
+    echo "UI_TRAFFIC_STATS=true"
+  } > "$path_env_file"
 
   # считывание вода пользователя
   input_tag
@@ -1418,14 +1418,57 @@ add_domain() {
     # поднимаем  службу
     systemctl start wg-easy-breezy > /dev/null 2>&1
 
-    echook "Домен $host добавлен и активирован"
+    echook "🎉 Домен '$host' добавлен и активирован"
   fi
   select_domain_option
 }
 
 # Функция изменения доменного имени
 change_domain() {
+  host=""
 
+  while true; do
+    echomsg "Введите новое доменное имя" 1
+    echoerr "После смены созданные ранее wg конфиги клиентов"
+    echoerr "требуют замены либо изменения адреса пира."
+    echomsg "(нажмите Enter с пустым вводом для отмены)"
+    read -rp " > " host
+    
+    # Проверка на пустой ввод
+    if [ -z "$host" ]; then
+      break
+    else
+      # преобразуем в punycode (на случай кириллицы) с нижним регистром
+      host=$(idn "$host" | tr '[:upper:]' '[:lower:]')
+      # если прошли проверку
+      if check_domain "$host"; then
+        echomsg "Применяем доменное имя '$host'" 1
+
+        # останавливаем службу
+        systemctl stop wg-easy-breezy > /dev/null 2>&1
+
+        # заменяем значение в .env
+        if grep -q '^WG_HOST=' "$path_env_file"; then
+          sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file"
+        else
+          echo "WG_HOST=$host" >> "$path_env_file"
+        fi
+
+        # заменяем значение в Caddyfile
+        if grep -q "^$WG_HOST" "$path_caddyfile"; then
+          sed -i "s/^$WG_HOST/$host/" "$path_caddyfile"
+        else
+          sed -i "1i $host" "$path_caddyfile"
+        fi
+
+        # поднимаем  службу
+        systemctl start wg-easy-breezy > /dev/null 2>&1
+
+        echook "🎉 Домен '$WG_HOST' изменен на '$host'"
+        break
+      fi
+    fi
+  done
   select_domain_option
 }
 

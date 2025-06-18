@@ -167,19 +167,19 @@ remove_install() {
     echomsg "Удаляем программу" 1
   fi
 
-  # Остановка сервисов с удаление всех задействованных контейнеров и образов
+  # Остановка сервисов
+  systemctl disable --now wg-easy-breezy > /dev/null 2>&1
   if [[ -e "$path_docker_compose_file" ]]; then
-    if systemctl is-active --quiet wg-easy-breezy; then
-      podman-compose -f $path_docker_compose_file down --remove-orphans --rmi all > /dev/null 2>&1
-      systemctl disable --now wg-easy-breezy > /dev/null 2>&1
-    fi
+    podman-compose -f $path_docker_compose_file down -t 5 > /dev/null 2>&1
   fi
+
+  # Удаление образов
+  podman rmi wg-easy-breezy > /dev/null 2>&1
+  podman rmi "$wg_easy_image" > /dev/null 2>&1
 
   # Деактивация ранее заданных iptables правил 
   if [[ -f "$path_iptables_delete_script" ]]; then
-    if systemctl is-active --quiet wg-easy-breezy; then
-      bash "$path_iptables_delete_script"
-    fi
+    bash "$path_iptables_delete_script"
   fi
 
   # Удаление ссылки на скрипт управления
@@ -1013,11 +1013,10 @@ create_systemd_unit() {
     echo "WorkingDirectory=$working_dir"
     echo "ExecStartPre=$path_iptables_apply_script"
     echo "ExecStart=$path_podman_compose -f $path_docker_compose_file up --force-recreate"
-    echo "ExecStop=$path_podman_compose -f $path_docker_compose_file down --remove-orphans"
+    echo "ExecStop=$path_podman_compose -f $path_docker_compose_file down --timeout 5"
     echo "ExecStopPost=$path_iptables_delete_script"
     echo "Restart=on-failure"
-    echo "RestartSec=5s"
-    echo "TimeoutStartSec=30"
+    echo "RestartSec=10"
     echo "LimitNOFILE=51200"
     echo
     echo "[Install]"

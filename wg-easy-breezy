@@ -745,8 +745,10 @@ add_iptables_rule() {
 # Функция удаления правил из apply и delete скриптов iptables по port и proto  
 remove_iptables_rule() {
   local port="$1"
-  sed -i "/\b$port\b/d" "$path_iptables_apply_script"
-  sed -i "/\b$port\b/d" "$path_iptables_delete_script"
+  if [[ "$port" ]]; then
+    sed -i "/\b$port\b/d" "$path_iptables_apply_script"
+    sed -i "/\b$port\b/d" "$path_iptables_delete_script"
+  fi
 }
 
 # Создание скриптов разрешения портов через iptables, при запуске/остановке службы
@@ -1272,18 +1274,18 @@ remove_wg_service() {
   # останавливаем службу
   systemctl stop wg-easy-breezy > /dev/null 2>&1
 
+  # правила iptables
+  port_wg=$(get_env_var_from_service "$service_name" "WG_PORT" "")
+  port_ui=$(get_env_var_from_service "$service_name" "PORT" "")
+  remove_iptables_rule "$port_wg"
+  remove_iptables_rule "$port_ui"
+
   # services.yml записи services и volumes
   yq e -i "del(.services.${service_name})" "$path_docker_compose_file"
   yq e -i "del(.volumes.${service_name})" "$path_docker_compose_file"
 
   # volume том
   # podman volume rm "$service_name" > /dev/null 2>&1
-
-  # правила iptables
-  port_wg=$(get_env_var_from_service "$service_name" "WG_PORT" "")
-  port_ui=$(get_env_var_from_service "$service_name" "PORT" "")
-  remove_iptables_rule "$port_wg"
-  remove_iptables_rule "$port_ui"
 
   # реверс прокси в caddyfile
   if [[ -f "$path_caddyfile" ]]; then

@@ -46,7 +46,7 @@ path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
 wg_easy_image="ghcr.io/wg-easy/wg-easy:14"
 
 # Ссылка на образ caddy сервера
-caddy_image="docker.io/library/caddy:2.10"
+caddy_image="docker.io/library/caddy:2.10-alpine"
 
 # Префикс к именам podman сервисов, сети, томов, url веб-интерфейсов
 service_prefix="wgeb"

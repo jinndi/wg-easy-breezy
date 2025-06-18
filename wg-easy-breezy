@@ -1561,6 +1561,10 @@ select_domain_option() {
   echo
   if [[ "$is__domain" ]]; then 
     echook "\033[0;36mВаш домен:\033[0m $WG_HOST"
+    local domen_ip
+    domen_ip=$(dig +short -4 "$WG_HOST")
+    [[ $domen_ip ]] || domen_ip="\033[1;31mнет привязки\033[0m"
+    echook "\033[0;36mПривязан к IP:\033[0m $domen_ip"
   else
     echoerr "Доменное имя отсутствует"
   fi

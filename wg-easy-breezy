@@ -1624,7 +1624,7 @@ select_menu_option() {
   echo " 10) 🚪 Выход из меню (Ctrl+C)"
 
   read -rp "Опция: " option
-  until [[ "$option" =~ ^[1-8]$ ]]; do
+  until [[ "$option" =~ ^[1-10]$ ]]; do
     echoerr "$option: неверная опция."
     read -rp "Опция: " option
   done

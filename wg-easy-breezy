@@ -1606,6 +1606,8 @@ select_menu_option() {
     read -rp "Опция: " option
   done
 
+  [[ "$option" =~ ^([1-9]|10|11)$ ]] && clear
+
   case "$option" in
     1)
       switch_active_services

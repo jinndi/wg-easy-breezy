@@ -44,7 +44,10 @@ path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
 
 # Ссылка на образ wg-easy
 wg_easy_image="ghcr.io/wg-easy/wg-easy:14"
- 
+
+# Ссылка на образ caddy сервера
+caddy_image="docker.io/library/caddy:2.10-alpine"
+
 # Префикс к именам podman сервисов, сети, томов, url веб-интерфейсов
 service_prefix="wgeb"
 
@@ -176,6 +179,7 @@ remove_install() {
   # Удаление образов
   podman rmi wg-easy-breezy > /dev/null 2>&1
   podman rmi "$wg_easy_image" > /dev/null 2>&1
+  podman rmi "$caddy_image" > /dev/null 2>&1
 
   # Деактивация ранее заданных iptables правил 
   if [[ -f "$path_iptables_delete_script" ]]; then
@@ -871,12 +875,15 @@ add_wg_service() {
 # Функция добавления Caddy сервиса
 add_caddy_service() {
   [[ "$is_domain" ]] || return
+
+  # Спуллить образ
+  podman pull "$caddy_image" > /dev/null 2>&1 || exiterr "ошибка при скачивании $caddy_image"
   
   local service_name="caddy-$service_prefix"
 
   # - services
   yq e -i ".services.${service_name} = {
-    \"image\": \"docker.io/library/caddy:2.10\",
+    \"image\": \"docker.io/library/caddy:2.10-alpine\",
     \"container_name\": \"${service_name}\",
     \"cap_add\": [\"NET_ADMIN\"],
     \"ports\": [
@@ -1128,14 +1135,17 @@ restart_services() {
 
 # Функция создания образа wg_easy_breezy
 build_wg_easy_breezy() {
+  echomsg "Билдим образ wg-easy-breezy" 1
   podman build --no-cache -t wg-easy-breezy -f $path_dockerfile $path_data_dir > /dev/null 2>&1
+  echook "Образ wg-easy-breezy создан"
 }
 
 # Функция пересоздания образа wg-easy-breezy
 rebuild_services() {
   systemctl stop wg-easy-breezy > /dev/null 2>&1
   echomsg "Пересобираем образ wg-easy-breezy" 1
-  build_wg_easy_breezy
+  podman rmi wg-easy-breezy > /dev/null 2>&1
+  podman build --no-cache -t wg-easy-breezy -f $path_dockerfile $path_data_dir > /dev/null 2>&1
   sysctl -e -q -p "$path_sysctl_config_link"
   systemctl start wg-easy-breezy > /dev/null 2>&1
   select_menu_option

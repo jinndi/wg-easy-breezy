@@ -866,8 +866,9 @@ add_wg_service() {
   if [[ -f "$path_caddyfile" ]]; then
     # reverse_proxy в caddyfile 
     {
-      echo "handle_path /$service_name/* {" 
-      echo "reverse_proxy $service_name:$port_ui }"
+      echo "handle_path /$service_name/* {"
+      echo "  reverse_proxy $service_name:$port_ui"
+      echo "}"
     } >> "$path_caddyfile"
     # cсылка на UI интерфейс wg-easy
     link_ui="https://${WG_HOST}/${service_name}/"
@@ -925,8 +926,9 @@ add_caddy_service() {
       local port_ui
       port_ui=$(get_env_var_from_service "$service" "PORT" "not_found")
       {
-        echo "handle_path /$service/* {" 
-        echo "reverse_proxy $service:$port_ui }"
+        echo "handle_path /$service/* {"
+        echo "  reverse_proxy $service:$port_ui"
+        echo "}"
       } >> "$path_caddyfile"
     fi
   done
@@ -1291,7 +1293,9 @@ remove_wg_service() {
   remove_iptables_rule "$port_ui" "tcp"
 
   # реверс прокси в caddyfile
-  [[ -f "$path_caddyfile" ]] && sed -i "/${service_name}[/:]/d" "$path_caddyfile"
+  if [[ -f "$path_caddyfile" ]]; then
+    sed -i "/^[[:space:]]*handle_path[[:space:]]\+\\/$service_name\\/\\*/,/^[[:space:]]*}/d" "$path_caddyfile"
+  fi
 
   # запускаем службу
   systemctl start wg-easy-breezy > /dev/null 2>&1
@@ -1398,8 +1402,8 @@ change_domain() {
         fi
 
         # заменяем значение в Caddyfile
-        if grep -q "^$WG_HOST" "$path_caddyfile"; then
-          sed -i "s/^$WG_HOST/$host/" "$path_caddyfile"
+        if grep -q "$WG_HOST" "$path_caddyfile"; then
+          sed -i "s/$WG_HOST/$host/" "$path_caddyfile"
         else
           sed -i "1i $host" "$path_caddyfile"
         fi

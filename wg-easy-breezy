@@ -1177,7 +1177,6 @@ show_services_list() {
     # Если это контейнер wg-easy
     if [[ "$service" == "${service_prefix}-"* ]]; then
       ss_link=$(get_env_var_from_service "$service" "SS_LINK" "")
-      wg_host=$(get_env_var_from_service "$service" "WG_HOST" "-")
       port_ui=$(get_env_var_from_service "$service" "PORT" "-")
       address=$(get_env_var_from_service "$service" "WG_DEFAULT_ADDRESS" "-")
 
@@ -1189,10 +1188,10 @@ show_services_list() {
 
       echo -e "\033[0;36mАдреса клиентов wg:\033[0m $address"
       
-      if [[ "$wg_host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
-        echo -e "\033[0;36mВеб интерфейс:\033[0m https://${wg_host}/${service}/"
+      if [[ -f "$path_caddyfile"]]; then
+        echo -e "\033[0;36mВеб интерфейс:\033[0m https://${WG_HOST}/${service}/"
       else
-        echo -e "\033[0;36mВеб интерфейс:\033[0m http://${wg_host}:${port_ui}"
+        echo -e "\033[0;36mВеб интерфейс:\033[0m http://${WG_HOST}:${port_ui}"
       fi
     fi
 

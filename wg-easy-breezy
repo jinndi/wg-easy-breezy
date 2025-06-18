@@ -1503,7 +1503,8 @@ remove_domain() {
 
     # services.yml записи services и volumes
     yq e -i "del(.services.${service_name})" "$path_docker_compose_file" > /dev/null 2>&1
-    yq e -i "del(.volumes.${service_name})" "$path_docker_compose_file" > /dev/null 2>&1
+    yq e -i "del(.volumes.${service_name}-data)" "$path_docker_compose_file" > /dev/null 2>&1
+    yq e -i "del(.volumes.${service_name}-config)" "$path_docker_compose_file" > /dev/null 2>&1
 
     # правила iptables
     remove_iptables_rule "443" "udp"

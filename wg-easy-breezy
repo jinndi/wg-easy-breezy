@@ -11,9 +11,6 @@
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
-# Загружаем переменные из .env файла
-load_env
-
 ## Пути исполняемых файлов
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -1546,7 +1543,7 @@ change_password() {
   # перезапускаем службу
   systemctl restart wg-easy-breezy > /dev/null 2>&1
   sleep 5
-  
+
   # возвращаемся меню опций
   select_menu_option
 }
@@ -1707,6 +1704,9 @@ install() {
   # отображение меню опций
   select_menu_option
 }
+
+# Загружаем переменные из .env файла
+load_env
 
 if [[ -d "$path_data_dir" ]]; then
   select_menu_option

@@ -745,14 +745,8 @@ add_iptables_rule() {
 # Функция удаления правил из apply и delete скриптов iptables по port и proto  
 remove_iptables_rule() {
   local port="$1"
-  local proto="$2"
-  local iptables_path
-  iptables_path="$(get_iptables_path)"
-  local apply_rule="$iptables_path -w 5 -I INPUT -p $proto --dport $port -j ACCEPT"
-  local delete_rule="$iptables_path -w 5 -D INPUT -p $proto --dport $port -j ACCEPT"
-
-  sed -i "\|^$apply_rule\$|d" "$path_iptables_apply_script"
-  sed -i "\|^$delete_rule\$|d" "$path_iptables_delete_script"
+  sed -i "/\b$port\b/d" "$path_iptables_apply_script"
+  sed -i "/\b$port\b/d" "$path_iptables_delete_script"
 }
 
 # Создание скриптов разрешения портов через iptables, при запуске/остановке службы
@@ -1288,8 +1282,8 @@ remove_wg_service() {
   # правила iptables
   port_wg=$(get_env_var_from_service "$service_name" "WG_PORT" "")
   port_ui=$(get_env_var_from_service "$service_name" "PORT" "")
-  remove_iptables_rule "$port_wg" "udp"
-  remove_iptables_rule "$port_ui" "tcp"
+  remove_iptables_rule "$port_wg"
+  remove_iptables_rule "$port_ui"
 
   # реверс прокси в caddyfile
   if [[ -f "$path_caddyfile" ]]; then
@@ -1445,8 +1439,7 @@ remove_domain() {
     yq e -i "del(.volumes.${service_name}-config)" "$path_docker_compose_file" > /dev/null 2>&1
 
     # правила iptables
-    remove_iptables_rule "443" "udp"
-    remove_iptables_rule "443" "tcp"
+    remove_iptables_rule "443"
 
     # caddyfile
     [[ -f "$path_caddyfile" ]] && rm "$path_caddyfile"

@@ -157,7 +157,7 @@ check_container() {
     exiterr "Установка внути контейнера не поддерживается данным установщиком."
   fi
 }
-
+    
 # Функция удаления предыдущих установок (без докера)
 remove_install() {
   local is_show_info
@@ -488,7 +488,11 @@ input_domain() {
           fi
         done
       fi
-      echo "WG_HOST=$host" > $path_env_file
+
+      grep -q '^WG_HOST=' "$path_env_file" && \
+        sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file" || \
+        echo "WG_HOST=$host" >> "$path_env_file"
+
       echook "Используем IPv4: $host"
       break
     else
@@ -496,7 +500,10 @@ input_domain() {
       host=$(idn "$host" | tr '[:upper:]' '[:lower:]')
       # проверка имени
       if check_domain "$host"; then
-        echo "WG_HOST=$host" > $path_env_file
+        grep -q '^WG_HOST=' "$path_env_file" && \
+          sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file" || \
+          echo "WG_HOST=$host" >> "$path_env_file"
+
         echook "Доменное имя: $host принято"
         break
       fi
@@ -860,6 +867,8 @@ add_wg_service() {
 
 # Функция добавления Caddy сервиса
 add_caddy_service() {
+  [[ "$is_domain" ]] || return
+  
   local service_name="caddy-$service_prefix"
 
   # - services
@@ -895,6 +904,15 @@ add_caddy_service() {
     echo "$host"
     echo "tls $email"
   } > "$path_caddyfile"
+
+  # - handle_path, если добавляем Caddy после установок wg
+  yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
+    if [[ "$service" == "${service_prefix}-"* ]]; then
+      local ui_port
+      port_ui=$(get_env_var_from_service "$service" "PORT" "not_found")
+      echo "handle_path /$service/* { reverse_proxy $service:$port_ui }" >> "$path_caddyfile"
+    fi
+  done
 }
 
 # Функция создания wg сервиса в зависимости от выбранного режима установки
@@ -1290,9 +1308,11 @@ install() {
   # выбор режима установки
   select_install_mode
 
-  # создаем необходимы папки
+  # создаем необходимы папки и файлы
   mkdir -p "$path_data_dir"
   mkdir -p "$(dirname "$path_script")"
+  mkdir -p "$(dirname "$path_env_file")"
+  > $path_env_file
 
   # считывание вода пользователя
   input_tag
@@ -1370,7 +1390,7 @@ select_install_mode() {
 
   read -rp "Выбор: " mode
   until [[ "$mode" =~ ^[1-2]$ ]]; do
-    echoerr "$option: неккоректное значение."
+    echoerr "$option: неверная опция."
     read -rp "Выбор: " mode
   done
 
@@ -1382,6 +1402,100 @@ select_install_mode() {
       install_mode="proxy"
     ;;
   esac
+}
+
+# Функция добавления доменного имени
+add_domain() {
+  input_domain
+  input_email
+  if [[ "$is_domain" ]]; then
+    # останавливаем службу
+    systemctl stop wg-easy-breezy > /dev/null 2>&1
+
+    # добавляем caddy сервер с настройкой реверспрокси
+    add_caddy_service
+
+    # поднимаем  службу
+    systemctl start wg-easy-breezy > /dev/null 2>&1
+
+    echook "Домен $host добавлен и активирован"
+  fi
+  select_domain_option
+}
+
+# Функция изменения доменного имени
+change_domain() {
+
+  select_domain_option
+}
+
+# Функция удаления доменного имени
+remove_domain() {
+
+  select_domain_option
+}
+
+# Функция управлени домменным именем
+select_domain_option() {
+  # грузим .env
+  load_env
+
+  # определяем установлено ли доменное имя
+  local is__domain=""
+  [[ -f "$path_caddyfile" ]] &&  \
+  [[ "$WG_HOST" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] && \
+  is__domain="true"
+
+  echo
+  if [[ "$is__domain" ]]; then 
+    echook "\033[0;36mВаш домен:\033[0m $WG_HOST"
+  else
+    echoerr "Доменное имя отсутствует"
+  fi
+  echo
+  echo "Выберие опцию:"
+
+  if [[ "$is__domain" ]]; then
+    echo " 1) Сменить доменное имя"
+    echo " 2) Удалить доменное имя"
+    echo " 3) Назад в меню"
+    read -rp "Выбор: " action
+
+    until [[ "$action" =~ ^[1-3]$ ]]; do
+      echoerr "$action: неверная опция."
+      read -rp "Выбор: " action
+    done
+
+    case "$action" in
+      1)
+        change_domain
+      ;;
+      2)
+        remove_domain
+      ;;
+      3)
+        select_menu_option
+      ;;
+    esac
+  else
+    echo " 1) Добавить доменное имя"
+    echo " 2) Назад в меню"
+    read -rp "Выбор: " action
+
+    until [[ "$action" =~ ^[1-2]$ ]]; do
+      echoerr "$action: неверная опция."
+      read -rp "Выбор: " action
+    done
+
+    case "$action" in
+      1)
+        add_domain
+      ;;
+      2)
+        select_menu_option
+      ;;
+    esac
+  fi
 }
 
 # Функция выбора опций
@@ -1406,11 +1520,12 @@ select_menu_option() {
   echo " 2) 🌀 Перезапустить контейнеры" 
   echo " 3) 📦 Добавить контейнер wg-easy"
   echo " 4) 🧹 Удалить контейнер wg-easy"
-  echo " 5) 🧿 Статус systemctl службы"
-  echo " 6) 📜 Последние логи journalctl"
-  echo " 7) 🔮 Пересобрать образ wg-easy"
-  echo " 8) 🪣 Удаление программы"
-  echo " 9) 🚪 Выход из меню (Ctrl+C)"
+  echo " 5) 🌐 Управление доменным именем"
+  echo " 6) 🧿 Статус systemctl службы"
+  echo " 7) 📜 Последние логи journalctl"
+  echo " 8) 🔮 Пересобрать образ wg-easy"
+  echo " 9) 🪣 Удаление программы"
+  echo " 10) 🚪 Выход из меню (Ctrl+C)"
 
   read -rp "Опция: " option
   until [[ "$option" =~ ^[1-8]$ ]]; do
@@ -1432,20 +1547,23 @@ select_menu_option() {
       remove_wg_service
     ;;
     5)
+      select_domain_option
+    ;;
+    6)
       systemctl status wg-easy-breezy --no-pager -l
       select_menu_option
     ;;
-    6)
+    7)
       journalctl -u wg-easy-breezy -n 100 --no-pager
       select_menu_option
     ;;
-    7)
+    8)
       rebuild_services
     ;;
-    8)
+    9)Ц
       remove_services
     ;;
-    9)
+    10)
       exit 0
     ;;
   esac

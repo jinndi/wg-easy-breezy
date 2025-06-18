@@ -1656,7 +1656,7 @@ select_menu_option() {
     8)
       rebuild_services
     ;;
-    9)Ц
+    9)
       remove_services
     ;;
     10)

@@ -1154,6 +1154,7 @@ rebuild_services() {
   podman build --no-cache -t wg-easy-breezy -f $path_dockerfile $path_data_dir > /dev/null 2>&1
   sysctl -e -q -p "$path_sysctl_config_link"
   systemctl start wg-easy-breezy > /dev/null 2>&1
+  sleep 5
   echook "Образ wg-easy-breezy пересобран"
   select_menu_option
 }

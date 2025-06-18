@@ -438,6 +438,35 @@ check_port() {
   return 0
 }
 
+# Функция получени IP сервера
+get_public_ip() {
+  local public_ip
+
+  # ip route (локальный интерфейс)
+  public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
+
+  # через dig
+  [ -z "$public_ip" ] && command -v dig >/dev/null && \
+    public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
+
+  # Через curl
+  [ -z "$public_ip" ] && command -v curl >/dev/null && \
+    public_ip=$(curl -s https://api.ipify.org)
+
+  # Проверка
+  if ! check_IPv4 "$public_ip"; then
+    echoerr "Не удалось определить публичный IP"
+
+    while true; do
+      echomsg "Введите публичный IPv4 адрес этого сервера"
+      read -rp "IPv4 этого сервера: " public_ip
+      if check_IPv4 "$public_ip"; then break; fi
+    done
+  fi
+
+  echo "$public_ip"
+}
+
 
 ## Функции ввода:
 
@@ -464,31 +493,7 @@ input_domain() {
     
     # Проверка на пустой ввод
     if [ -z "$host" ]; then
-      # IP текущего сервера
-      local public_ip
-
-      # ip route (локальный интерфейс)
-      public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
-
-      # через DNS (OpenDNS)
-      [ -z "$public_ip" ] && command -v dig >/dev/null && \
-        public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
-
-      # проверка формата
-      if [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-        host="$public_ip"
-      else
-        echoerr "Не удалось определить публичный IP"
-        while true; do
-          echomsg "Введите публичный IPv4 ардес этого сервера"
-          read -rp "IPv4 этого сервера: " host
-
-          if check_IPv4 "$host"; then
-            break
-          fi
-        done
-      fi
-
+      host=$(get_public_ip)
       echook "Используем IPv4: $host"
       break
     else
@@ -1258,7 +1263,7 @@ remove_wg_service() {
   yq e -i "del(.volumes.${service_name})" "$path_docker_compose_file"
 
   # volume том
-  podman volume rm "$service_name" > /dev/null 2>&1
+  # podman volume rm "$service_name" > /dev/null 2>&1
 
   # правила iptables
   port_wg=$(get_env_var_from_service "$service_name" "WG_PORT" "")
@@ -1368,7 +1373,7 @@ remove_services() {
   msg="Удалить приложение? [y/N]: "
   read -rp "$msg" remove
 
-  until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
+  until [[ "$remove" =~ ^[yYnNдДнН]$ ]]; do
     echo "$remove: неверная опция."
     read -rp "$msg" remove
   done
@@ -1469,11 +1474,58 @@ change_domain() {
       fi
     fi
   done
+
   select_domain_option
 }
 
 # Функция удаления доменного имени
 remove_domain() {
+  local msg
+  echo
+  echoerr "После удаления доменного имени,"
+  echoerr "созданные ранее wg конфиги клиентов"
+  echoerr "требуют замены либо изменения адреса пира."
+  msg="Удаляем? [y/N]: "
+  read -rp "$msg" remove
+
+  until [[ "$remove" =~ ^[yYnNдДнН]$ ]]; do
+    echo "$remove: неверная опция."
+    read -rp "$msg" remove
+  done
+
+  if [[ "$remove" =~ ^[yYдД]$ ]]; then
+    local service_name="caddy-$service_prefix"
+
+    echomsg "Удаляем доменное имя '$WG_HOST'" 1
+
+    # останавливаем службу
+    systemctl stop wg-easy-breezy > /dev/null 2>&1
+
+    # services.yml записи services и volumes
+    yq e -i "del(.services.${service_name})" "$path_docker_compose_file" > /dev/null 2>&1
+    yq e -i "del(.volumes.${service_name})" "$path_docker_compose_file" > /dev/null 2>&1
+
+    # правила iptables
+    remove_iptables_rule "443" "udp"
+    remove_iptables_rule "443" "tcp"
+
+    # caddyfile
+    [[ -f "$path_caddyfile" ]] && rm "$path_caddyfile"
+
+    # заменяем значение в .env
+    host=$(get_public_ip)
+    if grep -q '^WG_HOST=' "$path_env_file"; then
+      sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file"
+    else
+      echo "WG_HOST=$host" >> "$path_env_file"
+    fi
+
+    # запускаем службу
+    systemctl start wg-easy-breezy > /dev/null 2>&1
+    sleep 5
+
+    echook "🎈 Доменное имя '$WG_HOST' удалено!"
+  fi
 
   select_domain_option
 }

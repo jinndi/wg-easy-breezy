@@ -1154,6 +1154,7 @@ rebuild_services() {
   podman build --no-cache -t wg-easy-breezy -f $path_dockerfile $path_data_dir > /dev/null 2>&1
   sysctl -e -q -p "$path_sysctl_config_link"
   systemctl start wg-easy-breezy > /dev/null 2>&1
+  echook "Образ wg-easy-breezy пересобран"
   select_menu_option
 }
 
@@ -1247,10 +1248,7 @@ add_new_wg_service() {
   echo -e "\033[0;36mВеб интерфейс: \033[1;32m$link_ui \033[0m"
   echo
 
-  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
-  
-  # отображение меню опций
-  select_menu_option
+  press_any_side_to_open_menu
 }
 
 # Функция удаления сервиса wg-easy
@@ -1302,10 +1300,7 @@ remove_wg_service() {
   sleep 5
 
   echook "🎈 Сервис $service_name удален!"
-  echo
-  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
-  # отображение меню опций
-  select_menu_option
+  press_any_side_to_open_menu
 }
 
 # Функция подтверждения удаления приложения
@@ -1559,13 +1554,18 @@ show_podman_logs() {
     echo -e "\n\033[1;34m=== Логи $name ===\033[0m"
     podman logs --tail 50 "$name"
   done
-  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
-  select_menu_option
+  press_any_side_to_open_menu
 }
 
 # Функция вывод статуса systemctl службы
 show_systemctl_status() {
   systemctl status wg-easy-breezy --no-pager -l
+  press_any_side_to_open_menu
+}
+
+# Функция возврата в меню опций по нажатию на любую клавишу
+press_any_side_to_open_menu() {
+  echo "______________________________________________________"
   read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
   select_menu_option
 }
@@ -1721,10 +1721,7 @@ install() {
   chmod +x "$path_script"
   ln -s "$path_script" "$path_script_link"
 
-  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
-
-  # отображение меню опций
-  select_menu_option
+  press_any_side_to_open_menu
 }
 
 # Загружаем переменные из .env файла

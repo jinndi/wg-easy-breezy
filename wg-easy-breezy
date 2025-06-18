@@ -809,7 +809,7 @@ add_wg_service() {
       \"WG_PERSISTENT_KEEPALIVE\": \"\${WG_PERSISTENT_KEEPALIVE}\",
       \"WG_DEFAULT_ADDRESS\": \"${address}\",
       \"WG_DEFAULT_DNS\": \"\${WG_DEFAULT_DNS}\",
-      \"UI_TRAFFIC_STATS\": \"\${UI_TRAFFIC_STATS}\",
+      \"UI_TRAFFIC_STATS\": \"\${UI_TRAFFIC_STATS}\"
     },
     \"volumes\": [
       \"${service_name}:/etc/wireguard\",

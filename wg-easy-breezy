@@ -179,7 +179,7 @@ remove_install() {
 
   # Деактивация ранее заданных iptables правил 
   if [[ -f "$path_iptables_delete_script" ]]; then
-    bash "$path_iptables_delete_script"
+    bash "$path_iptables_delete_script" > /dev/null 2>&1
   fi
 
   # Удаление ссылки на скрипт управления

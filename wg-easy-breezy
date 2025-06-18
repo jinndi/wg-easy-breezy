@@ -1277,7 +1277,7 @@ remove_wg_service() {
   remove_iptables_rule "$port_ui" "tcp"
 
   # реверс прокси в caddyfile
-  [[ -f "$path_caddyfile" ]] && sed -i "/$service_name/d" "$path_caddyfile"
+  [[ -f "$path_caddyfile" ]] && sed -i "/${service_name}[/:]/d" "$path_caddyfile"
 
   # запускаем службу
   systemctl start wg-easy-breezy > /dev/null 2>&1

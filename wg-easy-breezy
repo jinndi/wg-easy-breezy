@@ -1631,7 +1631,7 @@ press_any_side_to_open_menu() {
 
 # Функция выбора опций
 select_menu_option() {
-  clear && tput cup $(( $(tput lines) - 1 )) 0
+  tput cup $(( $(tput lines) - 1 )) 0
   show_services_list
 
   local select_option=" Меню опций:"
@@ -1789,6 +1789,7 @@ install() {
 load_env
 
 if [[ -d "$path_data_dir" ]]; then
+  clear
   select_menu_option
 else
   install

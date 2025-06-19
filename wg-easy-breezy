@@ -267,10 +267,10 @@ install_pkgs() {
       apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade > /dev/null 2>&1
     ) || exiterr "'apt-get upgrade' ошибка."
     (
-      apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
-        dnsutils curl idn grep sed nano htop > /dev/null 2>&1 \
-      || apt-get -yqq install podman podman-compose iproute2 iptables openssl lsof \
-        dnsutils curl idn grep sed nano htop > /dev/null 2>&1
+      apt-get -yqq install podman podman-compose netavark aardvark-dns iproute2 iptables \
+        openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1 \
+      || apt-get -yqq install podman podman-compose netavark aardvark-dns iproute2 iptables \
+        openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1
     ) || exiterr "'apt-get install' ошибка."
 
     # mikefarah yq
@@ -288,6 +288,27 @@ install_pkgs() {
         exiterr "Не удалось загрузить mikefarah/yq"
       }
       chmod +x /usr/local/bin/yq
+    fi
+
+    # конфиг podman containers, изменение сетевого бэкэнда на netavark
+    mkdir -p /etc/containers/
+    if [[ ! -f /etc/containers/containers.conf ]] && [[ -f /usr/share/containers/containers.conf ]]; then
+      cp /usr/share/containers/containers.conf /etc/containers/
+    else
+      touch /etc/containers/containers.conf
+    fi
+    if grep -q 'network_backend' /etc/containers/containers.conf; then
+      sed -i "/network_backend/c$(printf '%s\n' 'network_backend = "netavark"')" /etc/containers/containers.conf
+    else
+      if grep -q '^\[network\]' /etc/containers/containers.conf; then
+        sed -i '/^\[network\]/a network_backend = "netavark"' /etc/containers/containers.conf
+      else
+        {
+          echo ''
+          echo '[network]'
+          echo 'network_backend = "netavark"'
+        } >> /etc/containers/containers.conf
+      fi
     fi
 
     # Спуллить образ wg-easy

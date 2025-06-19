@@ -1226,17 +1226,19 @@ get_env_var_from_service() {
 
 # Функция вывода списка служб на основе compose yml файла
 show_services_list() {
-  # Получаем список сервисов
-  yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
-    local container_status ports port_ui address ss_link 
+  local service container_status ports status ss_link port_ui address
 
-    # Получаем статус контейнера по имени сервиса (по части имени)
-    container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n 1)
+  # Получаем список сервисов один раз
+  mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
-    if [[ "$container_status" == "" ]]; then
+  for service in "${services[@]}"; do
+    # Получаем статус контейнера по имени (фильтр по имени сервиса)
+    container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n1)
+
+    if [[ -z "$container_status" ]]; then
       status="\033[1;34mне запущен\033[0m"
-    elif echo "$container_status" | grep -q "^${service}"; then
-      if echo "$container_status" | grep -q "Up"; then
+    elif [[ "$container_status" == ${service}* ]]; then
+      if [[ "$container_status" =~ Up ]]; then
         status="\033[1;32mработает\033[0m"
       else
         status="\033[1;31mне работает\033[0m"
@@ -1246,28 +1248,27 @@ show_services_list() {
     fi
 
     # Порты из compose
-    ports=$(yq -r ".services.\"$service\".ports | join(\", \")" "$path_docker_compose_file")
-    [ -z "$ports" ] && ports="—"
+    ports=$(yq -r ".services.\"$service\".ports // [] | join(\", \")" "$path_docker_compose_file")
+    [[ -z "$ports" ]] && ports="—"
 
-    echo
-    echo -e "\033[0;36mИмя сервиса:\033[0m $service"
+    echo -e "\n\033[0;36mИмя сервиса:\033[0m $service"
     echo -e "\033[0;36mСтатус:\033[0m $status"
     echo -e "\033[0;36mПроброс портов:\033[0m $ports"
 
-    # Если это контейнер wg-easy
+    # Проверяем wg-easy контейнеры по префиксу
     if [[ "$service" == "${service_prefix}-"* ]]; then
       ss_link=$(get_env_var_from_service "$service" "SS_LINK" "")
       port_ui=$(get_env_var_from_service "$service" "PORT" "-")
       address=$(get_env_var_from_service "$service" "WG_DEFAULT_ADDRESS" "-")
 
-      if [[ "$ss_link" ]]; then
-        echo -e "\033[0;36mПрокси режим:\033[0m да, shadowsosks -> ${ss_link#*@}"
+      if [[ -n "$ss_link" ]]; then
+        echo -e "\033[0;36mПрокси режим:\033[0m да, shadowsocks -> ${ss_link#*@}"
       else
         echo -e "\033[0;36mПрокси режим:\033[0m нет"
       fi
 
       echo -e "\033[0;36mАдреса клиентов wg:\033[0m $address"
-      
+
       if [[ -f "$path_caddyfile" ]]; then
         echo -e "\033[0;36mВеб интерфейс:\033[0m https://${WG_HOST}/${service}/"
       else

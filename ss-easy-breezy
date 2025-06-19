@@ -513,6 +513,7 @@ install_ssserver(){
 }
 
 select_menu_option() {
+  tput cup $(( $(tput lines) - 1 )) 0
   local menu
   local select_option=" Меню опций:"
 
@@ -542,6 +543,8 @@ select_menu_option() {
     read -rp " Опция: " option
   done
 
+  [[ "$option" =~ ^[1-6]$ ]] && clear && tput cup $(( $(tput lines) - 1 )) 0
+
   case "$option" in
     1)
       switch_active_service
@@ -567,6 +570,7 @@ select_menu_option() {
 }
 
 if [[ -f "$path_ssserver" && -f "$path_service" ]]; then
+  clear
   select_menu_option
 else
   check_root

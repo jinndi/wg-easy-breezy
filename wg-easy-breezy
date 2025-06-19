@@ -291,7 +291,7 @@ install_pkgs() {
     fi
 
     # конфиг podman containers, изменение сетевого бэкэнда на netavark
-    # https://docs.oracle.com/en/operating-systems/oracle-linux/podman/podman-ConfiguringNetworkingforPodman.html#podman-network-list
+    # https://docs.oracle.com/en/operating-systems/oracle-linux/podman/podman-ConfiguringNetworkingforPodman.html#topic_owf_d4t_t5b
     mkdir -p /etc/containers/
     if [[ ! -f /etc/containers/containers.conf ]] && [[ -f /usr/share/containers/containers.conf ]]; then
       cp /usr/share/containers/containers.conf /etc/containers/

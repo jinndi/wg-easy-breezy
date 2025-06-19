@@ -1100,13 +1100,50 @@ is_all_ok_services() {
   return 0
 }
 
+# Фукнция ожидания запуска всех контейнеров (до 10 сек)
+wait_for_containers() {
+  mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
+
+  local failed=0
+
+  for service in "${services[@]}"; do
+    local elapsed=0
+    local status=""
+    while true; do
+      status=$(podman inspect -f '{{.State.Status}}' "$service" 2>/dev/null || echo "notfound")
+
+      if [[ "$status" == "running" ]]; then
+        break
+      elif [[ "$status" == "exited" || "$status" == "stopped" || "$status" == "notfound" ]]; then
+        failed=1
+        break
+      fi
+
+      sleep 1
+      ((elapsed++))
+      if (( elapsed >= 10 )); then
+        failed=1
+        break
+      fi
+    done
+  done
+
+  if (( failed == 1 )); then
+    echoerr "Некоторые контейнеры не запустились, либо время ожидания истекло!"
+    return 1
+  fi
+
+  echook "Все контейнеры запущены и работают!"
+  return 0
+}
+
 # Функция запуска всех сервисов
 start_services() {
   echomsg "Запускаем сервисы" 1
 
   # Запускаем докер контейнеры
   systemctl enable --now wg-easy-breezy > /dev/null 2>&1
-  sleep 5
+  wait_for_containers
   if ! systemctl is-active --quiet wg-easy-breezy; then
     echoerr "Запуск не удался"
   else
@@ -1148,7 +1185,7 @@ restart_services() {
   echomsg "Перезапускаем сервисы" 1
   systemctl stop wg-easy-breezy > /dev/null 2>&1
   systemctl start wg-easy-breezy > /dev/null 2>&1
-  sleep 5
+  wait_for_containers
   if is_all_ok_services; then
     echook "Служба успешно перезапущена!"
   else
@@ -1172,7 +1209,7 @@ rebuild_services() {
   podman build --no-cache -t wg-easy-breezy -f $path_dockerfile $path_data_dir > /dev/null 2>&1
   sysctl -e -q -p "$path_sysctl_config_link"
   systemctl start wg-easy-breezy > /dev/null 2>&1
-  sleep 5
+  wait_for_containers
   echook "Образ wg-easy-breezy пересобран"
   select_menu_option
 }
@@ -1260,7 +1297,7 @@ add_new_wg_service() {
 
   # запускаем службу
   systemctl start wg-easy-breezy > /dev/null 2>&1
-  sleep 5
+  wait_for_containers
 
   echo
   echo -e "\033[1;32🎉 mwg-easy добавлен! \033[0m"
@@ -1316,7 +1353,7 @@ remove_wg_service() {
 
   # запускаем службу
   systemctl start wg-easy-breezy > /dev/null 2>&1
-  sleep 5
+  wait_for_containers
 
   echook "🎈 Сервис $service_name удален!"
   press_any_side_to_open_menu
@@ -1478,7 +1515,7 @@ remove_domain() {
 
     # запускаем службу
     systemctl start wg-easy-breezy > /dev/null 2>&1
-    sleep 5
+    wait_for_containers
 
     echook "🎈 Доменное имя '$WG_HOST' удалено!"
   fi
@@ -1560,7 +1597,7 @@ change_password() {
 
   # перезапускаем службу
   systemctl restart wg-easy-breezy > /dev/null 2>&1
-  sleep 5
+  wait_for_containers
 
   # возвращаемся меню опций
   select_menu_option

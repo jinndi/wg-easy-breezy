@@ -513,26 +513,28 @@ install_ssserver(){
 }
 
 select_menu_option() {
+  local menu
   local select_option=" Меню опций:"
 
   show_header
   if systemctl is-active --quiet ssserver; then
-    echo " shadowsocks-rust server $version"
-    echo " 🟢 Служба systemctl активна"
-    echo
-    echo "$select_option"
-    echo "  1) ❌ Остановить"
+    menu+=" shadowsocks-rust server $version\n"
+    menu+=" 🟢 Служба systemctl активна\n"
+    menu+="\n$select_option\n"
+    menu+="  1) ❌ Остановить\n"
   else
-    echo " 🔴 Служба systemctl не активна"
-    echo
-    echo "$select_option"
-    echo "  1) 🚀 Запустить"
+    menu+=" 🔴 Служба systemctl не активна\n"
+    menu+="\n$select_option\n"
+    menu+="  1) 🚀 Запустить\n"
   fi
-  echo "  2) 🌀 Перезапустить"
-  echo "  3) 🧿 Статус службы"
-  echo "  4) 📜 Последние логи"
-  echo "  5) 🪣 Удаление программы"
-  echo "  6) 🚪 Выход из меню (Ctrl+C)"
+
+  menu+="  2) 🌀 Перезапустить\n"
+  menu+="  3) 🧿 Статус службы\n"
+  menu+="  4) 📜 Последние логи\n"
+  menu+="  5) 🪣 Удаление программы\n"
+  menu+="  6) 🚪 Выход из меню (Ctrl+C)\n"
+
+  echo -e "$menu"
 
   read -rp " Опция: " option
   until [[ "$option" =~ ^[1-6]$ ]]; do

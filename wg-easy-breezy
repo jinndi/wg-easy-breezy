@@ -1100,8 +1100,9 @@ is_all_ok_services() {
   return 0
 }
 
-# Фукнция ожидания запуска всех контейнеров (до 10 сек)
+# Фукнция ожидания запуска всех контейнеров (до 15 сек)
 wait_for_containers() {
+  sleep 5
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
   local failed=0

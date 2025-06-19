@@ -1227,12 +1227,11 @@ get_env_var_from_service() {
 # Функция вывода списка служб на основе compose yml файла
 show_services_list() {
   local service container_status ports status ss_link port_ui address
+  local output=""
 
-  # Получаем список сервисов один раз
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
   for service in "${services[@]}"; do
-    # Получаем статус контейнера по имени (фильтр по имени сервиса)
     container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n1)
 
     if [[ -z "$container_status" ]]; then
@@ -1247,37 +1246,40 @@ show_services_list() {
       status="неизвестный"
     fi
 
-    # Порты из compose
     ports=$(yq -r ".services.\"$service\".ports // [] | join(\", \")" "$path_docker_compose_file")
     [[ -z "$ports" ]] && ports="—"
 
-    echo -e "\n\033[0;36mИмя сервиса:\033[0m $service"
-    echo -e "\033[0;36mСтатус:\033[0m $status"
-    echo -e "\033[0;36mПроброс портов:\033[0m $ports"
+    output+=$'\n'
+    output+="\033[0;36mИмя сервиса:\033[0m $service\n"
+    output+="\033[0;36mСтатус:\033[0m $status\n"
+    output+="\033[0;36mПроброс портов:\033[0m $ports\n"
 
-    # Проверяем wg-easy контейнеры по префиксу
     if [[ "$service" == "${service_prefix}-"* ]]; then
       ss_link=$(get_env_var_from_service "$service" "SS_LINK" "")
       port_ui=$(get_env_var_from_service "$service" "PORT" "-")
       address=$(get_env_var_from_service "$service" "WG_DEFAULT_ADDRESS" "-")
 
       if [[ -n "$ss_link" ]]; then
-        echo -e "\033[0;36mПрокси режим:\033[0m да, shadowsocks -> ${ss_link#*@}"
+        output+="\033[0;36mПрокси режим:\033[0m да, shadowsocks -> ${ss_link#*@}\n"
       else
-        echo -e "\033[0;36mПрокси режим:\033[0m нет"
+        output+="\033[0;36mПрокси режим:\033[0m нет\n"
       fi
 
-      echo -e "\033[0;36mАдреса клиентов wg:\033[0m $address"
+      output+="\033[0;36mАдреса клиентов wg:\033[0m $address\n"
 
       if [[ -f "$path_caddyfile" ]]; then
-        echo -e "\033[0;36mВеб интерфейс:\033[0m https://${WG_HOST}/${service}/"
+        output+="\033[0;36mВеб интерфейс:\033[0m https://${WG_HOST}/${service}/\n"
       else
-        echo -e "\033[0;36mВеб интерфейс:\033[0m http://${WG_HOST}:${port_ui}"
+        output+="\033[0;36mВеб интерфейс:\033[0m http://${WG_HOST}:${port_ui}\n"
       fi
     fi
 
-    echo "___________________________________________________"
+    output+="___________________________________________________\n"
   done
+
+  # Выводим всё разом
+  show_header
+  echo -e "$output"
 }
 
 # Функция добавления нового сервиса wg-easy
@@ -1629,7 +1631,6 @@ press_any_side_to_open_menu() {
 
 # Функция выбора опций
 select_menu_option() {
-  show_header
   show_services_list
   echo
 

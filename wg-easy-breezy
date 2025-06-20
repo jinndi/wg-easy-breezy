@@ -816,10 +816,10 @@ load_env() {
 # Функция добавления сервиса wg
 add_wg_service() {
   local service_name="$service_prefix-$1"
-  local port_wg="$2"
-  local port_ui="$3"
+  local port_wg="${2:-51820}"
+  local port_ui="${3:-51821}"
   local address="${4:-10.8.1.x}"
-  local ss_link="${5:-}"
+  local ss_link="${5:-missing}"
 
   # добавление сервиса
   yq e -i ".services.${service_name} = {
@@ -1635,7 +1635,7 @@ select_containers_menu() {
   echo -e "$menu"
 
   read -rp " Опция: " option
-  until [[ "$option" =~ ^[1-8]$ ]]; do
+  until [[ "$option" =~ ^[1-5]$ ]]; do
     echoerr "Неверная опция"
     read -rp " Опция: " option
   done

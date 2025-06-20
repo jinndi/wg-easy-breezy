@@ -10,24 +10,24 @@
 
 ## Features:
 
-Selecting the installation mode of wg-easy: either the usual one or through the shasowsocks proxy to another server using tun2socks
+Selecting the installation mode for wg-easy: either standard or via a Shadowsocks proxy to another server using tun2socks.
 
-Creating a shasowsocks server (rust port) using the `ss-easy-breezy` script and getting links to specify it in the `wg-easy-breezy` script
+Creating a Shadowsocks server (Rust implementation) using the `ss-easy-breezy` script and obtaining a link to specify in the `wg-easy-breezy` script.
 
-Adding and removing wg-easy containers from the script menu with all necessary settings
+Adding and removing wg-easy containers via the script menu, with all necessary settings applied automatically.
 
-Adding, changing, deleting a domain name (it is necessary to configure the `A` entry in the registrar panel for your server's IP)
+Adding, modifying, and deleting a domain name (requires setting an A record in your domain registrar's panel pointing to your server's IP address).
 
-Automatic deployment of the Caddy web server as a reverse proxy with an auto-renewing SSL certificate
+Automatic deployment of the Caddy web server as a reverse proxy with auto-renewing SSL certificate.
 
-Changing the password from the wg-easy web interface(s)
+Changing the password for the wg-easy web interface(s).
 
-Optimized network settings both on the server host and inside containers 
+Optimized network settings on both the server host and within the containers.
 
 ## Requirements:
 
-1. VPS server from 1GB RAM with Linux OS Ubuntu 24.04+ or Debian 12+, IPv4 address, kernel version >=6 (2 pcs if you want to deploy a shasowsocks server on another one)
-2. Operation and launch via ssh from the root user
+1. A VPS server with at least 1 GB of RAM, running Linux (Ubuntu 24.04+ or Debian 12+), with an IPv4 address and a kernel version ≥ 6. (You’ll need two servers if you want to deploy the Shadowsocks server separately.)
+2. Access and execution via SSH as the root user.
 
 ## Installation:
 
@@ -55,14 +55,35 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
 
 Follow the instructions on the screen. There will be requests for data entry:
 
- 1. `Installation mode` - select from the regular and proxy shasowsocks
- 2. `service tag` - for postfixes of names of services, containers, and links for logging into web interfaces
- 3. `domain name` - enter if you have one and want to secure the use of the web interface(s), you can configure it later from the menu
- 4. `e-mail address` - if you have specified the domain name (for obtaining an SSL certificate by the Caddy server)
- 5. `shasowsocks link` - if you have selected the proxy installation mode, get it by installing `ss-easy-breezy` on another server
- 6. `Wireguard port` - you can enter any of the specified range (for the web interface(s) it will be one more)
- 7. `Wireguard client address range` - in the format wg-easy - 10.0.0.x, 10.1.0.x, etc.
- 8. `password for logging into the web interface(s)` - will be automatically encoded and written to an .env file
+- **Installation mode**  
+  Choose one of the following:
+  - Standard
+  - Proxy via Shadowsocks
+
+- **Service tag**  
+  Used as a postfix in service names, container names, and web interface URLs.
+
+- **Domain name**  
+  Optional — used to secure access to the web interface via HTTPS.  
+  *(Can be set later through the menu.)*
+
+- **Email address**  
+  Required if a domain name is provided — used by the Caddy server to obtain an SSL certificate.
+
+- **Shadowsocks link**  
+  Required if proxy mode is selected.  
+  You can obtain it by installing `ss-easy-breezy` on another server.
+
+- **WireGuard port**  
+  Choose any port from the suggested range.  
+  *(The web interface will use the next port number.)*
+
+- **WireGuard client address range**  
+  In the format used by `wg-easy`, e.g.:  
+  `10.0.0.x`, `10.1.0.x`, etc.
+
+- **Web interface password**  
+  Will be automatically encoded and saved to the `.env` file.
 
 After the installation is complete, you will receive a link to the web interface.
 

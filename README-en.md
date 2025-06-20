@@ -53,7 +53,7 @@ On the server "A" from under ssh, install the main script `wg-easy-breezy`
 curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
 ```
 
-Follow the instructions on the screen. There will be requests for data entry:
+Follow the on-screen instructions. You will be prompted to enter the following:
 
 - **Installation mode**  
   Choose one of the following:

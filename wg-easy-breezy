@@ -906,7 +906,7 @@ add_caddy_service() {
 
   # - services
   yq e -i ".services.${service_name} = {
-    \"image\": \"docker.io/library/caddy:2.10-alpine\",
+    \"image\": \"${caddy_image}\",
     \"container_name\": \"${service_name}\",
     \"cap_add\": [\"NET_ADMIN\"],
     \"ports\": [

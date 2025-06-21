@@ -1326,8 +1326,8 @@ add_new_wg_service() {
 remove_wg_service() {
   # ввод имени сервиса для удаления
   while true; do
-    echomsg "Введите имя сервиса для удаления" 1
-    echomsg "(Enter без ввода возвращает в меню)"
+    echo -e "\nВведите имя сервиса для удаления\n"
+    echo -e "(Enter без ввода возвращает в меню)\n"
     read -rp " > " service_name
 
     if [[ -z "$service_name" ]]; then

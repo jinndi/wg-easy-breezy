@@ -1690,7 +1690,7 @@ show_systemctl_status() {
 press_any_side_to_open_menu() {
   local type="${1:-main}"
 
-  echomsg "------------------------------------------------------"
+  echomsg "\n ------------------------------------------------"
   read -n1 -r -p " Нажмите любую клавишу, чтобы открыть меню..."
 
   case "$type" in

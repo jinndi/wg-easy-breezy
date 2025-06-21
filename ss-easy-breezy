@@ -421,12 +421,12 @@ activate_ssserver(){
   if systemctl is-active --quiet ssserver; then
     echook "shadowsocks-rust сервер запущен!"
   else
-    echoerr "Ошибка запуска shadowsocks-rust! Введите 'journalctl -u ssserver -n 30' для просмотра лога"
+    echoerr "Ошибка запуска shadowsocks-rust!"
   fi
 }
 
 press_any_side_to_open_menu() {
-  echomsg "------------------------------------------------------"
+  echomsg "\n ------------------------------------------------"
   read -n1 -r -p " Нажмите любую клавишу, чтобы открыть меню..."
   select_menu_option
 }
@@ -437,7 +437,7 @@ switch_active_service(){
     echomsg "Останавливаем службу" 1
     { systemctl stop ssserver && systemctl disable ssserver; } >/dev/null 2>&1
     if systemctl is-active --quiet ssserver; then
-      echoerr "Ошибка остановки! Введите 'journalctl -u ssserver -n 30' для просмотра лога"
+      echoerr "Ошибка остановки!"
     else
       echook "Служба успешно остановлена!"
     fi
@@ -447,7 +447,7 @@ switch_active_service(){
     if systemctl is-active --quiet ssserver; then
       echook "Служба успешно запущена!"
     else
-      echoerr "Ошибка запуска! Введите 'journalctl -u ssserver -n 30' для просмотра лога"
+      echoerr "Ошибка запуска!"
     fi
   fi
   press_any_side_to_open_menu
@@ -460,8 +460,14 @@ reload_service(){
   if systemctl is-active --quiet ssserver; then
     echook "Служба успешно перезапущена!"
   else
-    echoerr "Ошибка перезапуска! Введите 'journalctl -u ssserver -n 30' для просмотра лога"
+    echoerr "Ошибка перезапуска!"
   fi
+  press_any_side_to_open_menu
+}
+
+show_connect_link() {
+  echo -e "\n Ссылка для подключения:"
+  echo -e "\033[0;36m $("$path_ssurl" --encode "$path_client_for_url_config") \033[0m"
   press_any_side_to_open_menu
 }
 
@@ -512,19 +518,14 @@ install_ssserver(){
   create_sysctl_config
   activate_ssserver
 
-  echo
-  echo -e "\033[1;32m 🎉 shadowsocks-rust сервер установлен! \033[0m"
-  echo
-  echo " Ссылка для подключения:"
-  echo -e "\033[0;36m $("$path_ssurl" --encode "$path_client_for_url_config") \033[0m"
-  echo
-
   # перемещам текущий скрипт, добавляем на него права и ссылку
   mv "$(realpath "$0")" "$path_script"
   chmod +x "$path_script"
   ln -s "$path_script" "$path_script_link"
 
-  press_any_side_to_open_menu
+  echo
+  echo -e "\033[1;32m 🎉 shadowsocks-rust сервер установлен! \033[0m"
+  show_connect_link
 }
 
 select_menu_option() {
@@ -546,9 +547,10 @@ select_menu_option() {
 
   menu+="  2) 🌀 Перезапустить\n"
   menu+="  3) 🧿 Статус службы\n"
-  menu+="  4) 📜 Последние логи\n"
-  menu+="  5) 🪣 Удаление программы\n"
-  menu+="  6) 🚪 Выход из меню (Ctrl+C)"
+  menu+="  4) 🔗 Ссылка подключения\n"
+  menu+="  5) 📜 Последние логи\n"
+  menu+="  6) 🪣 Удаление программы\n"
+  menu+="  7) 🚪 Выход из меню (Ctrl+C)"
 
   echo -e "$menu"
 
@@ -558,7 +560,7 @@ select_menu_option() {
     read -rp " Опция: " option
   done
 
-  [[ "$option" =~ ^[1-6]$ ]] && clear
+  [[ "$option" =~ ^[1-7]$ ]] && clear
 
   case "$option" in
     1)
@@ -571,12 +573,15 @@ select_menu_option() {
       show_systemctl_status
     ;;
     4)
-      show_journalctl_log
+      show_connect_link
     ;;
     5)
-      remove_shadowsocks_rust
+      show_journalctl_log
     ;;
     6)
+      remove_shadowsocks_rust
+    ;;
+    7)
       exit 0
     ;;
   esac

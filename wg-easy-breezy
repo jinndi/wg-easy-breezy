@@ -1653,6 +1653,8 @@ select_containers_menu() {
     read -rp " Опция: " option
   done
 
+  [[ "$option" =~ ^(3|4)$ ]] && clear
+
   case "$option" in
     1)
       add_new_wg_service

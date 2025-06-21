@@ -1697,7 +1697,7 @@ press_any_side_to_open_menu() {
 
 # Функция выбора опций
 select_menu_option() {
-  clear && tput cup $(( $(tput lines) - 1 )) 0
+  clear
   show_header
 
   local select_option=" Меню опций:"

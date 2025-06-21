@@ -555,7 +555,7 @@ select_menu_option() {
   echo -e "$menu"
 
   read -rp " Опция: " option
-  until [[ "$option" =~ ^[1-6]$ ]]; do
+  until [[ "$option" =~ ^[1-7]$ ]]; do
     echoerr " $option: неверная опция."
     read -rp " Опция: " option
   done

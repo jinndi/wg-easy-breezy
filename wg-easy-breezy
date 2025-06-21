@@ -1298,7 +1298,7 @@ show_services_list() {
 # Функция добавления нового сервиса wg-easy
 add_new_wg_service() {
   # выбор режима установки
-  select_install_mode
+  select_install_mode 1
 
   # считывание вода пользователя
   input_tag
@@ -1396,13 +1396,19 @@ remove_services() {
 
 # Функция выбора режима установки
 select_install_mode() {
+  local is_menu="${1:-}"
+  local total_items=2
   echo
   echo " Выберите режим установки"
   echo "  1) Стандартный wg-easy"
-  echo "  2) Прокси wg-easy -> shasowsocks"
+  echo "  2) Прокси wg-easy -> shadowsocks"
+  if [[ -n "$is_menu" ]]; then
+    echo "  3) Вернуться в меню"
+    total_items=3
+  fi
 
   read -rp " Выбор: " mode
-  until [[ "$mode" =~ ^[1-2]$ ]]; do
+  until [[ "$mode" =~ ^[1-$total_items]$ ]]; do
     echoerr "Неверная опция"
     read -rp " Выбор: " mode
   done
@@ -1413,6 +1419,9 @@ select_install_mode() {
     ;;
     2)
       install_mode="proxy"
+    ;;
+    3)
+      select_containers_menu
     ;;
   esac
 }

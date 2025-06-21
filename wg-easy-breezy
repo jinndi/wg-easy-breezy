@@ -1113,7 +1113,7 @@ is_all_ok_services() {
   return 0
 }
 
-# Фукнция ожидания запуска всех контейнеров (до 15 сек)
+# Фукнция ожидания запуска всех контейнеров (до 90 сек)
 wait_for_containers() {
   sleep 5
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1135,7 +1135,7 @@ wait_for_containers() {
 
       sleep 1
       ((elapsed++))
-      if (( elapsed >= 10 )); then
+      if (( elapsed >= 85 )); then
         failed=1
         break
       fi

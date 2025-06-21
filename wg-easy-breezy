@@ -819,7 +819,7 @@ add_wg_service() {
   local port_wg="${2:-51820}"
   local port_ui="${3:-51821}"
   local address="${4:-10.8.1.x}"
-  local ss_link="${5:-missing}"
+  local ss_link="${5:-}"
 
   # добавление сервиса
   yq e -i ".services.${service_name} = {

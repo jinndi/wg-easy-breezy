@@ -12,7 +12,7 @@ export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
 ## Пути исполняемых файлов
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin"
 
 ## Пути файлов:
 # - папка в которую будет произведена установка
@@ -169,7 +169,7 @@ remove_install() {
   # Остановка сервисов
   systemctl disable --now wg-easy-breezy > /dev/null 2>&1
   if [[ -e "$path_docker_compose_file" ]]; then
-    podman-compose -f $path_docker_compose_file down -t 5 > /dev/null 2>&1
+    podman-compose -f $path_docker_compose_file down -t 0 > /dev/null 2>&1
   fi
 
   # Удаление образов
@@ -262,11 +262,17 @@ install_pkgs() {
       apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade > /dev/null 2>&1
     ) || exiterr "'apt-get upgrade' ошибка."
     (
-      apt-get -yqq install podman podman-compose netavark aardvark-dns iproute2 iptables \
+      apt-get -yqq install podman python3 pipx netavark aardvark-dns iproute2 iptables \
         openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1 \
-      || apt-get -yqq install podman podman-compose netavark aardvark-dns iproute2 iptables \
+      || apt-get -yqq install podman python3 pipx netavark aardvark-dns iproute2 iptables \
         openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1
     ) || exiterr "'apt-get install' ошибка."
+
+    # podman-compose
+    (
+      pipx ensurepath > /dev/null 2>&1
+      pipx install podman-compose > /dev/null 2>&1
+    ) || exiterr "podman-compose install ошибка."
 
     # mikefarah yq
     yq_path=$(command -v yq)

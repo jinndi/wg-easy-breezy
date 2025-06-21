@@ -21,10 +21,6 @@ path_data_dir="/opt/wg-easy-breezy"
 path_script="$path_data_dir/wg-easy-breezy"
 # - ссылка на файл текущего скрипта
 path_script_link="/usr/bin/wgeb"
-# - файл Dockerfile создание образа wg-easy-breezy
-path_dockerfile="$path_data_dir/Dockerfile"
-# - файл start.sh для докер image wg-easy-breezy
-path_start_sh="$path_data_dir/start.sh"
 # - файл docker compose (podman-compose) настройки сервисов
 path_docker_compose_file="$path_data_dir/services.yml"
 # - файл переменных окружения .env
@@ -43,7 +39,7 @@ path_sysctl_config="$path_data_dir/sysctl.conf"
 path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
 
 # Ссылка на образ wg-easy
-wg_easy_image="ghcr.io/wg-easy/wg-easy:14"
+wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:latest"
 
 # Ссылка на образ caddy сервера
 caddy_image="docker.io/library/caddy:2.10-alpine"
@@ -177,7 +173,6 @@ remove_install() {
   fi
 
   # Удаление образов
-  podman rmi wg-easy-breezy > /dev/null 2>&1
   podman rmi "$wg_easy_image" > /dev/null 2>&1
   podman rmi "$caddy_image" > /dev/null 2>&1
 
@@ -828,7 +823,7 @@ add_wg_service() {
 
   # добавление сервиса
   yq e -i ".services.${service_name} = {
-    \"image\": \"wg-easy-breezy\",
+    \"image\": \"${wg_easy_image}\",
     \"container_name\": \"${service_name}\",
     \"environment\": {
       \"LANG\": \"\${LANG}\",
@@ -978,22 +973,6 @@ create_services_config() {
   load_env
 
   echomsg "Создаём и загружаем конфиги сервисов" 1
-
-  # Dockerfile
-  mkdir -p "$(dirname "$path_dockerfile")"
-  curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-    https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/Dockerfile \
-    -o "$path_dockerfile" || {
-    exiterr "Не удалось загрузить Dockerfile"
-  }
-
-  # start.sh
-  mkdir -p "$(dirname "$path_start_sh")"
-  curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-    https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/start.sh \
-    -o "$path_start_sh" || {
-    exiterr "Не удалось загрузить start.sh"
-  }
 
   # services.yml шаблон
   mkdir -p "$(dirname "$path_docker_compose_file")"
@@ -1207,26 +1186,6 @@ restart_services() {
   fi
 
   press_any_side_to_open_menu
-}
-
-# Функция создания образа wg_easy_breezy
-build_wg_easy_breezy() {
-  echomsg "Билдим образ wg-easy-breezy" 1
-  podman build --no-cache -t wg-easy-breezy -f $path_dockerfile $path_data_dir > /dev/null 2>&1
-  echook "Образ wg-easy-breezy создан"
-}
-
-# Функция пересоздания образа wg-easy-breezy
-rebuild_services() {
-  systemctl stop wg-easy-breezy > /dev/null 2>&1
-  echomsg "Пересобираем образ wg-easy-breezy" 1
-  podman rmi wg-easy-breezy > /dev/null 2>&1
-  podman build --no-cache -t wg-easy-breezy -f $path_dockerfile $path_data_dir > /dev/null 2>&1
-  sysctl -e -q -p "$path_sysctl_config_link"
-  systemctl start wg-easy-breezy > /dev/null 2>&1
-  wait_for_containers
-  echook "Образ wg-easy-breezy пересобран"
-  press_any_side_to_open_menu "containers"
 }
 
 # Функция извлечения переменной из environment по имени сервиса 
@@ -1647,14 +1606,13 @@ select_containers_menu() {
   menu+=" Выберие опцию:\n"
   menu+="  1) 📦 Добавить wg-easy\n"
   menu+="  2) 🧹 Удалить wg-easy\n"
-  menu+="  3) 💫 Пересобрать wg-easy\n"
-  menu+="  4) 📜 Последние логи\n"
-  menu+="  5) 📖 Назад в меню"
+  menu+="  3) 📜 Последние логи\n"
+  menu+="  4) 📖 Назад в меню"
 
   echo -e "$menu"
 
   read -rp " Опция: " option
-  until [[ "$option" =~ ^[1-5]$ ]]; do
+  until [[ "$option" =~ ^[1-4]$ ]]; do
     echoerr "Неверная опция"
     read -rp " Опция: " option
   done
@@ -1669,12 +1627,9 @@ select_containers_menu() {
       remove_wg_service
     ;;
     3)
-      rebuild_services
-    ;;
-    4)
       show_podman_logs
     ;;
-    5)
+    4)
       select_menu_option
     ;;
   esac
@@ -1827,9 +1782,6 @@ install() {
 
   # создание systemd unit службы управления сервисами
   create_systemd_unit
-
-  # билдим образ wg-easy-breezy
-  build_wg_easy_breezy
 
   # запуск сервисов
   start_services

@@ -1,6 +1,6 @@
 name: Docker
 
-# Только теги вида v13, v14 и т.п.
+# Только теги вида v1, v2 и т.п.
 on:
   push:
     tags:
@@ -36,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # Преобразует v13 → 13
+          # Преобразует v1 → 1
           # Добавляет latest
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |

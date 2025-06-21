@@ -425,6 +425,12 @@ activate_ssserver(){
   fi
 }
 
+press_any_side_to_open_menu() {
+  echomsg "------------------------------------------------------"
+  read -n1 -r -p " Нажмите любую клавишу, чтобы открыть меню..."
+  select_menu_option
+}
+
 switch_active_service(){
   systemctl daemon-reload >/dev/null 2>&1
   if systemctl is-active --quiet ssserver; then
@@ -444,7 +450,7 @@ switch_active_service(){
       echoerr "Ошибка запуска! Введите 'journalctl -u ssserver -n 30' для просмотра лога"
     fi
   fi
-  select_menu_option
+  press_any_side_to_open_menu
 }
 
 reload_service(){
@@ -456,7 +462,17 @@ reload_service(){
   else
     echoerr "Ошибка перезапуска! Введите 'journalctl -u ssserver -n 30' для просмотра лога"
   fi
-  select_menu_option
+  press_any_side_to_open_menu
+}
+
+show_systemctl_status() {
+  systemctl status ssserver --no-pager -l
+  press_any_side_to_open_menu
+}
+
+show_journalctl_log() {
+  journalctl -u ssserver -n 50 --no-pager
+  press_any_side_to_open_menu
 }
 
 remove_shadowsocks_rust(){
@@ -508,8 +524,7 @@ install_ssserver(){
   chmod +x "$path_script"
   ln -s "$path_script" "$path_script_link"
 
-  read -n1 -r -p " Нажмите любую клавишу чтобы отобразить меню..."
-  select_menu_option
+  press_any_side_to_open_menu
 }
 
 select_menu_option() {
@@ -533,7 +548,7 @@ select_menu_option() {
   menu+="  3) 🧿 Статус службы\n"
   menu+="  4) 📜 Последние логи\n"
   menu+="  5) 🪣 Удаление программы\n"
-  menu+="  6) 🚪 Выход из меню (Ctrl+C)\n"
+  menu+="  6) 🚪 Выход из меню (Ctrl+C)"
 
   echo -e "$menu"
 
@@ -553,12 +568,10 @@ select_menu_option() {
       reload_service
     ;;
     3)
-      systemctl status ssserver --no-pager -l
-      select_menu_option
+      show_systemctl_status
     ;;
     4)
-      journalctl -u ssserver -n 100 --no-pager
-      select_menu_option
+      show_journalctl_log
     ;;
     5)
       remove_shadowsocks_rust

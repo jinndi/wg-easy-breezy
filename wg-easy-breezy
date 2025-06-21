@@ -661,6 +661,11 @@ input_address() {
         fi
       done < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
+      if [[ "$address" == "192.168.100.x" ]]; then
+        echoerr "Значение '$address' используется сетью контейнеров"
+        conflict=1
+      fi
+
       if [[ "$conflict" -eq 1 ]]; then
         continue  # вернуться к началу ввода
       fi
@@ -1004,9 +1009,19 @@ create_services_config() {
   yq e -i ".networks += {
     \"${service_prefix}\": {
       \"name\": \"${service_prefix}\",
-      \"driver\": \"bridge\"
+      \"driver\": \"bridge\",
+      \"ipam\": {
+        \"config\": [
+          {
+            \"subnet\": \"192.168.100.0/24\",
+            \"gateway\": \"192.168.100.1\"
+          }
+        ]
+      }
     }
   }" "$path_docker_compose_file"
+
+
 
   echook "Конфиги сервисов загружены и созданы"
 }

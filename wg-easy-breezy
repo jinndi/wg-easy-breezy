@@ -1021,8 +1021,6 @@ create_services_config() {
     }
   }" "$path_docker_compose_file"
 
-
-
   echook "Конфиги сервисов загружены и созданы"
 }
 
@@ -1635,7 +1633,7 @@ show_podman_logs() {
 
 # Функция вывод меню управления контейнерами
 select_containers_menu() {
-  clear && tput cup $(( $(tput lines) - 1 )) 0
+  clear
   show_header
   show_services_list
 
@@ -1732,7 +1730,7 @@ select_menu_option() {
     read -rp " Опция: " option
   done
 
-  [[ "$option" =~ ^[1-8]$ ]] && clear && tput cup $(( $(tput lines) - 1 )) 0
+  [[ "$option" =~ ^[1-8]$ ]] && clear
 
   case "$option" in
     1)

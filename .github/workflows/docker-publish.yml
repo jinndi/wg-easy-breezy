@@ -1,9 +1,10 @@
 name: Docker
 
+# Только теги вида v13, v14 и т.п.
 on:
   push:
     tags:
-      - 'v[0-9]*'  # Только теги вида v13, v14 и т.п.
+      - 'v[0-9]*'
 
 env:
   REGISTRY: ghcr.io
@@ -35,10 +36,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
+          # Преобразует v13 → 13
+          # Добавляет latest
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=match,pattern=v([0-9]+),group=1  # Преобразует v13 → 13
-            type=raw,value=latest                # Добавляет latest
+            type=match,pattern=v([0-9]+),group=1
+            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

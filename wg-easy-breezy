@@ -12,7 +12,7 @@ export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
 ## Пути исполняемых файлов
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 ## Пути файлов:
 # - папка в которую будет произведена установка
@@ -269,10 +269,11 @@ install_pkgs() {
     ) || exiterr "'apt-get install' ошибка."
 
     # podman-compose
-    (
-      pipx ensurepath > /dev/null 2>&1
-      pipx install podman-compose > /dev/null 2>&1
-    ) || exiterr "podman-compose install ошибка."
+    PIPX_HOME="$path_data_dir/pipx"\
+    PIPX_BIN_DIR="$path_data_dir/pipx"\
+    PIPX_MAN_DIR="$path_data_dir/pipx/man"\
+    pipx install podman-compose > /dev/null 2>&1 \
+    || exiterr "Не удалось установить podman-compose"
 
     # mikefarah yq
     yq_path=$(command -v yq)
@@ -1052,7 +1053,7 @@ create_sysctl_config () {
 create_systemd_unit() {
   local working_dir path_podman_compose
   working_dir="$(dirname "$path_docker_compose_file")"
-  path_podman_compose=$(command -v podman-compose)
+  path_podman_compose="$path_data_dir/pipx/podman-compose"
 
   echomsg "Создание systemd службы" 1
   {

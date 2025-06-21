@@ -643,7 +643,7 @@ input_address() {
   while true; do
     echomsg "Диапазон IP адресов клиентов WireGuard," 1
     echomsg "например 10.0.0.x, 10.1.0.x, и т.п."
-    read -r -e -i "$default_value" address
+    read -r -e -i " $default_value" address
     address=${address:-$default_value}
 
     # Проверка на конфликты

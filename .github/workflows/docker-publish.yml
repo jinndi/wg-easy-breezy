@@ -2,8 +2,8 @@ name: Docker
 
 on:
   push:
-    # Публиковать образ только при пуше семантических тегов, например v1.2.3
-    tags: [ 'v*.*.*' ]
+    tags:
+      - 'v[0-9]*'  # Только теги вида v13, v14 и т.п.
 
 env:
   REGISTRY: ghcr.io
@@ -36,6 +36,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=match,pattern=v([0-9]+),group=1  # Преобразует v13 → 13
+            type=raw,value=latest                # Добавляет latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

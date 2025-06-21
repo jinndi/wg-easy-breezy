@@ -1770,6 +1770,7 @@ select_menu_option() {
 
 # Функция установки приложения
 install() {
+  clear
   # проверка поддержки
   check_root
   check_shell

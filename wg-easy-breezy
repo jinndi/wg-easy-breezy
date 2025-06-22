@@ -683,7 +683,7 @@ input_address() {
   local default_value="10.0.0.x"
 
   while true; do
-    echomsg "Диапазон IP адресов клиентов WireGuard," 1
+    echomsg "Подсеть клиентов WireGuard," 1
     echomsg "например 10.0.0.x, 10.1.0.x, и т.п."
     read -r -e -i " $default_value" address
     address=${address:-$default_value}
@@ -704,7 +704,7 @@ input_address() {
       done < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
       if [[ "$address" == "192.168.100.x" ]]; then
-        echoerr "Значение '$address' используется сетью контейнеров"
+        echoerr "Значение '$address' используется контейнерами"
         conflict=1
       fi
 
@@ -716,7 +716,7 @@ input_address() {
     break  # адрес уникален
   done
 
-  echook "Задан диапазон адресов для клиентов: $address"
+  echook "Задана подсеть клиентов: $address"
 }
 
 
@@ -1275,7 +1275,7 @@ show_services_list() {
         output+="\033[0;36mПрокси режим:\033[0m нет\n"
       fi
 
-      output+="\033[0;36mАдреса клиентов wg:\033[0m $address\n"
+      output+="\033[0;36mПодсеть клиентов:\033[0m $address\n"
 
       if [[ -f "$path_caddyfile" ]]; then
         output+="\033[0;36mВеб интерфейс:\033[0m https://${WG_HOST}/${service}/\n"

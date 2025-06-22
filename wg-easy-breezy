@@ -1337,9 +1337,6 @@ remove_wg_service() {
 
   local port_wg port_ui
 
-  # останавливаем службу
-  systemctl stop wg-easy-breezy > /dev/null 2>&1
-
   # правила iptables
   port_wg=$(get_env_var_from_service "$service_name" "WG_PORT" "")
   port_ui=$(get_env_var_from_service "$service_name" "PORT" "")
@@ -1358,9 +1355,8 @@ remove_wg_service() {
     sed -i "/^[[:space:]]*handle_path[[:space:]]\+\\/$service_name\\/\\*/,/^[[:space:]]*}/d" "$path_caddyfile"
   fi
 
-  # запускаем службу
-  systemctl start wg-easy-breezy > /dev/null 2>&1
-  wait_for_containers
+  # Останавливаем контейнер
+  "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" > /dev/null 2>&1
 
   echook "🎈 Сервис $service_name удален!"
   press_any_side_to_open_menu "containers"

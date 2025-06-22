@@ -1339,6 +1339,22 @@ remove_wg_service() {
     fi
 
     if [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]]; then
+      # volume том
+      echo
+      echo "Удалить настройки сервера/клиентов Wireguard?"
+      local msg
+      msg="[y/N]: "
+      read -rp "$msg" remove_volume
+
+      until [[ "$remove_volume" =~ ^[yYnNдДнН]$ ]]; do
+        echoerr "Неверная опция"
+        read -rp "$msg" remove_volume
+      done
+
+      if [[ "$remove_volume" =~ ^[yYдД]$ ]]; then
+        podman volume rm "$service_name" > /dev/null 2>&1
+      fi
+      
       echomsg "Удаляем сервис $service_name" 1
       break
     else
@@ -1363,13 +1379,16 @@ remove_wg_service() {
   yq e -i "del(.services.${service_name})" "$path_docker_compose_file"
   yq e -i "del(.volumes.${service_name})" "$path_docker_compose_file"
 
-  # volume том
-  # podman volume rm "$service_name" > /dev/null 2>&1
-
   # реверс прокси в caddyfile
   if [[ -f "$path_caddyfile" ]]; then
     sed -i "/^[[:space:]]*handle_path[[:space:]]\+\\/$service_name\\/\\*/,/^[[:space:]]*}/d" "$path_caddyfile"
   fi
+
+  # запускаем с force-recreate caddy-wgeb для переинициализации caddyfile
+  {
+    podman container exists caddy-wgeb && \
+    "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate caddy-wgeb
+  } > /dev/null 2>&1
 
   echook "🎈 Сервис $service_name удален!"
   press_any_side_to_open_menu "containers"

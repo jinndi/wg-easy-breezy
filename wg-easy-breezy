@@ -273,8 +273,19 @@ install_pkgs() {
     ) || exiterr "'apt-get install' ошибка."
 
     # uv https://astral.sh
+    # https://docs.astral.sh/uv/getting-started/installation/
+    # https://docs.astral.sh/uv/reference/environment/
     {
-      curl -LsSf https://astral.sh/uv/install.sh | env UV_UNMANAGED_INSTALL="$path_uv_dir" sh
+      curl -LsSf https://astral.sh/uv/install.sh \
+        | env UV_INSTALL_DIR="$path_uv_dir" \
+              INSTALLER_NO_MODIFY_PATH=1 \
+              UV_PYTHON_INSTALL_DIR="$path_uv_dir/puthon" \
+              UV_PYTHON_CACHE_DIR="$path_uv_dir/puthon/cache" \
+              UV_PYTHON_BIN_DIR="$path_uv_dir/puthon/bin" \
+              UV_TOOL_DIR="$path_uv_dir/tool" \
+              UV_TOOL_BIN_DIR="$path_uv_dir/tool/bin" \
+              UV_CACHE_DIR="$path_uv_dir/cache" \
+          sh
     } > /dev/null 2>&1 || exiterr "Не удалось установить uv"
 
     # python-build-standalone https://docs.astral.sh/uv/guides/install-python/

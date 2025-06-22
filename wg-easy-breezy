@@ -1096,6 +1096,7 @@ create_systemd_unit() {
     echo "Type=simple"
     echo "WorkingDirectory=$working_dir"
     echo "EnvironmentFile=$path_env_file"
+    echo "EnvironmentFile=$path_uv_env_file"
     echo "ExecStartPre=$path_iptables_apply_script"
     echo "ExecStart=$path_uvx podman-compose -f $path_docker_compose_file up --force-recreate --remove-orphans"
     echo "ExecStop=$path_uvx podman-compose-f $path_docker_compose_file down --timeout 5"

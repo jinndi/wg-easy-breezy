@@ -273,11 +273,13 @@ install_pkgs() {
     ) || exiterr "'apt-get install' ошибка."
 
     # uv https://astral.sh
-    curl -LsSf https://astral.sh/uv/install.sh \
-      | env UV_UNMANAGED_INSTALL="$path_uv_dir" sh > /dev/null 2>&1 \
-      || exiterr "Не удалось установить uv (astral.sh)"
+    {
+      curl -LsSf https://astral.sh/uv/install.sh | env UV_UNMANAGED_INSTALL="$path_uv_dir" sh
+    } > /dev/null 2>&1 || exiterr "Не удалось установить uv"
+
     # python-build-standalone https://docs.astral.sh/uv/guides/install-python/
-    "$path_uv_dir/uv" python install || exiterr "Не удалось установить python (astral.sh)"
+    "$path_uv_dir/uv" python install > /dev/null 2>&1 \
+      || exiterr "Не удалось установить python (astral.sh)"
 
     # mikefarah yq
     # https://mikefarah.gitbook.io/yq

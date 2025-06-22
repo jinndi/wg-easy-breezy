@@ -251,29 +251,25 @@ show_spinner() {
   return $status
 }
 
+# Функция ожидания разблокировки apt/dpkg
+wait_for_apt_unlock() {
+  local timeout=300
+  local waited=0
+
+  while pgrep -x apt >/dev/null || pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null; do
+    sleep 1
+    [ "$waited" = 0 ] && echomsg "Ожидание завершения процессов apt/dpkg..." 1
+    ((waited++))
+    if (( waited >= timeout )); then
+      exiterr "Превышено время ожидания ($timeout сек)."
+      return 1
+    fi
+  done
+}
 
 # Функция установки необходимых пакетов программ
 install_pkgs() {
-  # ожидания пока система освободит блокировку пакетного менеджера (apt/dpkg)
-  local count apt_lk apt_lk frontend_lk has_fuser has_lsof yq_path
-  count=0
-  apt_lk="/var/lib/apt/lists/lock"
-  pkg_lk="/var/lib/dpkg/lock"
-  frontend_lk="/var/lib/dpkg/lock-frontend"
-  has_fuser=$(command -v fuser)
-  has_lsof=$(command -v lsof)
-
-  while \
-    { [ "$has_fuser" ] && { fuser "$apt_lk" "$pkg_lk" "$frontend_lk" >/dev/null 2>&1; }; } || \
-    { [ "$has_lsof" ] && { lsof "$apt_lk" >/dev/null 2>&1 || lsof "$pkg_lk" >/dev/null 2>&1 || \
-    lsof "$frontend_lk" >/dev/null 2>&1; }; }
-  do
-    [ "$count" = 0 ] && echomsg "Ожидаем, когда apt освободится..."
-    [ "$count" -ge 100 ] && exiterr "Не удалось дождаться разблокировку apt/dpkg."
-    count=$((count+1))
-    printf '%s' '.'
-    sleep 3
-  done
+  wait_for_apt_unlock
 
   echomsg "Обновление пакетов и установка зависимостей" 1
   (

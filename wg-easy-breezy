@@ -37,6 +37,10 @@ path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 path_sysctl_config="$path_data_dir/sysctl.conf"
 # - ссылка на файл конфига sysctl (path_sysctl_config)
 path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
+# - папка uv https://astral.sh
+path_uv_dir="$path_data_dir/astral"
+# - исполняемый файл uvx (Running tools uv)
+path_uvx="$path_uv_dir/uvx"
 
 # Ссылка на образ wg-easy
 wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:latest"
@@ -169,7 +173,7 @@ remove_install() {
   # Остановка сервисов
   systemctl disable --now wg-easy-breezy > /dev/null 2>&1
   if [[ -e "$path_docker_compose_file" ]]; then
-    podman-compose -f $path_docker_compose_file down -t 0 > /dev/null 2>&1
+    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 > /dev/null 2>&1
   fi
 
   # Удаление образов
@@ -262,20 +266,21 @@ install_pkgs() {
       apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade > /dev/null 2>&1
     ) || exiterr "'apt-get upgrade' ошибка."
     (
-      apt-get -yqq install podman python3 pipx netavark aardvark-dns iproute2 iptables \
+      apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
         openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1 \
-      || apt-get -yqq install podman python3 pipx netavark aardvark-dns iproute2 iptables \
+      || apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
         openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1
     ) || exiterr "'apt-get install' ошибка."
 
-    # podman-compose
-    PIPX_HOME="$path_data_dir/pipx"\
-    PIPX_BIN_DIR="$path_data_dir/pipx"\
-    PIPX_MAN_DIR="$path_data_dir/pipx/man"\
-    pipx install podman-compose > /dev/null 2>&1 \
-    || exiterr "Не удалось установить podman-compose"
+    # uv https://astral.sh
+    curl -LsSf https://astral.sh/uv/install.sh \
+      | env UV_UNMANAGED_INSTALL="$path_uv_dir" sh > /dev/null 2>&1 \
+      || exiterr "Не удалось установить uv (astral.sh)"
+    # python-build-standalone https://docs.astral.sh/uv/guides/install-python/
+    "$path_uv_dir/uv" python install || exiterr "Не удалось установить python (astral.sh)"
 
     # mikefarah yq
+    # https://mikefarah.gitbook.io/yq
     yq_path=$(command -v yq)
     if [[ -n "$yq_path" ]]; then
       if ! yq --version 2>/dev/null | grep -q 'mikefarah'; then
@@ -1053,7 +1058,6 @@ create_sysctl_config () {
 create_systemd_unit() {
   local working_dir path_podman_compose
   working_dir="$(dirname "$path_docker_compose_file")"
-  path_podman_compose="$path_data_dir/pipx/podman-compose"
 
   echomsg "Создание systemd службы" 1
   {
@@ -1067,8 +1071,8 @@ create_systemd_unit() {
     echo "WorkingDirectory=$working_dir"
     echo "EnvironmentFile=$path_env_file"
     echo "ExecStartPre=$path_iptables_apply_script"
-    echo "ExecStart=$path_podman_compose -f $path_docker_compose_file up --force-recreate --remove-orphans"
-    echo "ExecStop=$path_podman_compose -f $path_docker_compose_file down --timeout 5"
+    echo "ExecStart=$path_uvx podman-compose -f $path_docker_compose_file up --force-recreate --remove-orphans"
+    echo "ExecStop=$path_uvx podman-compose-f $path_docker_compose_file down --timeout 5"
     echo "ExecStopPost=$path_iptables_delete_script"
     echo "Restart=on-failure"
     echo "RestartSec=10"

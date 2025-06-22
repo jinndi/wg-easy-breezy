@@ -1099,7 +1099,7 @@ create_systemd_unit() {
     echo "EnvironmentFile=$path_uv_env_file"
     echo "ExecStartPre=$path_iptables_apply_script"
     echo "ExecStart=$path_uvx podman-compose -f $path_docker_compose_file up --force-recreate --remove-orphans"
-    echo "ExecStop=$path_uvx podman-compose-f $path_docker_compose_file down --timeout 5"
+    echo "ExecStop=$path_uvx podman-compose -f $path_docker_compose_file down --timeout 5"
     echo "ExecStopPost=$path_iptables_delete_script"
     echo "Restart=on-failure"
     echo "RestartSec=10"

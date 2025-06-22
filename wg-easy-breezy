@@ -1309,6 +1309,7 @@ add_new_wg_service() {
   local service_name="$service_prefix-$service_tag"
   "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "$service_name" > /dev/null 2>&1
   # запускаем с force-recreate caddy-wgeb для применения реверс прокси
+  podman container exists caddy-wgeb && \
   "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate caddy-wgeb
   wait_for_containers
 

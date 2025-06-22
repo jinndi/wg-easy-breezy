@@ -1237,7 +1237,7 @@ get_env_var_from_service() {
 
 # Функция вывода списка служб на основе compose yml файла
 show_services_list() {
-  local service container_status ports status ss_link port_ui address
+  local service container_status ports status ss_link port_ui address mount_point client_count
   local output=""
 
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1269,6 +1269,13 @@ show_services_list() {
       port_ui=$(get_env_var_from_service "$service" "PORT" "-")
       address=$(get_env_var_from_service "$service" "WG_DEFAULT_ADDRESS" "-")
 
+      if podman volume exists "$service"; then
+        mount_point=$(podman volume inspect "$service" --format '{{ .Mountpoint }}')
+        client_count=$(yq '(.clients // {}) | length' "$mount_point/wg0.json")
+      else
+        client_count="\033[1;31mоvolume не найден!\033[0m"
+      fi
+
       if [[ -n "$ss_link" ]]; then
         output+="\033[0;36mПрокси режим:\033[0m да, shadowsocks -> ${ss_link#*@}\n"
       else
@@ -1276,6 +1283,8 @@ show_services_list() {
       fi
 
       output+="\033[0;36mПодсеть клиентов:\033[0m $address\n"
+
+      output+="\033[0;36mКол-во клиентов:\033[0m $client_count\n"
 
       if [[ -f "$path_caddyfile" ]]; then
         output+="\033[0;36mВеб интерфейс:\033[0m https://${WG_HOST}/${service}/\n"

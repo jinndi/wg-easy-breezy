@@ -121,7 +121,7 @@ load_env() {
 }
 
 # Функция загрузки переменных uv из .env (если он существует)
-export_uv_env() {
+load_uv_env() {
   if [ -f "$path_uv_env_file" ]; then
     set -o allexport
     # shellcheck disable=SC1090
@@ -307,8 +307,8 @@ install_pkgs() {
       echo "UV_CACHE_DIR='$path_uv_dir/cache'"
     } > "$path_uv_env_file"
 
-    # экспортируем переменные окружения uv
-    export_uv_env
+    # Загружаем с экспортом переменные окружения uv
+    load_uv_env
 
     # python-build-standalone https://docs.astral.sh/uv/guides/install-python/
     "$path_uv_dir/uv" python install > /dev/null 2>&1 \
@@ -1354,7 +1354,7 @@ remove_wg_service() {
       if [[ "$remove_volume" =~ ^[yYдД]$ ]]; then
         podman volume rm "$service_name" > /dev/null 2>&1
       fi
-      
+
       echomsg "Удаляем сервис $service_name" 1
       break
     else
@@ -1861,11 +1861,11 @@ install() {
   press_any_side_to_open_menu
 }
 
-# Загружаем переменные окружения wg-easy
+# Загружаем с экспортом переменные окружения wg-easy
 load_env
 
-# экспортируем переменные окружения uv
-export_uv_env
+# Загружаем с экспортом переменные окружения uv
+load_uv_env
 
 if [[ -d "$path_data_dir" ]]; then
   select_menu_option

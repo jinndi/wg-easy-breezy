@@ -39,6 +39,8 @@ path_sysctl_config="$path_data_dir/sysctl.conf"
 path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
 # - папка uv https://astral.sh
 path_uv_dir="$path_data_dir/astral"
+# - файл переменных окружения uv
+path_uv_env_file="$path_uv_dir/.env"
 # - исполняемый файл uvx (Running tools uv)
 path_uvx="$path_uv_dir/uvx"
 
@@ -108,6 +110,22 @@ exiterr() {
   exit 1
 }
 
+# Функция загрузки переменных wg-easy из .env (если он существует)
+load_env() {
+  if [ -f "$path_env_file" ]; then
+    source "$path_env_file"
+  fi
+}
+
+# Функция загрузки переменных uv из .env (если он существует)
+export_uv_env() {
+  if [ -f "$path_uv_env_file" ]; then
+    set -o allexport
+    # shellcheck disable=SC1090
+    source "$path_uv_env_file"
+    set +o allexport
+  fi
+}
 
 ## Функции проверок возможности установки:
 # - рут права
@@ -288,7 +306,10 @@ install_pkgs() {
       echo "UV_TOOL_DIR='$path_uv_dir/tool'"
       echo "UV_TOOL_BIN_DIR='$path_uv_dir/tool/bin'"
       echo "UV_CACHE_DIR='$path_uv_dir/cache'"
-    } > "$path_uv_dir/.env"
+    } > "$path_uv_env_file"
+
+    # экспортируем переменные окружения uv
+    export_uv_env
 
     # python-build-standalone https://docs.astral.sh/uv/guides/install-python/
     "$path_uv_dir/uv" python install > /dev/null 2>&1 \
@@ -828,16 +849,6 @@ create_iptables_scripts() {
   chmod +x "$path_iptables_apply_script" "$path_iptables_delete_script"
 
   echook "Скрипты с правилами iptables созданы"
-}
-
-# Функция загрузки переменных из .env (если он существует)
-load_env() {
-  if [ -f "$path_env_file" ]; then
-    set -o allexport
-    # shellcheck disable=SC1090
-    source "$path_env_file"
-    set +o allexport
-  fi
 }
 
 # Функция добавления сервиса wg
@@ -1826,8 +1837,11 @@ install() {
   press_any_side_to_open_menu
 }
 
-# Загружаем переменные из .env файла
+# Загружаем переменные окружения wg-easy
 load_env
+
+# экспортируем переменные окружения uv
+export_uv_env
 
 if [[ -d "$path_data_dir" ]]; then
   select_menu_option

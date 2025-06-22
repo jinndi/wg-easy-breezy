@@ -1130,7 +1130,7 @@ is_all_ok_services() {
   return 0
 }
 
-# Фукнция ожидания запуска всех контейнеров (до 90 сек)
+# Фукнция ожидания запуска всех контейнеров (до 85 сек)
 wait_for_containers() {
   sleep 5
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1150,33 +1150,32 @@ wait_for_containers() {
         break
       fi
 
-      sleep 1
+      sleep 2
       ((elapsed++))
-      if (( elapsed >= 85 )); then
-        failed=1
+      if (( elapsed >= 40 )); then
+        echoerr "\nВремя ожидания запуска контейнеров истекло!\n"
         break
       fi
     done
   done
 
   if (( failed == 1 )); then
-    echoerr "\nНекоторые контейнеры не запустились, либо время ожидания истекло!\n"
+    echoerr "\nНекоторые контейнеры не запустились!\n"
     return 1
   fi
 
-  echook "\nВсе контейнеры запущены и работают!\n"
   return 0
 }
 
 # Функция запуска всех сервисов
 start_services() {
-  echomsg "Запускаем сервисы" 1
+  echomsg "Запускаем службу" 1
 
   # Запускаем докер контейнеры
   systemctl enable --now wg-easy-breezy > /dev/null 2>&1
   wait_for_containers
   if ! systemctl is-active --quiet wg-easy-breezy; then
-    echoerr "Запуск не удался"
+    echoerr "Запуск службы не удался"
   else
     echook "Служба успешно запущена!"
   fi
@@ -1184,18 +1183,19 @@ start_services() {
 
 # Функция остановки всех сервисов и служб
 stop_services() {
-  echomsg "Останавливаем сервисы" 1
-
+  echomsg "Останавливаем службу" 1
+  
   # Останавливаем и удаляем docker-контейнеры
   if [[ -f "$path_docker_compose_file" ]]; then
     systemctl disable --now wg-easy-breezy > /dev/null 2>&1
+    sleep 5
     if systemctl is-active --quiet wg-easy-breezy; then
-      echoerr "Остановка не удалась"
+      echoerr "Остановка службы не удалась"
     else
-      echook "Служба успешно остановлена!"
+    echook "Служба успешно остановлена!"
     fi
   else
-    echoerr "Файл docker-compose не найден: $path_docker_compose_file"
+    echoerr "Файл '$path_docker_compose_file' не найден"
   fi
 }
 
@@ -1213,14 +1213,14 @@ switch_active_services() {
 
 # Функция перезапуска  сервисов
 restart_services() {
-  echomsg "Перезапускаем сервисы" 1
+  echomsg "Перезапускаем службу" 1
   systemctl stop wg-easy-breezy > /dev/null 2>&1
   systemctl start wg-easy-breezy > /dev/null 2>&1
   wait_for_containers
   if is_all_ok_services; then
     echook "Служба успешно перезапущена!"
   else
-    echoerr "Ошибка перезапуска! Введите 'journalctl -u wg-easy-breezy -n 30' для просмотра лога"
+    echoerr "Ошибка перезапуска службы!"
   fi
 
   press_any_side_to_open_menu

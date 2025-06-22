@@ -1340,6 +1340,9 @@ remove_wg_service() {
     fi
   done
 
+  # останавливаем контейнер
+  "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" > /dev/null 2>&1
+
   local port_wg port_ui
 
   # правила iptables
@@ -1359,9 +1362,6 @@ remove_wg_service() {
   if [[ -f "$path_caddyfile" ]]; then
     sed -i "/^[[:space:]]*handle_path[[:space:]]\+\\/$service_name\\/\\*/,/^[[:space:]]*}/d" "$path_caddyfile"
   fi
-
-  # Останавливаем контейнер
-  "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" > /dev/null 2>&1
 
   echook "🎈 Сервис $service_name удален!"
   press_any_side_to_open_menu "containers"

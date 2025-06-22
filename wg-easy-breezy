@@ -1307,10 +1307,16 @@ add_new_wg_service() {
 
   # запускаем wg-easy контейнер
   local service_name="$service_prefix-$service_tag"
-  "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "$service_name" > /dev/null 2>&1
+  {
+    "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "$service_name"
+  } > /dev/null 2>&1
+  
   # запускаем с force-recreate caddy-wgeb для применения реверс прокси
-  podman container exists caddy-wgeb && \
-  "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate caddy-wgeb
+  {
+    podman container exists caddy-wgeb && \
+    "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate caddy-wgeb
+  } > /dev/null 2>&1
+
   wait_for_containers
 
   echo -e "\n\033[1;32m🎉 wg-easy добавлен! \033[0m"
@@ -1341,7 +1347,9 @@ remove_wg_service() {
   done
 
   # останавливаем контейнер
-  "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" > /dev/null 2>&1
+  {
+    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" 
+  } > /dev/null 2>&1
 
   local port_wg port_ui
 

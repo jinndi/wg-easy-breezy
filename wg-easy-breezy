@@ -277,17 +277,17 @@ install_pkgs() {
   echomsg "Обновление пакетов и установка зависимостей" 1
   (
     (
-      apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update > /dev/null 2>&1
-    ) || exiterr "'apt-get update' ошибка."
+      apt-get -yqq update || apt-get -yqq update
+    ) > /dev/null 2>&1 || exiterr "'apt-get update' ошибка."
     (
-      apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade > /dev/null 2>&1
-    ) || exiterr "'apt-get upgrade' ошибка."
+      apt-get -yqq upgrade || apt-get -yqq upgrade
+    ) > /dev/null 2>&1 || exiterr "'apt-get upgrade' ошибка."
     (
       apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
-        openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1 \
+        openssl lsof dnsutils curl idn grep sed nano htop \
       || apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
-        openssl lsof dnsutils curl idn grep sed nano htop > /dev/null 2>&1
-    ) || exiterr "'apt-get install' ошибка."
+        openssl lsof dnsutils curl idn grep sed nano htop
+    ) > /dev/null 2>&1 || exiterr "'apt-get install' ошибка."
 
     # uv https://astral.sh
     # https://docs.astral.sh/uv/reference/installer/
@@ -1661,7 +1661,7 @@ change_password() {
 show_podman_logs() {
   for name in $(podman ps --format '{{.Names}}' | grep "$service_prefix"); do
     echo -e "\n\033[1;34m=== Логи $name ===\033[0m"
-    podman logs --tail 50 "$name"
+    podman logs --tail 30 "$name"
   done
   press_any_side_to_open_menu "containers"
 }

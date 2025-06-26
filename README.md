@@ -5,9 +5,6 @@
 ### Развертывание wg-easy / wg-easy через tun2socks прокси shasowsocks / caddy реверс прокси
 
 
-![Схема работы](https://github.com/user-attachments/assets/f041ac27-b01c-45e1-87c5-58f05bb432c3)
-
-
 ## Особенности:
 
 - Выбор режима установки wg-easy: обычный или через прокси Shadowsocks к другому серверу с использованием tun2socks.

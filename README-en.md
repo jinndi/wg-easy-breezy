@@ -10,19 +10,19 @@
 
 ## Features:
 
-Selecting the installation mode for wg-easy: either standard or via a Shadowsocks proxy to another server using tun2socks.
+- Selecting the installation mode for wg-easy: either standard or via a Shadowsocks proxy to another server using tun2socks.
 
-Creating a Shadowsocks server (Rust implementation) using the `ss-easy-breezy` script and obtaining a link to specify in the `wg-easy-breezy` script.
+- Creating a Shadowsocks server (Rust implementation) using the `ss-easy-breezy` script and obtaining a link to specify in the `wg-easy-breezy` script.
 
-Adding and removing wg-easy containers via the script menu, with all necessary settings applied automatically.
+- Adding and removing wg-easy containers via the script menu, with all necessary settings applied automatically.
 
-Adding, modifying, and deleting a domain name (requires setting an A record in your domain registrar's panel pointing to your server's IP address).
+- Adding, modifying, and deleting a domain name (requires setting an A record in your domain registrar's panel pointing to your server's IP address).
 
-Automatic deployment of the Caddy web server as a reverse proxy with auto-renewing SSL certificate.
+- Automatic deployment of the Caddy web server as a reverse proxy with auto-renewing SSL certificate.
 
-Changing the password for the wg-easy web interface(s).
+- Changing the password for the wg-easy web interface(s).
 
-Optimized network settings on both the server host and within the containers.
+- Optimized network settings on both the server host and within the containers.
 
 ## Requirements:
 

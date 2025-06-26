@@ -5,9 +5,6 @@
 ### Deployment of WG-easy / WG-easy via tun2socks proxy shasowsocks / caddy reverse proxy
 
 
-![The scheme of work](https://github.com/user-attachments/assets/f041ac27-b01c-45e1-87c5-58f05bb432c3 )
-
-
 ## Features:
 
 - Selecting the installation mode for wg-easy: either standard or via a Shadowsocks proxy to another server using tun2socks.

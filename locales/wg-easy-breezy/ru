@@ -63,6 +63,5 @@ W_NO_DOMAIN_OPTIONS=" 1) 🌐 Добавить доменное имя\n 2) $W_B
 W_LOGS="Логи"
 W_CONTAINER_OPTIONS="$W_SELECT_OPTION:\n 1) 📦 Добавить wg-easy\n 2) 🧹 Удалить wg-easy\n 3) 📜 Последние логи\n 4) $W_BACK_TO_MENU"
 W_MAIN_MENU=" 2) 🌀 Перезапустить\n 3) 📦 Контейнеры\n 4) 🌍 Доменное имя\n 5) 🔑 Сменить пароль\n 6) 🧿 Статус службы\n 7) 🪣 Удалить программу\n 8) 🚪 Выход (Ctrl+C)"
-W_PRESS_ANY_KEY_TO_INSTALL="Нажмите любую клавишу, чтобы начать установку..."
 W_INSTALL_COMPLETED="🎉 Установка завершена"
 W_DIRECTORY_PROGRAM="Директория программы"

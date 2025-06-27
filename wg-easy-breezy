@@ -1595,7 +1595,7 @@ select_domain_option() {
   else
     echoerr "$W_NO_DOMAIN_NAME"
   fi
-  echo "$W_SELECT_OPTION:"
+  echo -e "$W_SELECT_OPTION:"
 
   if [[ "$is__domain" ]]; then
     echo -e "$W_DOMAIN_OPTIONS"

@@ -114,6 +114,7 @@ load_translation() {
     touch "$path_translation_file"
     
     (
+      set -e
       curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
         "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation" \
         -o "$path_translation_file"

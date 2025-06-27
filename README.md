@@ -1,103 +1,105 @@
 # WG-EASY-BREEZY
 
-![RU](https://github.com/jinndi/wg-easy-breezy/blob/main/README.md) | ![EN](https://github.com/jinndi/wg-easy-breezy/blob/main/README-en.md)
+![RU](https://github.com/jinndi/wg-easy-breezy/blob/main/README-ru.md)
 
-### Развертывание wg-easy / wg-easy через tun2socks прокси shasowsocks / caddy реверс прокси
+### Deployment of WG-easy / WG-easy via tun2socks proxy shasowsocks / caddy reverse proxy
 
 
-## Особенности:
+## Features:
 
-- Выбор режима установки wg-easy: обычный или через прокси Shadowsocks к другому серверу с использованием tun2socks.
+- Selecting the installation mode for wg-easy: either standard or via a Shadowsocks proxy to another server using tun2socks.
 
-- Создание сервера Shadowsocks (реализация на Rust) с помощью скрипта `ss-easy-breezy` и получение ссылки для указания в скрипте `wg-easy-breezy`.
+- Creating a Shadowsocks server (Rust implementation) using the `ss-easy-breezy` script and obtaining a link to specify in the `wg-easy-breezy` script.
 
-- Добавление и удаление контейнеров wg-easy из меню скрипта с автоматическим применением всех необходимых настроек.
+- Adding and removing wg-easy containers via the script menu, with all necessary settings applied automatically.
 
-- Добавление, изменение и удаление доменного имени (требуется предварительная настройка A-записи в панели регистратора на IP-адрес вашего сервера).
+- Adding, modifying, and deleting a domain name (requires setting an A record in your domain registrar's panel pointing to your server's IP address).
 
-- Автоматическое развертывание веб-сервера Caddy как реверс-прокси с автопродлеваемым SSL-сертификатом.
+- Automatic deployment of the Caddy web server as a reverse proxy with auto-renewing SSL certificate.
 
-- Смена пароля от веб-интерфейса(ов) wg-easy.
+- Changing the password for the wg-easy web interface(s).
 
-- Оптимизированные сетевые настройки как на хосте сервера, так и внутри контейнеров.
+- Optimized network settings on both the server host and within the containers.
 
-## Требования:
+## Requirements:
 
-1. VPS-сервер с минимальными характеристиками: от 1 ГБ оперативной памяти, с установленной ОС Linux Ubuntu 24.04+ или Debian 12+, с IPv4-адресом и ядром версии 6 или выше. (Понадобится два сервера, если вы хотите развернуть Shadowsocks отдельно на другом сервере.)
-2. Работа и запуск через SSH от имени пользователя root.
+1. A VPS server with at least 1 GB of RAM, running Linux (Ubuntu 24.04+ or Debian 12+), with an IPv4 address and a kernel version ≥ 6. (You’ll need two servers if you want to deploy the Shadowsocks server separately.)
+2. Access and execution via SSH as the root user.
 
-## Установка:
+## Installation:
 
 ### ss-easy-breezy
 
-Если есть 2 VPS сервера, допустим один `в вашей резиденции (сервер A)`, другой для обхода блокировок `за границей (сервер B)`, 
-то для начала установите на "B" shasowsocks сервер из ssh коммандой:
+If there are 2 VPS servers, let's say one is `in your residence (server A)`, the other is for bypassing locks `abroad (server B)`,
+then first install the ssh command server on "B" shasowsocks:
 
 ```
 curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
 ```
-В процессе установки вам нужно будет ввести только номер порта, после завершения вы получите ссылку для подлючения, сохраните её.
+During the installation process, you will only need to enter the port number. After completion, you will receive a link to connect and save it.
 
-Директория установки: `/opt/shasowsocks-rust/`
+Installation directory: `/opt/shasowsocks-rust/`
 
-Управление установленным сервером осуществляется по комманде `sseb`
+The installed server is managed using the `sseb` command
 
 ### wg-easy-breezy
 
-На сервере "A" из под ssh выполните установку основного скрипта `wg-easy-breezy`
+On the server "A" from under ssh, install the main script `wg-easy-breezy`
 
 ```
 curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
 ```
 
-Следуйте инструкциям на экране. В процессе будут запрашиваться следующие данные:
+Follow the on-screen instructions. You will be prompted to enter the following:
 
-- **Выбор языка**  
-  Выберите один из двух вариантов:
-  - Английский
-  - Русский
+- **Choosing a language**  
+  Choose one of the following:
+  - English
+  - Russian
 
-- **Режим установки**  
-  Выберите один из двух вариантов:
-  - Обычный
-  - Через прокси (Shadowsocks)
+- **Installation mode**  
+  Choose one of the following:
+  - Standard
+  - Proxy via Shadowsocks
 
-- **Тег сервиса**  
-  Используется как постфикс в названиях сервисов, контейнеров и ссылках для входа в веб-интерфейсы.
+- **Service tag**  
+  Used as a postfix in service names, container names, and web interface URLs.
 
-- **Имя домена**  
-  Укажите, если хотите защитить доступ к веб-интерфейсу(ам) через HTTPS.  
-  *(Можно указать позже через меню.)*
+- **Domain name**  
+  Optional — used to secure access to the web interface via HTTPS.  
+  *(Can be set later through the menu.)*
 
-- **E-mail адрес**  
-  Требуется при наличии доменного имени — используется Caddy-сервером для получения SSL-сертификата.
+- **Email address**  
+  Required if a domain name is provided — used by the Caddy server to obtain an SSL certificate.
 
-- **Ссылка на Shadowsocks**  
-  Указывается, если выбран прокси-режим. Получить её можно, установив `ss-easy-breezy` на другом сервере.
+- **Shadowsocks link**  
+  Required if proxy mode is selected.  
+  You can obtain it by installing `ss-easy-breezy` on another server.
 
-- **Порт WireGuard**  
-  Выберите любой порт из предложенного диапазона.  
-  *(Порт для веб-интерфейса будет на единицу больше.)*
+- **WireGuard port**  
+  Choose any port from the suggested range.  
+  *(The web interface will use the next port number.)*
 
-- **Диапазон адресов клиентов WireGuard**  
-  В формате, поддерживаемом `wg-easy`, например:  
-  `10.0.0.x`, `10.1.0.x`, и т.п.
+- **WireGuard client address range**  
+  In the format used by `wg-easy`, e.g.:  
+  `10.0.0.x`, `10.1.0.x`, etc.
 
-- **Пароль для входа в веб-интерфейс(ы)**  
-  Будет автоматически закодирован и записан в `.env` файл.
+- **Web interface password**  
+  Will be automatically encoded and saved to the `.env` file.
 
-После завершения установки вы получите ссылку на веб интерфейс
+After the installation is complete, you will receive a link to the web interface.
 
-Директория установки: `/opt/wg-easy-breezy/`
+Installation directory: `/opt/wg-easy-breezy/`
 
-Управление установленным сервером осуществляется по комманде `wgeb`
+The installed server is managed using the `wgeb` command
 
 
 
-## Ссылки:
+## Links:
 1. [Github wg-easy](https://github.com/wg-easy/wg-easy)
 2. [Github shadowsocks-rust](https://github.com/shadowsocks/shadowsocks-rust)
 3. [Github tun2socks](https://github.com/xjasonlyu/tun2socks)
 4. [Github caddy](https://github.com/caddyserver/caddy)
-5. [Дешевые и качественные VPS](https://just.hosting/?ref=231025)
-6. [Лучший регистратор доменов](https://www.namecheap.com)
+5. [Cheap and high-quality VPS](https://just.hosting/?ref=231025 )
+6. [The Best Domain Registrar](https://www.namecheap.com )
+

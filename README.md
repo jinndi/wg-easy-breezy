@@ -58,6 +58,7 @@ Follow the on-screen instructions. You will be prompted to enter the following:
 
 - **Shadowsocks link**  
   Required if proxy mode is selected.  
+  
   You can obtain it by installing `ss-easy-breezy` on another server commander:
 
   ```

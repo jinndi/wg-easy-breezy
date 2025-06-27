@@ -57,7 +57,9 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
   Требуется при наличии доменного имени — используется Caddy-сервером для получения SSL-сертификата.
 
 - **Ссылка на Shadowsocks**  
-  Указывается, если выбран прокси-режим. Получить её можно, установив `ss-easy-breezy` на другом сервере коммандой:
+  Указывается, если выбран прокси-режим. 
+  
+  Получить её можно, установив `ss-easy-breezy` на другом сервере коммандой:
 
   ```
   curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy

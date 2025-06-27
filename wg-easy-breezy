@@ -324,7 +324,7 @@ install_pkgs() {
   (
     (
       dpkg --configure -a || dpkg --configure -a
-    ) > /dev/null 2>&1 || || exiterr "${W_ERROR}: 'dpkg --configure -a'"
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'dpkg --configure -a'"
     (
       apt-get -yqq update || apt-get -yqq update
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get update'"

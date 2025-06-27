@@ -52,6 +52,11 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
 
 Follow the on-screen instructions. You will be prompted to enter the following:
 
+- **Choosing a language**  
+  Choose one of the following:
+  - English
+  - Russian
+
 - **Installation mode**  
   Choose one of the following:
   - Standard

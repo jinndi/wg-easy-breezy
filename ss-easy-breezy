@@ -97,7 +97,7 @@ load_translation() {
       read -rp "Option: " option
     done
 
-    locale translation
+    local translation
     case "$option" in
       1)
         translation="en"

@@ -28,23 +28,7 @@
 
 ## Installation:
 
-### ss-easy-breezy
-
-If there are 2 VPS servers, let's say one is `in your residence (server A)`, the other is for bypassing locks `abroad (server B)`,
-then first install the ssh command server on "B" shasowsocks:
-
-```
-curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
-```
-During the installation process, you will only need to enter the port number. After completion, you will receive a link to connect and save it.
-
-Installation directory: `/opt/shasowsocks-rust/`
-
-The installed server is managed using the `sseb` command
-
-### wg-easy-breezy
-
-On the server "A" from under ssh, install the main script `wg-easy-breezy`
+From under ssh, install the main script `wg-easy-breezy`
 
 ```
 curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
@@ -74,7 +58,11 @@ Follow the on-screen instructions. You will be prompted to enter the following:
 
 - **Shadowsocks link**  
   Required if proxy mode is selected.  
-  You can obtain it by installing `ss-easy-breezy` on another server.
+  You can obtain it by installing `ss-easy-breezy` on another server commander:
+
+  ```
+  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
+  ```
 
 - **WireGuard port**  
   Choose any port from the suggested range.  

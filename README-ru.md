@@ -28,23 +28,7 @@
 
 ## Установка:
 
-### ss-easy-breezy
-
-Если есть 2 VPS сервера, допустим один `в вашей резиденции (сервер A)`, другой для обхода блокировок `за границей (сервер B)`, 
-то для начала установите на "B" shasowsocks сервер из ssh коммандой:
-
-```
-curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
-```
-В процессе установки вам нужно будет ввести только номер порта, после завершения вы получите ссылку для подлючения, сохраните её.
-
-Директория установки: `/opt/shasowsocks-rust/`
-
-Управление установленным сервером осуществляется по комманде `sseb`
-
-### wg-easy-breezy
-
-На сервере "A" из под ssh выполните установку основного скрипта `wg-easy-breezy`
+Из под ssh выполните установку основного скрипта `wg-easy-breezy`
 
 ```
 curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
@@ -73,7 +57,11 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
   Требуется при наличии доменного имени — используется Caddy-сервером для получения SSL-сертификата.
 
 - **Ссылка на Shadowsocks**  
-  Указывается, если выбран прокси-режим. Получить её можно, установив `ss-easy-breezy` на другом сервере.
+  Указывается, если выбран прокси-режим. Получить её можно, установив `ss-easy-breezy` на другом сервере коммандой:
+
+  ```
+  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
+  ```
 
 - **Порт WireGuard**  
   Выберите любой порт из предложенного диапазона.  

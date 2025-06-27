@@ -62,6 +62,8 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
   ```
   curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
   ```
+  Директория установки: `/opt/shasowsocks-rust/`Add commentMore actions
+  Управление установленным сервером осуществляется по комманде `sseb`
 
 - **Порт WireGuard**  
   Выберите любой порт из предложенного диапазона.  

@@ -27,6 +27,8 @@ path_ssserver="$path_shadowsocks_rust/ssserver"
 path_ssservice="$path_shadowsocks_rust/ssservice"
 # - файл ssurl ( Shadowsocks-rust создание ссылок)
 path_ssurl="$path_shadowsocks_rust/ssurl"
+# - файл перевода
+path_translation_file="$path_shadowsocks_rust/translation"
 # - файл службы запуска shadowsocks-rust сервера
 path_service="/etc/systemd/system/ssserver.service"
 # - файл конфига shadowsocks-rust
@@ -39,7 +41,6 @@ path_sysctl_config="/etc/sysctl.d/99-ss-easy-breezy.conf"
 path_script="$path_shadowsocks_rust/ss-easy-breezy"
 # - место сохранения ссылки на этот скрипт
 path_script_link="/usr/bin/sseb"
-
 
 ## Шифр, поддерживаются следующие в порядке увеличения нагрузки на процессор:
 # -- chacha20-ietf-poly1305
@@ -80,23 +81,63 @@ echoerr () {
 }
 # - об ошибке с выходом из скрипта
 exiterr() {
-  echo -e "\033[1;31mОшибка: $1\033[0m" >&2
+  echo -e "\033[1;31m${W_ERROR}: $1\033[0m" >&2
   exit 1
 }
+ 
+# Функция загрузки локали
+load_translation() {
+  if [ ! -f "$path_translation_file" ]; then
+    echo -e "\nSelect language\n 1) English\n 2) Русский"
 
+    read -rp "Option: " option
+
+    until [[ "$option" =~ ^[1-2]$ ]]; do
+      echoerr "Incorrect option"
+      read -rp "Option: " option
+    done
+
+    locale translation
+    case "$option" in
+      1)
+        translation="en"
+      ;;
+      2)
+        translation="ru"
+      ;;
+      *)
+        translation="en"
+      ;;
+    esac
+
+    mkdir -p "$(dirname "$path_translation_file")"
+    touch "$path_translation_file"
+    
+    (
+      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation"
+        -o "$path_translation_file"
+      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/ss-easy-breezy/$translation" \
+        >> "$path_translation_file"
+    ) || exiterr "Error: 'curl translation'"
+  fi
+
+  source "$path_translation_file"
+}
 
 ## Функции проверок возможности установки:
 # - рут права
 check_root() {
   if [ "$(id -u)" != 0 ]; then
-    exiterr "Этот установщик должен быть запущен от имени root. Попробуйте 'sudo bash $0'"
+    exiterr "$W_ERROR_ROOT 'sudo bash $0'"
   fi
 }
 
 # - способ запуска скрипта через bash а не sh
 check_shell() {
   if readlink /proc/$$/exe | grep -q "dash"; then
-    exiterr 'Этот установщик необходимо запускать с помощью «bash», а не «sh».'
+    exiterr "$W_ERROR_BASH"
   fi
 }
 
@@ -109,31 +150,31 @@ check_os() {
     os="debian"
     os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
   else
-    exiterr "Этот установщик поддерживает только дистрибутивы Ubuntu и Debian!"
+    exiterr "$W_ERROR_DIST"
   fi
 }
 
 # - версия дистрибутива ОС
 check_os_ver() {
   if [[ "$os" == "ubuntu" && "$os_version" -lt 2404 ]]; then
-    exiterr "Для использования этого установщика требуется Ubuntu 24.04 или более поздняя версия."
+    exiterr "$W_ERROR_DIST_UBUNTU"
   fi
   if [[ "$os" == "debian" && "$os_version" -lt 12 ]]; then
-    exiterr "Для использования этого установщика требуется Debian 12 или более поздняя версия."
+    exiterr "$W_ERROR_DIST_DEBIAN"
   fi
 }
 
 # - поддержка версии ядра
 check_kernel() {
   if [[ $(uname -r | cut -d "." -f 1) -lt 6 ]]; then
-     exiterr "Для установки необходимо ядро ОС версии >=6"
+     exiterr "$W_ERROR_KERNEL"
   fi
 }
 
 # - среда работы ОС (запрет установки из контейнера, например докер)
 check_container() {
   if systemd-detect-virt -cq 2>/dev/null; then
-    exiterr "Установка внути контейнера не поддерживается данным установщиком."
+    exiterr "$W_ERROR_CONTAINER"
   fi
 }
 
@@ -142,19 +183,19 @@ check_container() {
 check_port() {
   # Проверка, является ли порт числом
   if ! [[ "$1" =~ ^[0-9]+$ ]]; then
-    echoerr "Порт должен быть числом"
+    echoerr "$W_PORT_MUST_NUMBER"
     return 1
   fi
 
   # Проверка диапазона порта (49152–65534)
   if [ "$1" -lt 49152 ] || [ "$1" -gt 65535 ]; then
-    echoerr "Порт должен быть в диапазоне от 49152 до 65535"
+    echoerr "$W_PORT_SHOULD_RANGE"
     return 1
   fi
 
   # Проверка, занят ли порт
   if lsof -i :"$1" >/dev/null ; then
-    echoerr "Порт $1 уже занят"
+    echoerr "$W_PORT_BUSY"
     return 1
   fi
 
@@ -165,7 +206,7 @@ check_port() {
 check_IPv4() {
   # Проверка на формат IPv4
   if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-    echoerr "Неверный формат IPv4: $1"
+    echoerr "$W_INCORRECT_FORMAT_IPV4"
     return 1
   fi
 
@@ -174,14 +215,14 @@ check_IPv4() {
   for octet in "${octets[@]}"; do
     # Проверка на ведущие нули (например, 01, 001)
     if [[ "$octet" != "0" && "$octet" =~ ^0 ]]; then
-      echoerr "Октет IPv4 с ведущим нулём недопустим: $octet"
+      echoerr "$W_INCORRECT_OCTET_IPV4"
       return 1
     fi
 
     # Преобразуем явно в десятичное значение и проверим диапазон
     dec_octet=$((10#$octet))
     if ((dec_octet < 0 || dec_octet > 255)); then
-      echoerr "Неверный диапазон октета IPv4: $octet"
+      echoerr "$W_WRONG_RANGE_OCTET_IPV4"
       return 1
     fi
   done
@@ -198,7 +239,7 @@ show_spinner() {
 
   while kill -0 "$pid" 2>/dev/null; do
     for i in $(seq 0 3); do
-      printf "\r[%c] Выполняем, ожидайте..." "${spinner:$i:1}"
+      printf "\r[%c] $W_PERFORM_WAIT" "${spinner:$i:1}"
       sleep "$delay"
     done
   done
@@ -217,10 +258,10 @@ wait_for_apt_unlock() {
 
   while pgrep -x apt >/dev/null || pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null; do
     sleep 1
-    [ "$waited" = 0 ] && echomsg "Ожидание завершения процессов apt/dpkg..." 1
+    [ "$waited" = 0 ] && echomsg "$W_APT_WAITING" 1
     ((waited++))
     if (( waited >= timeout )); then
-      exiterr "Превышено время ожидания ($timeout сек)."
+      exiterr "$W_EXCEEDING_WAIT_TIME ($timeout сек)."
       return 1
     fi
   done
@@ -229,25 +270,23 @@ wait_for_apt_unlock() {
 install_pkgs(){
   wait_for_apt_unlock
 
-  echomsg "Обновление пакетов и установка зависимостей" 1
+  echomsg "$W_PKG_UPDATING_AND_ISTALL_DEPENDC" 1
   (
     (
-      apt-get -yqq update > /dev/null 2>&1 || apt-get -yqq update
-    ) > /dev/null 2>&1 || exiterr "'apt-get update' ошибка."
+      apt-get -yqq update || apt-get -yqq update
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get update'"
     (
-      apt-get -yqq upgrade > /dev/null 2>&1 || apt-get -yqq upgrade
-    ) > /dev/null 2>&1 || exiterr "'apt-get upgrade' ошибка."
+      apt-get -yqq upgrade || apt-get -yqq upgrade
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get upgrade'"
     (
       apt-get -yqq install iproute2 iptables curl tar xz-utils lsof dnsutils grep nano htop \
       || apt-get -yqq install iproute2 iptables curl tar xz-utils lsof dnsutils grep nano htop
-    ) > /dev/null 2>&1 || exiterr "'apt-get install' ошибка."
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get install'"
   ) & show_spinner $!
-
-  echook "Пакеты обновлены, зависимости установлены"
 }
 
 download_shadowsocks_rust(){
-  echomsg "Загрузка shadowsocks-rust $version" 1
+  echomsg "$W_DOWNLOAD shadowsocks-rust $version" 1
 
   mkdir -p "$path_shadowsocks_rust"
 
@@ -257,13 +296,11 @@ download_shadowsocks_rust(){
       "https://github.com/shadowsocks/shadowsocks-rust/releases/download/${version}/shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz" && \
     tar -xf "shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz" -C "$path_shadowsocks_rust/" && \
     rm -r "shadowsocks-${version}.x86_64-unknown-linux-gnu.tar.xz"
-  ) > /dev/null 2>&1 || exiterr "Ошибка загрузки shadowsocks-rust"
-
-  echook "shadowsocks-rust $version загружен"
+  ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'curl shadowsocks-rust'"
 }
 
 create_sysctl_config (){
-  echomsg "Создание конфига sysctl по пути $path_sysctl_config" 1
+  echomsg "$W_CREATING_NETWORK_SETTINGS" 1
 
   # Создать дирректорию если нет
   mkdir -p "$(dirname "$path_sysctl_config")"
@@ -271,7 +308,7 @@ create_sysctl_config (){
   # Загружаем конфиг
   link_sysctl_config="https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf"
   curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "$link_sysctl_config" \
-      -o "$path_sysctl_config" > /dev/null 2>&1 || exiterr "Ошибка загрузки sysctl конфига"
+      -o "$path_sysctl_config" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'curl sysctl.conf'"
 
   # Включение TCP BBR контроля перегрузки, если не удачно, то пробуем hybla
   if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
@@ -287,23 +324,20 @@ create_sysctl_config (){
 
   # Применяем полученный конфиг
   sysctl -e -q -p "$path_sysctl_config"
-
-  echook "Конфиг sysctl создан и применен"
 }
 
 input_port(){
   while true; do
-    echomsg "Введите порт shadowsocks (от 49152 до 65535)" 1
+    echomsg "$W_INPUT_PORT" 1
     read -rp " > " port
     if check_port "$port"; then
-      echook "Порт $port принят"
       break
     fi
   done
 }
 
 create_config() {
-  echomsg "Формируем конфиг shadowsocks-rust сервера" 1
+  echomsg "$W_CREATE_CONFIG" 1
 
   mkdir -p "$(dirname "$path_config")"
 
@@ -313,11 +347,13 @@ create_config() {
     echo "{"
     echo "  \"server\": \"::\","
     echo "  \"server_port\": $port,"
-    echo "  \"mode\": \"tcp_only\","
+    echo "  \"mode\": \"tcp_and_udp\","
     echo "  \"method\": \"$encrypt_method\","
     echo "  \"password\": \"$password\","
     echo "  \"keep_alive\": 25,"
     echo "  \"timeout\": 300,"
+    echo "  \"udp_timeout\": 300,"
+    echo "  \"udp_max_associations\": 512,"
     echo "  \"nofile\": 51200,"
     echo "  \"fast_open\": true,"
     echo "  \"no_delay\": true"
@@ -337,9 +373,9 @@ create_config() {
   # Проверка формата
   if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
     public_ip=""
-    echoerr "Не удалось определить публичный IP"
+    echoerr "$W_FAILED_DETERMINE_PUBLIC_IP"
     while true; do
-      echomsg "Введите публичный IPv4 ардес этого сервера" 1
+      echomsg "$W_ENTER_IPV4_THIS_SERVER" 1
       read -rp " > " public_ip
 
       if check_IPv4 "$public_ip"; then
@@ -356,12 +392,10 @@ create_config() {
     echo "  \"password\": \"$password\""
     echo "}"
   } > "$path_client_for_url_config"
-
-  echook "Конфиг создан"
 }
 
 create_service(){
-  echomsg "Создаём systemd службу" 1
+  echomsg "$W_CREATING_SYSTEMD_SERVICE" 1
 
   # Путь к iptables
   local iptables_path
@@ -395,71 +429,68 @@ create_service(){
     echo "[Install]"
     echo "WantedBy=multi-user.target"
   } > "$path_service"
-
-  echook "Служба создана"
 }
 
 add_user(){
-  echomsg "Добавляем пользователя 'shadowsocks' для запуска сервиса" 1
+  echomsg "$W_ADD_USER 'shadowsocks'" 1
   useradd --system --home-dir /nonexistent --no-create-home \
   --shell /usr/sbin/nologin shadowsocks >/dev/null 2>&1 \
-  || exiterr "Ошибка при создании пользователя"
-  echook "Пользователь добавлен"
+  || exiterr "${W_ERROR}: 'useradd shadowsocks'"
 }
 
 activate_ssserver(){
-  echomsg "Активируем и запускаем ssserver службу" 1
+  echomsg "$W_LAUNCH_SERVICE" 1
   systemctl daemon-reload >/dev/null 2>&1
   systemctl enable --now ssserver >/dev/null 2>&1
   if systemctl is-active --quiet ssserver; then
-    echook "shadowsocks-rust сервер запущен!"
+    echook "$W_SERVICE_SUCCESS_LAUNCH"
   else
-    echoerr "Ошибка запуска shadowsocks-rust!"
+    echoerr "$W_LAUNCH_SERVICE_FAILED"
   fi
 }
 
 press_any_side_to_open_menu() {
-  echomsg "\n------------------------------------------------"
-  read -n1 -r -p "Нажмите любую клавишу, чтобы открыть меню..."
+  echomsg "------------------------------------------------"
+  read -n1 -r -p "$W_PRESS_ANY_KEY_TO_OPEN_MENU"
   select_menu_option
 }
 
 switch_active_service(){
   systemctl daemon-reload >/dev/null 2>&1
   if systemctl is-active --quiet ssserver; then
-    echomsg "Останавливаем службу" 1
+    echomsg "$W_STOP_SERVICE" 1
     { systemctl stop ssserver && systemctl disable ssserver; } >/dev/null 2>&1
     if systemctl is-active --quiet ssserver; then
-      echoerr "Ошибка остановки!"
+      echoerr "$W_SERVICE_STOP_FAILED"
     else
-      echook "Служба успешно остановлена!"
+      echook "$W_SERVICE_SUCCESS_STOPPED"
     fi
   else
-    echomsg "Запускаем службу" 1
+    echomsg "$W_LAUNCH_SERVICE" 1
     systemctl enable --now ssserver >/dev/null 2>&1
     if systemctl is-active --quiet ssserver; then
-      echook "Служба успешно запущена!"
+      echook "$W_SERVICE_SUCCESS_LAUNCH"
     else
-      echoerr "Ошибка запуска!"
+      echoerr "$W_LAUNCH_SERVICE_FAILED"
     fi
   fi
   press_any_side_to_open_menu
 }
 
 reload_service(){
-  echomsg "Перезапускаем службу" 1
+  echomsg "$W_RESTART_SERVICE" 1
   systemctl daemon-reload >/dev/null 2>&1
   systemctl reload ssserver >/dev/null 2>&1
   if systemctl is-active --quiet ssserver; then
-    echook "Служба успешно перезапущена!"
+    echook "$W_SERVICE_SUCCESS_RESTARTED"
   else
-    echoerr "Ошибка перезапуска!"
+    echoerr "$W_ERROR_RESTART_SERVICE"
   fi
   press_any_side_to_open_menu
 }
 
 show_connect_link() {
-  echo -e "\nСсылка для подключения:"
+  echo -e "\n$W_LINK_CONNECTION:"
   echo -e "\033[0;36m$("$path_ssurl" --encode "$path_client_for_url_config")\033[0m"
   press_any_side_to_open_menu
 }
@@ -474,18 +505,10 @@ show_journalctl_log() {
   press_any_side_to_open_menu
 }
 
-remove_shadowsocks_rust(){
-  echo
-  read -rp "Подтвердите удаление [y/N]: " remove
-  until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
-    echo "Неверная опция"
-    read -rp "Подтвердите удаление [y/N]: " remove
-  done
-
-  if [[ "$remove" =~ ^[yYдД]$ ]]; then
-    echomsg "Удаление shadowsocks-rust файлов" 1
-    systemctl stop ssserver >/dev/null 2>&1
-    systemctl disable ssserver >/dev/null 2>&1
+remove_shadowsocks_rust() {
+  (
+    systemctl stop ssserver
+    systemctl disable ssserver
     rm -f "$path_config"
     rm -f "$path_service"
     rm -f "$path_sysctl_config" 
@@ -494,7 +517,21 @@ remove_shadowsocks_rust(){
     rm -rf "$path_shadowsocks_rust"
     systemctl daemon-reload
     userdel shadowsocks
-    echook "shadowsocks-rust успешно удален из системы!"
+  ) >/dev/null 2>&1
+}
+
+accept_remove_shadowsocks_rust() {
+  echo
+  read -rp "$W_DELETE_APP [y/N]: " remove
+  until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
+    echo "$W_INCORRECT_OPTION"
+    read -rp "$W_DELETE_APP [y/N]: " remove
+  done
+
+  if [[ "$remove" =~ ^[yYдД]$ ]]; then
+    echomsg "$W_DELETE_PROGRAM" 1
+    remove_shadowsocks_rust
+    echook "$W_DELETE_PROGRAM_OK"
     exit 0
   else
     select_menu_option
@@ -502,6 +539,25 @@ remove_shadowsocks_rust(){
 }
 
 install_ssserver(){
+  clear
+  check_root
+  check_shell
+  check_kernel
+  check_os
+  check_os_ver
+  check_container
+  show_header
+  read -n1 -r -p "$W_PRESS_ANY_KEY_TO_INSTALL"
+
+  if [[ -f "$path_translation_file" ]]; then
+    cp "$path_translation_file" /opt/.translation.tmp
+  fi
+  remove_shadowsocks_rust
+  if [[ -f "/opt/.translation.tmp" ]]; then
+    mkdir -p "$(dirname "$path_translation_file")"
+    mv /opt/.translation.tmp "$path_translation_file"
+  fi
+
   install_pkgs
   input_port
   download_shadowsocks_rust
@@ -516,41 +572,34 @@ install_ssserver(){
   chmod +x "$path_script"
   ln -s "$path_script" "$path_script_link"
 
-  echo
-  echo -e "\033[1;32m🎉 shadowsocks-rust сервер установлен!\033[0m"
+  echo -e "\n\033[1;32m$W_INSTALL_COMPLETED\033[0m"
   show_connect_link
 }
 
 select_menu_option() {
   clear
   local menu
-  local select_option="Меню опций:"
+  menu+="shadowsocks-rust server $version\n"
 
   show_header
   if systemctl is-active --quiet ssserver; then
-    menu+="shadowsocks-rust server $version\n"
-    menu+="🟢 Служба активна\n"
-    menu+="\n$select_option\n"
-    menu+=" 1) ❌ Остановить\n"
+    menu+="$W_ACTIVE_SERVICE\n"
+    menu+="$W_SELECT_OPTION\n"
+    menu+="$W_STOP\n"
   else
-    menu+="🔴 Служба не активна\n"
-    menu+="\n$select_option\n"
-    menu+=" 1) 🚀 Запустить\n"
+    menu+="$W_SERVICE_NOT_ACTIVE\n"
+    menu+="$W_SELECT_OPTION\n"
+    menu+="$W_LAUNCH\n"
   fi
 
-  menu+=" 2) 🌀 Перезапустить\n"
-  menu+=" 3) 🧿 Статус службы\n"
-  menu+=" 4) 🔗 Ссылка подключения\n"
-  menu+=" 5) 📜 Последние логи\n"
-  menu+=" 6) 🪣 Удаление программы\n"
-  menu+=" 7) 🚪 Выход из меню (Ctrl+C)"
-
+  menu+="$W_MAIN_MENU"
+  
   echo -e "$menu"
 
-  read -rp "Опция: " option
+  read -rp "$W_CHOICE: " option
   until [[ "$option" =~ ^[1-7]$ ]]; do
-    echoerr "Неверная опция"
-    read -rp "Опция: " option
+    echoerr "$W_INCORRECT_OPTION"
+    read -rp "$W_CHOICE: " option
   done
 
   [[ "$option" =~ ^[1-7]$ ]] && clear
@@ -572,7 +621,7 @@ select_menu_option() {
       show_journalctl_log
     ;;
     6)
-      remove_shadowsocks_rust
+      accept_remove_shadowsocks_rust
     ;;
     7)
       exit 0
@@ -580,17 +629,11 @@ select_menu_option() {
   esac
 }
 
-if [[ -f "$path_ssserver" && -f "$path_service" ]]; then
+# Загружаем локаль
+load_translation
+
+if [[ -f "$path_script" ]]; then
   select_menu_option
 else
-  clear
-  check_root
-  check_shell
-  check_kernel
-  check_os
-  check_os_ver
-  check_container
-  show_header
-  read -n1 -r -p "Нажмите любую клавишу, чтобы начать установку..."
   install_ssserver
 fi

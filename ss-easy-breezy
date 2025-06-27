@@ -274,6 +274,9 @@ install_pkgs(){
   echomsg "$W_PKG_UPDATING_AND_ISTALL_DEPENDC" 1
   (
     (
+      dpkg --configure -a || dpkg --configure -a
+    ) > /dev/null 2>&1 || || exiterr "${W_ERROR}: 'dpkg --configure -a'"
+    (
       apt-get -yqq update || apt-get -yqq update
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get update'"
     (

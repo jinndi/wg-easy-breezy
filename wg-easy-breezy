@@ -601,7 +601,6 @@ input_domain() {
     # Проверка на пустой ввод
     if [ -z "$host" ]; then
       host=$(get_public_ip)
-      echook "Используем IPv4: $host"
       break
     else
       # преобразуем в punycode (на случай кириллицы) с нижним регистром

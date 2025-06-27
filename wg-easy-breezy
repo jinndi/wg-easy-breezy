@@ -1356,7 +1356,7 @@ remove_wg_service() {
 
     if [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]]; then
       # volume том
-      echo "$W_DELETE_WG_SETTINGS"
+      echo -e "$W_DELETE_WG_SETTINGS"
       local msg
       msg="[y/N]: "
       read -rp "$msg" remove_volume

@@ -63,7 +63,8 @@ Follow the on-screen instructions. You will be prompted to enter the following:
   ```
   curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
   ```
-  Installation directory: `/opt/shasowsocks-rust/`Add commentMore actions
+  Installation directory: `/opt/shasowsocks-rust/`
+  
   The installed server is managed using the `sseb` command
 
 - **WireGuard port**  

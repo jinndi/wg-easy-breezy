@@ -5,10 +5,9 @@
 ![GitHub License](https://img.shields.io/github/license/jinndi/wg-easy-breezy)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/jinndi/wg-easy-breezy/docker-publish.yml)
 
+Развёртывание и управление контейнерами wg-easy с использованием Podman, включая маршрутизацию трафика через прокси Shadowsocks и настройку веб-сервера Caddy в роли реверс-прокси с автоматическим продлением SSL-сертификатов
+
 ![EN](https://github.com/jinndi/wg-easy-breezy/blob/main/README.md)
-
-### Развертывание wg-easy / wg-easy через tun2socks прокси shasowsocks / caddy реверс прокси
-
 
 ## Особенности:
 

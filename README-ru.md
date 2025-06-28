@@ -1,4 +1,9 @@
 # WG-EASY-BREEZY
+![GitHub Release](https://img.shields.io/github/v/release/jinndi/wg-easy-breezy)
+![GitHub commits since latest release](https://img.shields.io/github/commits-since/jinndi/wg-easy-breezy/latest)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/jinndi/wg-easy-breezy)
+![GitHub License](https://img.shields.io/github/license/jinndi/wg-easy-breezy)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/jinndi/wg-easy-breezy/docker-publish.yml)
 
 ![EN](https://github.com/jinndi/wg-easy-breezy/blob/main/README.md)
 

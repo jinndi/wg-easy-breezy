@@ -7,8 +7,10 @@ LABEL org.opencontainers.image.title="wg-easy-breezy" \
 # https://github.com/xjasonlyu/tun2socks/releases
 ARG TUN2SOCKS_RELEASE="v2.6.0"
 
-RUN apk add --no-cache curl unzip bash nano dumb-init
-RUN apk --update upgrade --no-cache
+RUN apk update && \
+    apk upgrade --no-cache && \
+    apk add --no-cache curl unzip bash nano dumb-init && \
+    rm -rf /var/cache/apk/*
 
 WORKDIR /app
 
@@ -20,7 +22,6 @@ RUN curl -L https://github.com/xjasonlyu/tun2socks/releases/download/${TUN2SOCKS
 RUN mkdir -p /etc/iproute2 && echo "20 lip" >> /etc/iproute2/rt_tables
 
 COPY ./sysctl.conf /etc/sysctl.conf
-
 COPY ./start.sh start.sh
 RUN chmod a+x start.sh
 

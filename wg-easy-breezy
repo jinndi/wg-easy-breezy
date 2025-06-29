@@ -7,100 +7,61 @@
 # Released under the MIT License, see the accompanying file LICENSE
 # or https://opensource.org/licenses/MIT
 
-## Неинтерактивный режим установки APT
 export DEBIAN_FRONTEND=noninteractive
-export DEBCONF_NONINTERACTIVE_SEEN=true
-
-## Пути исполняемых файлов
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-## Пути файлов:
-# - папка в которую будет произведена установка
+## File paths:
 path_data_dir="/opt/wg-easy-breezy"
-# - файл текущего скрипта
 path_script="$path_data_dir/wg-easy-breezy"
-# - ссылка на файл текущего скрипта
 path_script_link="/usr/bin/wgeb"
-# - файл перевода
 path_translation_file="$path_data_dir/translation"
-# - файл docker compose (podman-compose) настройки сервисов
 path_docker_compose_file="$path_data_dir/services.yml"
-# - файл переменных окружения .env
 path_env_file="$path_data_dir/.env"
-# - ссылка на файл systemd unit службы
 path_systemd_unit_file="/etc/systemd/system/wg-easy-breezy.service"
-# - файл настройки Caddy сервера
 path_caddyfile="$path_data_dir/Caddyfile"
-# - файл скрипта c сетевыми правилами iptables на запуск wg-easy-breezy
 path_iptables_apply_script="$path_data_dir/iptables/apply.sh"
-# - файл скрипта для удаления ранее созданных iptables правил
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
-# - расположение файла конфига sysctl параметров
 path_sysctl_config="$path_data_dir/sysctl.conf"
-# - ссылка на файл конфига sysctl (path_sysctl_config)
 path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
-# - папка uv https://astral.sh
 path_uv_dir="$path_data_dir/astral"
-# - файл переменных окружения uv
 path_uv_env_file="$path_uv_dir/.env"
-# - исполняемый файл uvx (Running tools uv)
 path_uvx="$path_uv_dir/uvx"
 
-# Ссылка на образ wg-easy
+## Links to podman images:
 wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:latest"
-
-# Ссылка на образ caddy сервера
 caddy_image="docker.io/library/caddy:2.10-alpine"
 
-# Префикс к именам podman сервисов, сети, томов, url веб-интерфейсов
+## Prefix for podman service names, networks, volumes, web interface URLs
 service_prefix="wgeb"
 
-## Объявление переменных задаваемых в процессе работы скрипта:
-# - ярлык имени службы, сети, томов, url веб-интерфейсов
+## Declaration of variables defined during the script execution:
 service_tag=""
-# - доменное имя либо IP-адрес хоста
 host=""
-# - e-mail адрес необходимый для получения SSL сертификата домена
 email=""
-# - ссылка (SIP002 URI scheme) для подключения к shadowsocks серверу
 ss_link=""
-# - tcp порт доступа к UI интерфейсу wg-easy
 port_ui=""
-# - udp порт WireGuard
 port_wg=""
-# - диапазон IP-адресов клиентов WireGuard
 address=""
-# - ссылка на UI интерфейс wg-easy
 link_ui=""
-# - указал ли пользователя адрес домена
 is_domain=""
-# - режим установки
-# -- main - wg-easy базовый
-# -- proxy - wg-easy -> прокси shasowsocks
 install_mode=""
 
-# Функция загрузки переменных wg-easy из .env (если он существует)
 load_env() {
   if [ -f "$path_env_file" ]; then
     set -o allexport
-    # shellcheck disable=SC1090
     source "$path_env_file"
     set +o allexport
   fi
 }
 
-# Функция загрузки переменных uv из .env (если он существует)
 load_uv_env() {
   if [ -f "$path_uv_env_file" ]; then
     set -o allexport
-    # shellcheck disable=SC1090
     source "$path_uv_env_file"
     set +o allexport
   fi
 }
 
-## Функции вывода сообщений:
-# - шапка установщика
 show_header() {
 echo -e "\033[1;35m"
 cat <<EOF
@@ -111,28 +72,28 @@ cat <<EOF
 EOF
 echo -e "\033[0m"
 }
-# - стандартное
+
 echomsg() {
   if [ -n "$2" ]; then
     echo
   fi
   echo -e "\033[1;34m$1\033[0m"
 }
-# - об успехе
+
 echook() {
   echo -e "\033[1;32m$1\033[0m"
 }
-# - об ошибке
+
 echoerr () {
   echo -e "\033[1;31m$1\033[0m"
 }
-# - об ошибке с выходом из скрипта
+
 exiterr() {
   echo -e "\033[1;31m${W_ERROR}: $1\033[0m" >&2
   exit 1
 }
 
-# Функция загрузки локали
+
 load_translation() {
   if [ ! -f "$path_translation_file" ]; then
     echo -e "\nSelect language\n 1) English\n 2) Русский"
@@ -176,22 +137,18 @@ load_translation() {
   source "$path_translation_file"
 }
 
-## Функции проверок возможности установки:
-# - рут права
 check_root() {
   if [ "$(id -u)" != 0 ]; then
     exiterr "$W_ERROR_ROOT 'sudo bash $0'"
   fi
 }
 
-# - способ запуска скрипта через bash а не sh
 check_shell() {
   if readlink /proc/$$/exe | grep -q "dash"; then
     exiterr "$W_ERROR_BASH"
   fi
 }
 
-# - вид дистрибутива ОС
 check_os() {
   if grep -qs "ubuntu" /etc/os-release; then
     os="ubuntu"
@@ -204,7 +161,6 @@ check_os() {
   fi
 }
 
-# - версия дистрибутива ОС
 check_os_ver() {
   if [[ "$os" == "ubuntu" && "$os_version" -lt 2404 ]]; then
     exiterr "$W_ERROR_DIST_UBUNTU"
@@ -214,21 +170,18 @@ check_os_ver() {
   fi
 }
 
-# - поддержка версии ядра
 check_kernel() {
   if [[ $(uname -r | cut -d "." -f 1) -lt 6 ]]; then
      exiterr "$W_ERROR_KERNEL"
   fi
 }
 
-# - среда работы ОС (запрет установки из контейнера, например докер)
 check_container() {
   if systemd-detect-virt -cq 2>/dev/null; then
     exiterr "$W_ERROR_CONTAINER"
   fi
 }
-    
-# Функция удаления предыдущих установок (без докера)
+
 remove_install() {
   local is_show_info
   is_show_info="$1"
@@ -237,38 +190,31 @@ remove_install() {
     echomsg "$W_DELETE_PROGRAM" 1
   fi
 
-  # Остановка сервисов
   systemctl disable --now wg-easy-breezy > /dev/null 2>&1
   if [[ -e "$path_docker_compose_file" ]]; then
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 > /dev/null 2>&1
   fi
 
-  # Удаление образов
   podman rmi "$wg_easy_image" > /dev/null 2>&1
   podman rmi "$caddy_image" > /dev/null 2>&1
 
-  # Деактивация ранее заданных iptables правил 
   if [[ -f "$path_iptables_delete_script" ]]; then
     bash "$path_iptables_delete_script" > /dev/null 2>&1
   fi
 
-  # Удаление ссылки на скрипт управления
   if [[ -L "$path_script_link" ]]; then
     rm -f "$path_script_link"
   fi
 
-  # Удаление ссылки на sysctl конфиг с применением изменений
   if [[ -L "$path_sysctl_config_link" ]]; then
     rm -f "$path_sysctl_config_link"
     sysctl --system > /dev/null 2>&1
   fi
   
-  # Удаление папки данных
   if [[ -d "$path_data_dir" ]]; then
     rm -rf "$path_data_dir"
   fi
 
-  # Удаление файла systemd службы
   if [[ -f "$path_systemd_unit_file" ]]; then
     rm -f "$path_systemd_unit_file"
     systemctl daemon-reload
@@ -279,12 +225,11 @@ remove_install() {
   fi
 }
 
-# Функция анимации ожидания
 show_spinner() {
   local pid=$1
   local delay=0.1
   local spinner="|/-\\"
-  tput civis  # скрыть курсор
+  tput civis
 
   while kill -0 "$pid" 2>/dev/null; do
     for i in $(seq 0 3); do
@@ -295,12 +240,11 @@ show_spinner() {
 
   wait "$pid"
   local status=$?
-  tput cnorm  # вернуть курсор
+  tput cnorm
   echo
   return $status
 }
 
-# Функция ожидания разблокировки apt/dpkg
 wait_for_apt_unlock() {
   local timeout=300
   local waited=0
@@ -316,7 +260,6 @@ wait_for_apt_unlock() {
   done
 }
 
-# Функция установки необходимых пакетов программ
 install_pkgs() {
   wait_for_apt_unlock
 
@@ -356,7 +299,6 @@ install_pkgs() {
       echo "UV_CACHE_DIR='$path_uv_dir/cache'"
     } > "$path_uv_env_file"
 
-    # Загружаем с экспортом переменные окружения uv
     load_uv_env
 
     # python-build-standalone https://docs.astral.sh/uv/guides/install-python/
@@ -379,7 +321,7 @@ install_pkgs() {
       chmod +x /usr/local/bin/yq
     fi
 
-    # конфиг podman containers, изменение сетевого бэкэнда на netavark
+    # Podman containers configuration, changing the network backend to netavark
     # https://docs.oracle.com/en/operating-systems/oracle-linux/podman/podman-ConfiguringNetworkingforPodman.html#topic_owf_d4t_t5b
     mkdir -p /etc/containers/
     if [[ ! -f /etc/containers/containers.conf ]] && [[ -f /usr/share/containers/containers.conf ]]; then
@@ -401,21 +343,15 @@ install_pkgs() {
       fi
     fi
 
-    # Спуллить образ wg-easy
     podman pull "$wg_easy_image" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'podman pull $wg_easy_image'"
 
   ) & show_spinner $!
 }
 
-
-## Фунции проверок введенных данных пользователем:
-
-# - тег
 check_tag() {
   local tag="$1"
   local service_name="${service_prefix}-${tag}"
 
-  # Если строка не содержит только латиницу, цифры, тире (-)
   if [[ ! "$tag" =~ ^[A-Za-z0-9-]{1,16}$ ]]; then
     echoerr "$W_TAG_NOT_REQUIREMENTS"
     return 1
@@ -431,9 +367,7 @@ check_tag() {
   return 0
 }
 
-# - имя домена
 check_domain() {
-  # Если строка не является доменом
   if [[ ! "$1" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
     echoerr "$W_INCORRECT_DOMAIN"
     is_domain=""
@@ -443,24 +377,19 @@ check_domain() {
   return 0
 }
 
-# - IPv4 адрес
 check_IPv4() {
-  # Проверка на формат IPv4
   if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
     echoerr "$W_INCORRECT_FORMAT_IPV4"
     return 1
   fi
 
-  # Проверка на диапазон для каждого октета IP
   IFS='.' read -r -a octets <<< "$1"
   for octet in "${octets[@]}"; do
-    # Проверка на ведущие нули (например, 01, 001)
     if [[ "$octet" != "0" && "$octet" =~ ^0 ]]; then
       echoerr "$W_INCORRECT_OCTET_IPV4"
       return 1
     fi
 
-    # Преобразуем явно в десятичное значение и проверим диапазон
     dec_octet=$((10#$octet))
     if ((dec_octet < 0 || dec_octet > 255)); then
       echoerr "$W_WRONG_RANGE_OCTET_IPV4"
@@ -471,9 +400,7 @@ check_IPv4() {
   return 0
 }
 
-# - e-mail адрес
 check_email() {
-  # Если строка не является доменом
   if [[ ! "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
     echoerr "$W_INCORRECT_EMAIL"
     return 1
@@ -482,27 +409,22 @@ check_email() {
   return 0
 }
 
-# - пароль
 check_password() {
-  # Проверка на пустой ввод
   if [ -z "$1" ]; then
     echoerr "$W_PASSWORD_CANNOT_BE_EMPTY"
     return 1
   fi
 
-  # Проверка длины пароля (минимум 6 символов)
   if [ "${#1}" -lt 6 ]; then
     echoerr "$W_PASSWORD_SHORT"
     return 1
   fi
 
-  # Проверка наличия хотя бы одной буквы
   if ! echo "$1" | grep -q '[a-zA-Z]'; then
     echoerr "$W_PASSWORD_ONE_LETTER"
     return 1
   fi
 
-  # Проверка наличия хотя бы одной цифры
   if ! echo "$1" | grep -q '[0-9]'; then
     echoerr "$W_PASSWORD_ONE_DIGIT"
     return 1
@@ -515,25 +437,21 @@ check_password() {
 check_port() {
   local port="$1"
 
-  # Проверка, является ли порт числом
   if ! [[ "$port" =~ ^[0-9]+$ ]]; then
     echoerr "$W_PORT_MUST_NUMBER"
     return 1
   fi
 
-  # Проверка диапазона порта (49152–65534)
   if [ "$port" -lt 49152 ] || [ "$port" -gt 65534 ]; then
     echoerr "$W_PORT_SHOULD_RANGE"
     return 1
   fi
 
-  # Проверка, занят ли порт в данный момент
   if lsof -i :"$port" >/dev/null ; then
     echoerr "$W_PORT_BUSY"
     return 1
   fi
 
-  # Проверка не записан ли порт уже в services.yml
   if [[ -f "$path_docker_compose_file" ]]; then
     yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
       if [[ "$service" == "${service_prefix}-"* ]]; then
@@ -551,22 +469,17 @@ check_port() {
   return 0
 }
 
-# Функция получени IP сервера
 get_public_ip() {
   local public_ip
 
-  # ip route (локальный интерфейс)
   public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
 
-  # через dig
   [ -z "$public_ip" ] && command -v dig >/dev/null && \
     public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
 
-  # Через curl
   [ -z "$public_ip" ] && command -v curl >/dev/null && \
     public_ip=$(curl -s https://api.ipify.org)
 
-  # Проверка
   if ! check_IPv4 "$public_ip"; then
     echoerr "$W_FAILED_DETERMINE_PUBLIC_IP"
 
@@ -580,10 +493,6 @@ get_public_ip() {
   echo "$public_ip"
 }
 
-
-## Функции ввода:
-
-# - ярлык для добавляемой службы (полное имя service_prefix-service_tag)
 input_tag() {
   while true; do
     echomsg "$W_INPUT_TAG" 1
@@ -595,27 +504,22 @@ input_tag() {
   done
 }
 
-# - имя домена (либо IPv4 если нет)
 input_domain() {
   while true; do
     echomsg "$W_INPUT_DOMAIN" 1
     read -rp " > " host
-    
-    # Проверка на пустой ввод
+
     if [ -z "$host" ]; then
       host=$(get_public_ip)
       break
     else
-      # преобразуем в punycode (на случай кириллицы) с нижним регистром
       host=$(idn "$host" | tr '[:upper:]' '[:lower:]')
-      # проверка имени
       if check_domain "$host"; then
         break
       fi
     fi
   done
 
-  # заменяем/добавляем значение в .env
   if grep -q '^WG_HOST=' "$path_env_file"; then
     sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file"
   else
@@ -623,22 +527,18 @@ input_domain() {
   fi
 }
 
-# - e-mail для полученя SSL сертификата домена
 input_email() {
   [[ "$is_domain" ]] || return
 
   while true; do
     echomsg "$W_INPUT_EMAIL" 1
     read -rp " > " email
-
-    # Проверка ввода
     if check_email "$email"; then
       break
     fi
   done
 }
 
-# - ссылка на подключение к shadowsocks (SIP002 URI scheme)
 input_ss_link() {
   [[ "$install_mode" = "main" ]] && return
 
@@ -648,34 +548,27 @@ input_ss_link() {
     echomsg "$W_INPUT_SS_LINK" 1
     read -rp " > " ss_link
     
-    # Проверка на пустой ввод
     if [ -z "$ss_link" ]; then
       break
     fi
 
-    # Добавляем префикс ss://, если его нет
     [[ "$ss_link" != ss://* ]] && ss_link="ss://${ss_link}"
 
-    # Удаляем префикс
     ss_clean="${ss_link#ss://}"
-
-    # Извлекаем base64, IP и порт
     base64_part="${ss_clean%@*}"
     ip_port_part="${ss_clean#*@}"
     public_ip="${ip_port_part%%:*}"
     port="${ip_port_part##*:}"
 
-    # Декодируем base64 строку
     if ! decoded=$(echo "$base64_part" | openssl base64 -d 2>/dev/null); then
       echoerr "$W_FAILED_DECODE_BASE64"
       continue
     fi
 
-    # Получаем и проверяем метод шифра 
     method="${decoded%%:*}"
     case "$method" in
       chacha20-ietf-poly1305|aes-128-gcm|aes-256-gcm)
-        # Всё ок
+        # Everything is okay
         ;;
       *)
         echoerr "$W_UNACCEPTABLE_ENCRYPT_METHOD"
@@ -683,9 +576,7 @@ input_ss_link() {
         ;;
     esac
 
-    # Проверка IPv4
     if check_IPv4 "$public_ip"; then
-      # Проверка порта
       if ! [[ "$port" =~ ^[0-9]+$ ]] || (( port < 49152 || port > 65535 )); then
         echoerr "$W_PORT_OUTSIDE_RANGE"
         continue
@@ -695,23 +586,19 @@ input_ss_link() {
   done
 }
 
-# - порт WireGuard сервера, и UI интерфейса
 input_port() {
   while true; do
     echomsg "$W_INPUT_PORT" 1
     read -rp " > " port_wg
 
-    # Увеличиваем порт на 1 (для UI интерфейса)
     port_ui=$((port_wg + 1))
 
-    # Проверка портов
     if check_port "$port_wg" && check_port "$port_ui"; then
       break
     fi
   done
 }
 
-# - диапазон адресов для клиентов WireGuard
 input_address() {
   local default_value="10.0.0.x"
 
@@ -720,7 +607,6 @@ input_address() {
     read -r -e -i "$default_value" address
     address=${address:-$default_value}
 
-    # Проверка на конфликты
     if [[ -f "$path_docker_compose_file" ]]; then
       local conflict=0
       while read -r service; do
@@ -741,28 +627,23 @@ input_address() {
       fi
 
       if [[ "$conflict" -eq 1 ]]; then
-        continue  # вернуться к началу ввода
+        continue
       fi
     fi
 
-    break  # адрес уникален
+    break
   done
 }
 
-
-# - пароль для входа в UI wg-easy
 input_password() {
   local output_wgpw password password_hash
 
   while true; do
     echomsg "$W_INPUT_PASSWORD" 1
     read -rsp " > " password
-    
-    # Проверка и обработка пароля
+
     if check_password "$password"; then
-      # Запрашиваем хеша пароля
       output_wgpw=$(podman run --rm -it $wg_easy_image wgpw "$password")
-      # Извлекаем и экранируем хеш пароля
       password_hash=$(echo "$output_wgpw" | tr -d '\r\n')
       if grep -q '^PASSWORD_HASH=' "$path_env_file"; then
         sed -i "s|^PASSWORD_HASH=.*|$password_hash|" "$path_env_file"
@@ -776,7 +657,6 @@ input_password() {
   done
 }
 
-# Функция поиска оптимального MTU WireGuard
 find_optimal_wg_mtu() {
   local target=8.8.8.8
   local low=1300
@@ -788,7 +668,7 @@ find_optimal_wg_mtu() {
 
   while (( low <= high )); do
     local mid=$(((low + high) / 2))
-    local size=$((mid - 28))  # 20 байт IP + 8 байт ICMP
+    local size=$((mid - 28))  # 20 bytes IP + 8 bytes ICMP
 
     if ping -c1 -W1 -M "do" -s "$size" "$target" &>/dev/null; then
       last_good=$mid
@@ -799,7 +679,6 @@ find_optimal_wg_mtu() {
   done
 
   if [ "$last_good" -ge 1000 ] 2>/dev/null; then
-    # Рассчитываем MTU для WireGuard
     wg_mtu=$((last_good - 80))
     (( wg_mtu < 1200 )) && wg_mtu=1200
   else
@@ -808,7 +687,6 @@ find_optimal_wg_mtu() {
   echo "WG_MTU=$wg_mtu" >> $path_env_file 
 }
 
-# Функция получени пути iptables
 get_iptables_path() {
   local path
   path=$(command -v iptables)
@@ -822,7 +700,6 @@ get_iptables_path() {
   echo "$path"
 }
 
-# Функция добавления правил в apply и delete скрипты iptables по port и proto
 add_iptables_rule() {
   local port="$1"
   local proto="$2"
@@ -837,7 +714,6 @@ add_iptables_rule() {
     echo "$delete_rule" >> "$path_iptables_delete_script"
 }
 
-# Функция удаления правил из apply и delete скриптов iptables по port и proto  
 remove_iptables_rule() {
   local port="$1"
   if [[ "$port" ]]; then
@@ -846,35 +722,28 @@ remove_iptables_rule() {
   fi
 }
 
-# Создание скриптов разрешения портов через iptables, при запуске/остановке службы
 create_iptables_scripts() {
   echomsg "$W_CREATION_IPTABLES_SCRIPTS" 1
 
-  # Создать дирректорию для сохранения скриптов на запуск/остановку служб
   mkdir -p "$(dirname "$path_iptables_apply_script")"
   mkdir -p "$(dirname "$path_iptables_delete_script")"
 
-  # Очистка/создание файлов перед формированием конфигов
   touch "$path_iptables_apply_script"
   touch "$path_iptables_delete_script"
 
-  # Формируем скрипты с правилами:
   {
     echo "#!/bin/bash"
     echo ""
   } | tee "$path_iptables_apply_script" "$path_iptables_delete_script" > /dev/null
 
-  # Запрет 80/tcp порта
   local iptables_path
   iptables_path="$(get_iptables_path)"
   echo "$iptables_path -w 5 -I INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_apply_script"
   echo "$iptables_path -w 5 -D INPUT -p tcp --dport 80 -j DROP" >> "$path_iptables_delete_script"
 
-  # Делаем скрипты исполняемыми
   chmod +x "$path_iptables_apply_script" "$path_iptables_delete_script"
 }
 
-# Функция добавления сервиса wg
 add_wg_service() {
   local service_name="$service_prefix-$1"
   local port_wg="${2:-51820}"
@@ -882,7 +751,6 @@ add_wg_service() {
   local address="${4:-10.8.1.x}"
   local ss_link="${5:-}"
 
-  # добавление сервиса
   yq e -i ".services.${service_name} = {
     \"image\": \"${wg_easy_image}\",
     \"container_name\": \"${service_name}\",
@@ -916,14 +784,11 @@ add_wg_service() {
     }
   }" "$path_docker_compose_file"
 
-  # если ss_link передана
   if [ -n "$ss_link" ]; then
-    # добавить devices
     yq e -i "
       .services.${service_name}.devices = [\"/dev/net/tun\"]
     " "$path_docker_compose_file"
 
-    # переменные в environment
     yq e -i ".services.${service_name}.environment += {
         \"WG_DEVICE\": \"sstun\",
         \"SS_TUN_NAME\": \"sstun\",
@@ -932,41 +797,33 @@ add_wg_service() {
     " "$path_docker_compose_file"
   fi
 
-  # volumes как service_name
   yq e -i ".volumes += {
     \"${service_name}\": { \"name\": \"${service_name}\" }
   }" "$path_docker_compose_file"
 
-  # правила iptables
   add_iptables_rule "$port_wg" "udp"
   add_iptables_rule "$port_ui" "tcp"
 
-  # если файл caddyfile существует
   if [[ -f "$path_caddyfile" ]]; then
-    # reverse_proxy в caddyfile 
     {
       echo "handle_path /$service_name/* {"
       echo "  reverse_proxy $service_name:$port_ui"
       echo "}"
     } >> "$path_caddyfile"
     
-    # cсылка на UI интерфейс wg-easy
     link_ui="https://${WG_HOST}/${service_name}/"
   else
     link_ui="http://${WG_HOST}:${port_ui}"
   fi
 }
 
-# Функция добавления Caddy сервиса
 add_caddy_service() {
   [[ "$is_domain" ]] || return
 
-  # Спуллить образ
   podman pull "$caddy_image" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'podman pull $caddy_image'"
   
   local service_name="caddy-$service_prefix"
 
-  # - services
   yq e -i ".services.${service_name} = {
     \"image\": \"${caddy_image}\",
     \"container_name\": \"${service_name}\",
@@ -983,24 +840,20 @@ add_caddy_service() {
     \"networks\": [\"${service_prefix}\"]
   }" "$path_docker_compose_file"
 
-  # - volumes
   yq e -i ".volumes += {
     \"${service_name}-data\": { \"name\": \"${service_name}-data\" },
     \"${service_name}-config\": { \"name\": \"${service_name}-config\" }
   }" "$path_docker_compose_file"
 
-  # - iptables
   add_iptables_rule "443" "udp"
   add_iptables_rule "443" "tcp"
 
-  # - Caddyfile
   mkdir -p "$(dirname "$path_caddyfile")"
   {
     echo "$host"
     echo "tls $email"
   } > "$path_caddyfile"
 
-  # - handle_path, если добавляем Caddy после установок wg
   yq -r '.services | keys[]' "$path_docker_compose_file" | while read -r service; do
     if [[ "$service" == "${service_prefix}-"* ]]; then
       local port_ui
@@ -1014,7 +867,6 @@ add_caddy_service() {
   done
 }
 
-# Функция создания wg сервиса в зависимости от выбранного режима установки
 create_wg_install_mode() {
   case "$install_mode" in
     "main")
@@ -1029,24 +881,18 @@ create_wg_install_mode() {
   esac
 }
 
-# Функция создания сервисного конфига
 create_services_config() {
-  # Подгружаем .env
   load_env
 
   echomsg "$W_CREATING_SERVICE_CONFIG" 1
 
-  # services.yml шаблон
   mkdir -p "$(dirname "$path_docker_compose_file")"
   echo -e "services: {}\nvolumes: {}\nnetworks: {}" > "$path_docker_compose_file"
 
-  # cервис Caddy сервера (если указано доменное имя)
   [[ "$is_domain" ]] && add_caddy_service
 
-  # cервис wg-easy-breezy в зависимости от выбранного режима установки
   create_wg_install_mode
 
-  # networks
   yq e -i ".networks += {
     \"${service_prefix}\": {
       \"name\": \"${service_prefix}\",
@@ -1063,20 +909,16 @@ create_services_config() {
   }" "$path_docker_compose_file"
 }
 
-# Функция создания конфига sysctl настроек сети
 create_sysctl_config () {
   echomsg "$W_CREATING_NETWORK_SETTINGS" 1
 
-  # Создать дирректорию если нет
   mkdir -p "$(dirname "$path_sysctl_config")"
   mkdir -p "$(dirname "$path_sysctl_config_link")"
   
-  # Загружаем конфиг
   curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
     https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf \
     -o "$path_sysctl_config" || exiterr "${W_ERROR}: 'curl sysctl.conf'"
 
-  # Включение TCP BBR контроля перегрузки, если не удачно, то пробуем hybla
   if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
   then
     echo "net.core.default_qdisc = fq" >> "$path_sysctl_config"
@@ -1088,16 +930,14 @@ create_sysctl_config () {
     fi
   fi
 
-  # Создаем ссылку на файл
   ln -s "$path_sysctl_config" "$path_sysctl_config_link"
 
-  # Применяем полученный конфиг
   sysctl -e -q -p "$path_sysctl_config_link"
 }
 
-# Функция создания systemd unit службы управления сервисами
 create_systemd_unit() {
   local working_dir path_podman_compose
+
   working_dir="$(dirname "$path_docker_compose_file")"
 
   echomsg "$W_CREATING_SYSTEMD_SERVICE" 1
@@ -1128,14 +968,11 @@ create_systemd_unit() {
   systemctl daemon-reload
 }
 
-# Функция проверки что все сервисы запущены и работают корректно
 is_all_ok_services() {
-  # если файл docker compose не существует — false
   if [[ ! -e "$path_docker_compose_file" ]]; then
     return 1
   fi
 
-  # проверка что systemd служба активна 
   if ! systemctl is-active --quiet wg-easy-breezy; then
     return 1
   fi
@@ -1143,7 +980,6 @@ is_all_ok_services() {
   return 0
 }
 
-# Фукнция ожидания запуска всех контейнеров (до 85 сек)
 wait_for_containers() {
   sleep 5
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1180,13 +1016,12 @@ wait_for_containers() {
   return 0
 }
 
-# Функция запуска всех сервисов
 start_services() {
   echomsg "$W_LAUNCH_SERVICE" 1
 
-  # Запускаем докер контейнеры
   systemctl enable --now wg-easy-breezy > /dev/null 2>&1
   wait_for_containers
+
   if ! systemctl is-active --quiet wg-easy-breezy; then
     echoerr "$W_LAUNCH_SERVICE_FAILED"
   else
@@ -1197,8 +1032,7 @@ start_services() {
 # Функция остановки всех сервисов и служб
 stop_services() {
   echomsg "$W_STOP_SERVICE" 1
-  
-  # Останавливаем и удаляем docker-контейнеры
+
   if [[ -f "$path_docker_compose_file" ]]; then
     systemctl disable --now wg-easy-breezy > /dev/null 2>&1
     sleep 5
@@ -1212,9 +1046,8 @@ stop_services() {
   fi
 }
 
-# Функция переключения статуса активности сервисов
+
 switch_active_services() {
-  # Если все сервисы и службы работают
   if is_all_ok_services; then
     stop_services
   else
@@ -1224,12 +1057,14 @@ switch_active_services() {
   press_any_side_to_open_menu
 }
 
-# Функция перезапуска  сервисов
+
 restart_services() {
   echomsg "$W_RESTART_SERVICE" 1
+
   systemctl stop wg-easy-breezy > /dev/null 2>&1
   systemctl start wg-easy-breezy > /dev/null 2>&1
   wait_for_containers
+
   if is_all_ok_services; then
     echook "$W_SERVICE_SUCCESS_RESTARTED"
   else
@@ -1239,7 +1074,7 @@ restart_services() {
   press_any_side_to_open_menu
 }
 
-# Функция извлечения переменной из environment по имени сервиса 
+
 get_env_var_from_service() {
   local service="$1"
   local var_name="$2"
@@ -1248,7 +1083,6 @@ get_env_var_from_service() {
   yq -r ".services.\"$service\".environment.\"$var_name\" // \"$default_value\"" "$path_docker_compose_file"
 }
 
-# Функция вывода списка служб на основе compose yml файла
 show_services_list() {
   local service container_status ports status ss_link port_ui address mount_point client_count
   local output=""
@@ -1307,31 +1141,25 @@ show_services_list() {
     output+="___________________________________________________\n"
   done
 
-  # Выводим всё разом
   echo -e "$output"
 }
 
-# Функция добавления нового сервиса wg-easy
 add_new_wg_service() {
-  # выбор режима установки
   select_install_mode 1
 
-  # считывание вода пользователя
   input_tag
   input_ss_link
   input_port
   input_address
 
-  # добавляем wg сервис в зависимости от выбранного режима установки
   create_wg_install_mode
 
-  # запускаем wg-easy контейнер
   local service_name="$service_prefix-$service_tag"
+
   {
     "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "$service_name"
   } > /dev/null 2>&1
   
-  # запускаем с force-recreate caddy-wgeb для применения реверс прокси
   {
     podman container exists caddy-wgeb && \
     "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate caddy-wgeb
@@ -1345,9 +1173,7 @@ add_new_wg_service() {
   press_any_side_to_open_menu "containers"
 }
 
-# Функция удаления сервиса wg-easy
 remove_wg_service() {
-  # ввод имени сервиса для удаления
   while true; do
     echo -e "$W_INPUT_SERVICE_NAME"
     read -rp " > " service_name
@@ -1358,7 +1184,6 @@ remove_wg_service() {
     fi
 
     if [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]]; then
-      # volume том
       echo -e "$W_DELETE_WG_SETTINGS"
       local msg
       msg="[y/N]: "
@@ -1380,29 +1205,24 @@ remove_wg_service() {
     fi
   done
 
-  # останавливаем контейнер
   {
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" 
   } > /dev/null 2>&1
 
   local port_wg port_ui
 
-  # правила iptables
   port_wg=$(get_env_var_from_service "$service_name" "WG_PORT" "")
   port_ui=$(get_env_var_from_service "$service_name" "PORT" "")
   remove_iptables_rule "$port_wg"
   remove_iptables_rule "$port_ui"
 
-  # services.yml записи services и volumes
   yq e -i "del(.services.${service_name})" "$path_docker_compose_file"
   yq e -i "del(.volumes.${service_name})" "$path_docker_compose_file"
 
-  # реверс прокси в caddyfile
   if [[ -f "$path_caddyfile" ]]; then
     sed -i "/^[[:space:]]*handle_path[[:space:]]\+\\/$service_name\\/\\*/,/^[[:space:]]*}/d" "$path_caddyfile"
   fi
 
-  # запускаем с force-recreate caddy-wgeb для переинициализации caddyfile
   {
     podman container exists caddy-wgeb && \
     "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate caddy-wgeb
@@ -1412,7 +1232,6 @@ remove_wg_service() {
   press_any_side_to_open_menu "containers"
 }
 
-# Функция подтверждения удаления приложения
 remove_services() {
   echo
   local msg
@@ -1432,7 +1251,6 @@ remove_services() {
   fi
 }
 
-# Функция выбора режима установки
 select_install_mode() {
   local is_menu="${1:-}"
   local total_items=2
@@ -1461,15 +1279,12 @@ select_install_mode() {
   esac
 }
 
-# Функция добавления доменного имени
 add_domain() {
   input_domain
   input_email
   if [[ "$is_domain" ]]; then
-    # добавляем caddy сервер с настройкой реверспрокси
     add_caddy_service
 
-    # перезапускаем службу
     systemctl restart wg-easy-breezy > /dev/null 2>&1
     wait_for_containers
 
@@ -1479,42 +1294,35 @@ add_domain() {
   select_domain_option
 }
 
-# Функция изменения доменного имени
 change_domain() {
   host=""
 
   while true; do
     echomsg "$W_INPUT_NEW_DOMAIN" 1
     read -rp " > " host
-    
-    # Проверка на пустой ввод
+
     if [ -z "$host" ]; then
       break
     else
-      # преобразуем в punycode (на случай кириллицы) с нижним регистром
       host=$(idn "$host" | tr '[:upper:]' '[:lower:]')
-      # если прошли проверку
+
       if check_domain "$host"; then
         echomsg "$W_APPLY_DOMAIN '$host'" 1
 
-        # останавливаем службу
         systemctl stop wg-easy-breezy > /dev/null 2>&1
 
-        # заменяем значение в .env
         if grep -q '^WG_HOST=' "$path_env_file"; then
           sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file"
         else
           echo "WG_HOST=$host" >> "$path_env_file"
         fi
 
-        # заменяем значение в Caddyfile
         if grep -q "$WG_HOST" "$path_caddyfile"; then
           sed -i "s/$WG_HOST/$host/" "$path_caddyfile"
         else
           sed -i "1i $host" "$path_caddyfile"
         fi
 
-        # поднимаем  службу
         systemctl start wg-easy-breezy > /dev/null 2>&1
 
         echook "$W_DOMAIN_NAME_CHANGED"
@@ -1526,7 +1334,6 @@ change_domain() {
   select_domain_option
 }
 
-# Функция удаления доменного имени
 remove_domain() {
   local msg
   echoerr "$W_DOMAIN_REMOVAL"
@@ -1543,21 +1350,16 @@ remove_domain() {
 
     echomsg "$W_DELETE_DOMAIN_NAME" 1
 
-    # останавливаем службу
     systemctl stop wg-easy-breezy > /dev/null 2>&1
 
-    # services.yml записи services и volumes
     yq e -i "del(.services.${service_name})" "$path_docker_compose_file" > /dev/null 2>&1
     yq e -i "del(.volumes.${service_name}-data)" "$path_docker_compose_file" > /dev/null 2>&1
     yq e -i "del(.volumes.${service_name}-config)" "$path_docker_compose_file" > /dev/null 2>&1
 
-    # правила iptables
     remove_iptables_rule "443"
 
-    # caddyfile
     [[ -f "$path_caddyfile" ]] && rm "$path_caddyfile"
 
-    # заменяем значение в .env
     host=$(get_public_ip)
     if grep -q '^WG_HOST=' "$path_env_file"; then
       sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file"
@@ -1565,7 +1367,6 @@ remove_domain() {
       echo "WG_HOST=$host" >> "$path_env_file"
     fi
 
-    # запускаем службу
     systemctl start wg-easy-breezy > /dev/null 2>&1
     wait_for_containers
 
@@ -1575,14 +1376,11 @@ remove_domain() {
   select_domain_option
 }
 
-# Функция управлени домменным именем
 select_domain_option() {
-  # грузим .env
   load_env
 
   show_header
 
-  # определяем установлено ли доменное имя
   local is__domain=""
   [[ -f "$path_caddyfile" ]] &&  \
   [[ "$WG_HOST" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$ ]] && \
@@ -1639,20 +1437,15 @@ select_domain_option() {
   fi
 }
 
-# Функция смены пароля веб интерфейса(ов)
 change_password() {
-  # вводим новый пароль с заменой в .env
   input_password
 
-  # перезапускаем службу
   systemctl restart wg-easy-breezy > /dev/null 2>&1
   wait_for_containers
 
-  # возвращаемся меню опций
   press_any_side_to_open_menu
 }
 
-# Функция вывод последних логов по контейнерам
 show_podman_logs() {
   for name in $(podman ps --format '{{.Names}}' | grep "$service_prefix"); do
     echo -e "\n\033[1;34m=== $W_LOGS $name ===\033[0m"
@@ -1661,7 +1454,6 @@ show_podman_logs() {
   press_any_side_to_open_menu "containers"
 }
 
-# Функция вывод меню управления контейнерами
 select_containers_menu() {
   clear
   show_header
@@ -1693,13 +1485,11 @@ select_containers_menu() {
   esac
 }
 
-# Функция вывод статуса systemctl службы
 show_systemctl_status() {
   systemctl status wg-easy-breezy --no-pager -l
   press_any_side_to_open_menu
 }
 
-# Функция возврата в меню опций по нажатию на любую клавишу
 press_any_side_to_open_menu() {
   local type="${1:-main}"
 
@@ -1719,7 +1509,6 @@ press_any_side_to_open_menu() {
   esac
 }
 
-# Функция выбора опций
 select_menu_option() {
   clear
   show_header
@@ -1776,10 +1565,8 @@ select_menu_option() {
   esac
 }
 
-# Функция установки приложения
 install() {
   clear
-  # проверка поддержки
   check_root
   check_shell
   check_kernel
@@ -1787,24 +1574,18 @@ install() {
   check_os_ver
   check_container
 
-  # приветсвие
   show_header
   read -n1 -r -p "$W_PRESS_ANY_KEY_TO_INSTALL"
 
-  # удаление предущей установки если была
-  # и остались файлы после неудачной
   if [[ -f "$path_translation_file" ]]; then
     cp "$path_translation_file" "/opt/.translation.tmp"
   fi
   remove_install
 
-  # установка зависимостей
   install_pkgs
 
-  # выбор режима установки
   select_install_mode
 
-  # создаем необходимы папки и файлы
   mkdir -p "$path_data_dir"
   mkdir -p "$(dirname "$path_script")"
   mkdir -p "$(dirname "$path_env_file")"
@@ -1817,7 +1598,6 @@ install() {
     echo "WG_PERSISTENT_KEEPALIVE=25"
   } >> "$path_env_file"
 
-  # считывание вода пользователя
   input_tag
   input_domain
   input_email
@@ -1826,29 +1606,17 @@ install() {
   input_address
   input_password
 
-  # поиск оптимального MTU WireGuard
   find_optimal_wg_mtu
-
-  # создание скриптов iptables правил
   create_iptables_scripts
-
-  # создание конфига докер сервисов
   create_services_config
-
-  # создание sysctl конфига
   create_sysctl_config
-
-  # создание systemd unit службы управления сервисами
   create_systemd_unit
-
-  # запуск сервисов
   start_services
   
   echo -e "\n\033[1;32m$W_INSTALL_COMPLETED\033[0m"
   echo -e "\033[0;36m$W_DIRECTORY_PROGRAM:\033[1;32m $path_data_dir\033[0m"
   echo -e "\033[0;36m$W_WEB_INTERFACE:\033[1;32m $link_ui\033[0m\n"
 
-  # перемещам текущий скрипт, добавляем на него права и ссылку
   mv "$(realpath "$0")" "$path_script"
   chmod +x "$path_script"
   ln -s "$path_script" "$path_script_link"
@@ -1856,13 +1624,8 @@ install() {
   press_any_side_to_open_menu
 }
 
-# Загружаем с экспортом переменные окружения wg-easy
 load_env
-
-# Загружаем с экспортом переменные окружения uv
 load_uv_env
-
-# Загружаем локаль
 load_translation
 
 if [[ -f "$path_script" ]]; then

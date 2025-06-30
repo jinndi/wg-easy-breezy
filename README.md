@@ -1,13 +1,24 @@
-# WG-EASY-BREEZY
-![GitHub Release](https://img.shields.io/github/v/release/jinndi/wg-easy-breezy)
-![GitHub commits since latest release](https://img.shields.io/github/commits-since/jinndi/wg-easy-breezy/latest)
-![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/jinndi/wg-easy-breezy)
-![GitHub License](https://img.shields.io/github/license/jinndi/wg-easy-breezy)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/jinndi/wg-easy-breezy/docker-publish.yml)
 
+<p align="center">
+<img alt="wg-easy-breezy" src="/logo.png">
+</p>
+
+<p align="center">
+<img alt="Release" src="https://img.shields.io/github/v/release/jinndi/wg-easy-breezy">
+<img alt="Commits since latest release" src="https://img.shields.io/github/commits-since/jinndi/wg-easy-breezy/latest">
+<img alt="Code size in bytes" src="https://img.shields.io/github/languages/code-size/jinndi/wg-easy-breezy">
+<img alt="License" src="https://img.shields.io/github/license/jinndi/wg-easy-breezy">
+<img alt="Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/jinndi/wg-easy-breezy/docker-publish.yml">
+</p>
+
+<p align="center">
 Deployment and management of wg-easy containers using Podman, including traffic routing through a Shadowsocks proxy and configuration of the Caddy web server as a reverse proxy with automatic SSL certificate renewal.
+</p>
 
-![RU](https://github.com/jinndi/wg-easy-breezy/blob/main/README-ru.md)
+<p align="center">
+  <a href="/README.md"><img alt="English" src="https://img.shields.io/badge/English-d9d9d9"></a>
+  <a href="/README-ru.md"><img alt="Русский" src="https://img.shields.io/badge/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-d9d9d9"></a>
+</p>
 
 ## Features:
 

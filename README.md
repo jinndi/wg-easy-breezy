@@ -1,6 +1,6 @@
 
 <p align="center">
-<img alt="wg-easy-breezy" src="/logo.png">
+<img alt="wg-easy-breezy" src="/logo.webp">
 </p>
 
 <p align="center">

@@ -1,4 +1,3 @@
-
 <p align="center">
 <img alt="wg-easy-breezy" src="/logo.webp">
 </p>

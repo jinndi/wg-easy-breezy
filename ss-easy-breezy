@@ -12,7 +12,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 ## Version of Shadowsocks-rust used
 # https://github.com/shadowsocks/shadowsocks-rust/releases/
-version="v1.23.4"
+version="v1.23.5"
 
 ## File paths:
 path_shadowsocks_rust="/opt/shadowsocks-rust"

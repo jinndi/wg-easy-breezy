@@ -10,7 +10,7 @@
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-## File paths:
+## Paths:
 path_data_dir="/opt/wg-easy-breezy"
 path_script="$path_data_dir/wg-easy-breezy"
 path_script_link="/usr/bin/wgeb"
@@ -1029,7 +1029,6 @@ start_services() {
   fi
 }
 
-# Функция остановки всех сервисов и служб
 stop_services() {
   echomsg "$W_STOP_SERVICE" 1
 

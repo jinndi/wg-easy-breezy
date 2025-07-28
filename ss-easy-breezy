@@ -14,7 +14,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # https://github.com/shadowsocks/shadowsocks-rust/releases/
 version="v1.23.5"
 
-## File paths:
+## Paths:
 path_shadowsocks_rust="/opt/shadowsocks-rust"
 path_ssserver="$path_shadowsocks_rust/ssserver"
 path_ssservice="$path_shadowsocks_rust/ssservice"

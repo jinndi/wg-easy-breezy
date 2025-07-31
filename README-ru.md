@@ -106,5 +106,7 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
 2. [Github shadowsocks-rust](https://github.com/shadowsocks/shadowsocks-rust)
 3. [Github tun2socks](https://github.com/xjasonlyu/tun2socks)
 4. [Github caddy](https://github.com/caddyserver/caddy)
-5. [Дешевые и качественные VPS](https://just.hosting/?ref=231025)
-6. [Лучший регистратор доменов](https://www.namecheap.com)
+5. [Дешевые и качественные VPS (just.hosting)](https://just.hosting/?ref=231025)
+6. [Лучший регистратор доменов (namecheap.com)](https://www.namecheap.com)
+7. [Бесплатные субдомены (duckdns.org)](https://www.duckdns.org)
+

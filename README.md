@@ -106,6 +106,6 @@ The installed server is managed using the `wgeb` command
 2. [Github shadowsocks-rust](https://github.com/shadowsocks/shadowsocks-rust)
 3. [Github tun2socks](https://github.com/xjasonlyu/tun2socks)
 4. [Github caddy](https://github.com/caddyserver/caddy)
-5. [Cheap and high-quality VPS](https://just.hosting/?ref=231025 )
-6. [The Best Domain Registrar](https://www.namecheap.com )
-
+5. [Cheap and high-quality VPS (just.hosting)](https://just.hosting/?ref=231025 )
+6. [The Best Domain Registrar (namecheap.com)](https://www.namecheap.com)
+7. [Free subdomains (duckdns.org)](https://www.duckdns.org)

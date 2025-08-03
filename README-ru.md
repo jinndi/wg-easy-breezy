@@ -45,7 +45,7 @@
 Из под ssh выполните установку основного скрипта `wg-easy-breezy`
 
 ```
-curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
+curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/proxy-ss/wg-easy-breezy && bash wg-easy-breezy
 ```
 
 Следуйте инструкциям на экране. В процессе будут запрашиваться следующие данные:
@@ -76,7 +76,7 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
   Получить её можно, установив `ss-easy-breezy` на другом сервере коммандой:
 
   ```
-  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
+  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/proxy-ss/ss-easy-breezy && bash ss-easy-breezy
   ```
   Директория установки: `/opt/shasowsocks-rust/`
   

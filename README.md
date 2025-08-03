@@ -45,7 +45,7 @@ Deployment and management of wg-easy containers using Podman, including traffic 
 From under ssh, install the main script `wg-easy-breezy`
 
 ```
-curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
+curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/proxy-ss/wg-easy-breezy && bash wg-easy-breezy
 ```
 
 Follow the on-screen instructions. You will be prompted to enter the following:
@@ -76,7 +76,7 @@ Follow the on-screen instructions. You will be prompted to enter the following:
   You can obtain it by installing `ss-easy-breezy` on another server commander:
 
   ```
-  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
+  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/proxy-ss/ss-easy-breezy && bash ss-easy-breezy
   ```
   Installation directory: `/opt/shasowsocks-rust/`
   

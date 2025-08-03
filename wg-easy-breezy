@@ -28,7 +28,7 @@ path_uv_env_file="$path_uv_dir/.env"
 path_uvx="$path_uv_dir/uvx"
 
 ## Links to podman images:
-wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:latest"
+wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:6"
 caddy_image="docker.io/library/caddy:2.10-alpine"
 
 ## Prefix for podman service names, networks, volumes, web interface URLs
@@ -123,10 +123,10 @@ load_translation() {
     
     (
       curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation" \
+        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/proxy-ss/locales/general/$translation" \
         -o "$path_translation_file"
       curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/wg-easy-breezy/$translation" \
+        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/proxy-ss/locales/wg-easy-breezy/$translation" \
         >> "$path_translation_file"
     ) || exiterr "Error: 'curl translation'"
 
@@ -916,7 +916,7 @@ create_sysctl_config () {
   mkdir -p "$(dirname "$path_sysctl_config_link")"
   
   curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-    https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf \
+    https://raw.githubusercontent.com/jinndi/wg-easy-breezy/proxy-ss/sysctl.conf \
     -o "$path_sysctl_config" || exiterr "${W_ERROR}: 'curl sysctl.conf'"
 
   if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]

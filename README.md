@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-Deployment and management of wg-easy containers using Podman, including traffic routing through a Shadowsocks proxy and configuration of the Caddy web server as a reverse proxy with automatic SSL certificate renewal.
+Deployment and management of wg-easy containers using Podman, including traffic routing through an XRay VLESS proxy with XTLS-Reality, and configuration of the Caddy web server as a reverse proxy with automatic SSL certificate renewal.
 </p>
 
 <p align="center">
@@ -23,17 +23,17 @@ Deployment and management of wg-easy containers using Podman, including traffic 
 
 - 💥 Selecting the installation mode for wg-easy: either standard or via a Shadowsocks proxy to another server using tun2socks.
 
-- 🧦 Creating a Shadowsocks server (Rust implementation) using the `ss-easy-breezy` script and obtaining a link to specify in the `wg-easy-breezy` script.
+- ⚡️ Create an XRay VLESS server with XTLS-Reality using the `xray-easy-breezy` script and get the encoded config string to point to in the `wg-easy-breezy` script.
 
 - 📦 Adding and removing wg-easy containers via the script menu, with all necessary settings applied automatically.
 
 - 🌐 Adding, modifying, and deleting a domain name (requires setting an A record in your domain registrar's panel pointing to your server's IP address).
 
-- 🚀 Automatic deployment of the Caddy web server as a reverse proxy with auto-renewing SSL certificate.
+- 💻 Automatic deployment of the Caddy web server as a reverse proxy with auto-renewing SSL certificate.
 
 - 🔑 Changing the password for the wg-easy web interface(s).
 
-- ⚡️ Optimized network settings on both the server host and within the containers.
+- 🚀 Optimized network settings on both the server host and within the containers.
 
 ## Requirements:
 
@@ -58,7 +58,7 @@ Follow the on-screen instructions. You will be prompted to enter the following:
 - **Installation mode**  
   Choose one of the following:
   - Standard
-  - Proxy via Shadowsocks
+  - Proxy (XRay VLESS with XTLS-Reality)
 
 - **Service tag**  
   Used as a postfix in service names, container names, and web interface URLs.
@@ -70,17 +70,17 @@ Follow the on-screen instructions. You will be prompted to enter the following:
 - **Email address**  
   Required if a domain name is provided — used by the Caddy server to obtain an SSL certificate.
 
-- **Shadowsocks link**  
+- **XRay encoded string** 
   Required if proxy mode is selected.  
   
-  You can obtain it by installing `ss-easy-breezy` on another server commander:
+  You can obtain it by installing `xray-easy-breezy` on another server commander:
 
   ```
-  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/ss-easy-breezy && bash ss-easy-breezy
+  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/xray-easy-breezy && bash xray-easy-breezy
   ```
-  Installation directory: `/opt/shasowsocks-rust/`
+  Installation directory: `/opt/xray/`
   
-  The installed server is managed using the `sseb` command
+  The installed server is managed using the `xrayeb` command
 
 - **WireGuard port**  
   Choose any port from the suggested range.  
@@ -103,7 +103,7 @@ The installed server is managed using the `wgeb` command
 
 ## Links:
 1. [Github wg-easy](https://github.com/wg-easy/wg-easy)
-2. [Github shadowsocks-rust](https://github.com/shadowsocks/shadowsocks-rust)
+2. [Github XRay](https://github.com/XTLS/Xray-core)
 3. [Github tun2socks](https://github.com/xjasonlyu/tun2socks)
 4. [Github caddy](https://github.com/caddyserver/caddy)
 5. [Cheap and high-quality VPS (just.hosting)](https://just.hosting/?ref=231025 )

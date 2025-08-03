@@ -1,7 +1,0 @@
-W_PORT_SHOULD_RANGE="The port should be in the range from 49152 to 65535"
-W_DOWNLOAD="Download"
-W_INPUT_PORT="Enter the port of Shadowsocks (from 49152 to 65535)"
-W_CREATE_CONFIG="Create a config shadowsocks-rust server"
-W_ADD_USER="Add the user"
-W_LINK_CONNECTION="Link for connection"
-W_MAIN_MENU=" 2) 🌀 Restart\n 3) 🧿 Service status\n 4) 🔗 Connection link\n 5) 📜 Latest logs\n 6) 🪣 Delete program\n 7) 🚪 Exit (Ctrl+C)"

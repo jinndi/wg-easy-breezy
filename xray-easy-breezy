@@ -1,0 +1,738 @@
+#!/bin/bash
+#
+# https://github.com/jinndi/wg-easy-breezy
+#
+# Copyright (c) 2025 Jinndi <alncores@gmail.ru>
+#
+# Released under the MIT License, see the accompanying file LICENSE
+# or https://opensource.org/licenses/MIT
+
+export DEBIAN_FRONTEND=noninteractive
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+## Version XRay
+# https://github.com/XTLS/Xray-core/releases
+version="v25.7.26"
+
+## Paths:
+path_xray_dir="/opt/xray"
+path_xray="$path_xray_dir/xray"
+path_translation_file="$path_xray_dir/translation"
+path_service="/etc/systemd/system/xrayeb.service"
+path_server_config="$path_xray_dir/config.json"
+path_client_config="$path_xray_dir/config_client.json"
+path_sysctl_config="/etc/sysctl.d/99-xray-easy-breezy.conf"
+path_script="$path_xray_dir/xray-easy-breezy"
+path_script_link="/usr/bin/xrayeb"
+
+## Cloaking domain
+SERVER_NAME=""
+
+show_header() {
+echo -e "\033[1;35m"
+cat <<EOF
+###################################################
+#                XRAY-EASY-BREEZY                 #
+# GitHub:https://github.com/jinndi/wg-easy-breezy #
+###################################################
+EOF
+echo -e "\033[0m"
+}
+
+echomsg() {
+  if [ -n "$2" ]; then
+    echo
+  fi
+  
+  echo -e "\033[1;34m$1\033[0m"
+}
+
+echook() {
+  echo -e "\033[1;32m$1\033[0m"
+}
+
+echoerr () {
+  echo -e "\033[1;31m$1\033[0m"
+}
+
+exiterr() {
+  echo -e "\033[1;31m${W_ERROR}: $1\033[0m" >&2
+  exit 1
+}
+ 
+load_translation() {
+  if [ ! -f "$path_translation_file" ]; then
+    echo -e "\nSelect language\n 1) English\n 2) Русский"
+
+    read -rp "Option: " option
+
+    until [[ "$option" =~ ^[1-2]$ ]]; do
+      echoerr "Incorrect option"
+      read -rp "Option: " option
+    done
+
+    local translation
+    case "$option" in
+      1)
+        translation="en"
+      ;;
+      2)
+        translation="ru"
+      ;;
+      *)
+        translation="en"
+      ;;
+    esac
+
+    mkdir -p "$(dirname "$path_translation_file")"
+    touch "$path_translation_file"
+    
+    (
+      set -e
+      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation" \
+        -o "$path_translation_file"
+      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/xray-easy-breezy/$translation" \
+        >> "$path_translation_file"
+    ) || exiterr "Error: 'curl translation'"
+  fi
+
+  source "$path_translation_file"
+}
+
+check_root() {
+  if [ "$(id -u)" != 0 ]; then
+    exiterr "$W_ERROR_ROOT 'sudo bash $0'"
+  fi
+}
+
+check_shell() {
+  if readlink /proc/$$/exe | grep -q "dash"; then
+    exiterr "$W_ERROR_BASH"
+  fi
+}
+
+check_os() {
+  if grep -qs "ubuntu" /etc/os-release; then
+    os="ubuntu"
+    os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
+  elif [[ -e /etc/debian_version ]]; then
+    os="debian"
+    os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
+  else
+    exiterr "$W_ERROR_DIST"
+  fi
+}
+
+check_os_ver() {
+  if [[ "$os" == "ubuntu" && "$os_version" -lt 2404 ]]; then
+    exiterr "$W_ERROR_DIST_UBUNTU"
+  fi
+  if [[ "$os" == "debian" && "$os_version" -lt 12 ]]; then
+    exiterr "$W_ERROR_DIST_DEBIAN"
+  fi
+}
+
+check_kernel() {
+  if [[ $(uname -r | cut -d "." -f 1) -lt 6 ]]; then
+     exiterr "$W_ERROR_KERNEL"
+  fi
+}
+
+check_container() {
+  if systemd-detect-virt -cq 2>/dev/null; then
+    exiterr "$W_ERROR_CONTAINER"
+  fi
+}
+
+check_IPv4() {
+  if [[ ! "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    echoerr "$W_INCORRECT_FORMAT_IPV4"
+    return 1
+  fi
+
+  IFS='.' read -r -a octets <<< "$1"
+  for octet in "${octets[@]}"; do
+    if [[ "$octet" != "0" && "$octet" =~ ^0 ]]; then
+      echoerr "$W_INCORRECT_OCTET_IPV4"
+      return 1
+    fi
+
+    dec_octet=$((10#$octet))
+    if ((dec_octet < 0 || dec_octet > 255)); then
+      echoerr "$W_WRONG_RANGE_OCTET_IPV4"
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+get_public_ip() {
+  local public_ip
+
+  public_ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}')
+
+  [ -z "$public_ip" ] && command -v dig >/dev/null && \
+    public_ip=$(dig +short -4 myip.opendns.com @resolver1.opendns.com)
+
+  [ -z "$public_ip" ] && command -v curl >/dev/null && \
+    public_ip=$(curl -s https://api.ipify.org)
+
+  if ! check_IPv4 "$public_ip"; then
+    echoerr "$W_FAILED_DETERMINE_PUBLIC_IP"
+
+    while true; do
+      echomsg "$W_ENTER_IPV4_THIS_SERVER" 1
+      read -rp " > " public_ip
+      if check_IPv4 "$public_ip"; then break; fi
+    done
+  fi
+
+  echo "$public_ip"
+}
+
+show_spinner() {
+  local pid=$1
+  local delay=0.1
+  local spinner="|/-\\"
+  tput civis
+
+  while kill -0 "$pid" 2>/dev/null; do
+    for i in $(seq 0 3); do
+      printf "\r[%c] $W_PERFORM_WAIT" "${spinner:$i:1}"
+      sleep "$delay"
+    done
+  done
+
+  wait "$pid"
+  local status=$?
+  tput cnorm
+  echo
+  return $status
+}
+
+wait_for_apt_unlock() {
+  local timeout=300
+  local waited=0
+
+  while pgrep -x apt >/dev/null || pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null; do
+    sleep 1
+    [ "$waited" = 0 ] && echomsg "$W_APT_WAITING" 1
+    ((waited++))
+    if (( waited >= timeout )); then
+      exiterr "$W_EXCEEDING_WAIT_TIME ($timeout сек)."
+      return 1
+    fi
+  done
+}
+
+install_pkgs() {
+  wait_for_apt_unlock
+
+  echomsg "$W_PKG_UPDATING_AND_ISTALL_DEPENDC" 1
+  (
+    (
+      dpkg --configure -a || dpkg --configure -a
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'dpkg --configure -a'"
+    (
+      apt-get -yqq update || apt-get -yqq update
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get update'"
+    (
+      apt-get -yqq upgrade || apt-get -yqq upgrade
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get upgrade'"
+    (
+      apt-get -yqq install iproute2 iptables openssl lsof dnsutils gzip grep nano htop \
+      || apt-get -yqq install iproute2 iptables openssl lsof dnsutils gzip grep nano htop
+    ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get install'"
+  ) & show_spinner $!
+}
+
+check_443port() {
+  echomsg "$W_CHECK_443PORT" 1
+  if lsof -i :"443" >/dev/null; then
+    exiterr "${W_ERROR}: '443 $W_PORT_BUSY'"
+  fi
+  return 0
+}
+
+input_server_name() {
+  echo -e "\n$W_INPUT_CLOAKING_DOMAIN\n 1) github.com\n 2) microsoft.com\n 3) samsung.com\n 4) nvidia.com\n 5) amd.com"
+
+  read -rp " > " option
+  until [[ "$option" =~ ^[1-5]$ || "$option" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; do
+    echoerr "$W_INCORRECT_OPTION"
+    read -rp " > " option
+  done
+
+  case "$option" in
+    1)
+      SERVER_NAME="github.com"
+    ;;
+    2)
+      SERVER_NAME="microsoft.com"
+    ;;
+    3)
+      SERVER_NAME="samsung.com"
+    ;;
+    4)
+      SERVER_NAME="nvidia.com"
+    ;;
+    5)
+      SERVER_NAME="amd.com"
+    ;;
+    *)
+      SERVER_NAME="$option"
+    ;;
+  esac
+}
+
+download_xray() {
+  echomsg "$W_DOWNLOAD XRay $version" 1
+  (
+    set -e
+    mkdir -p "$(dirname "$path_xray")" && \
+    curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache"  -o xray.zip \
+    https://github.com/XTLS/Xray-core/releases/download/${version}/Xray-linux-64.zip && \
+    unzip ./xray.zip -d "$path_xray_dir" && \
+    chmod +x "$path_xray" && \
+    rm ./xray.zip
+  ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'curl xray'"
+}
+
+create_sysctl_config () {
+  echomsg "$W_CREATING_NETWORK_SETTINGS" 1
+
+  mkdir -p "$(dirname "$path_sysctl_config")"
+
+  link_sysctl_config="https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf"
+  curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "$link_sysctl_config" \
+      -o "$path_sysctl_config" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'curl sysctl.conf'"
+
+  if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
+  then
+    echo "net.core.default_qdisc = fq" >> "$path_sysctl_config"
+    echo "net.ipv4.tcp_congestion_control = bbr" >> "$path_sysctl_config"
+  else
+    if modprobe -q tcp_hybla && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
+    then
+      echo "net.ipv4.tcp_congestion_control = hybla" >> "$path_sysctl_config"
+    fi
+  fi
+
+  sysctl -e -q -p "$path_sysctl_config"
+}
+
+create_configs() {
+  local CLIENT_ID KEYS PRIVATE_KEY SHORT_ID DEST PUBLIC_IP
+
+  echomsg "$W_CREATE_CONFIGS" 1
+
+  mkdir -p "$(dirname "$path_server_config")"
+  mkdir -p "$(dirname "$path_client_config")"
+  CLIENT_ID=$("$path_xray" uuid)
+  KEYS=$("$path_xray" x25519)
+  PRIVATE_KEY=$(echo "$KEYS" | grep 'Private key' | awk '{print $NF}')
+  PUBLIC_KEY=$(echo "$KEYS" | grep 'Public key' | awk '{print $NF}')
+  SHORT_ID=$(openssl rand -base64 16)
+  DEST="$SERVER_NAME:443"
+  PUBLIC_IP=$(get_public_ip)
+
+  # Server config
+  {
+    echo "{"
+    echo "  \"log\": {"
+    echo "    \"loglevel\": \"info\""
+    echo "  },"
+    echo "  \"inbounds\": ["
+    echo "    {"
+    echo "      \"port\": 443,"
+    echo "      \"protocol\": \"vless\","
+    echo "      \"settings\": {"
+    echo "        \"clients\": ["
+    echo "          {"
+    echo "            \"id\": \"$CLIENT_ID\","
+    echo "            \"flow\": \"xtls-rprx-vision\""
+    echo "          }"
+    echo "        ],"
+    echo "        \"decryption\": \"none\""
+    echo "      },"
+    echo "      \"streamSettings\": {"
+    echo "        \"network\": \"tcp\","
+    echo "        \"security\": \"reality\","
+    echo "        \"realitySettings\": {"
+    echo "          \"privateKey\": \"$PRIVATE_KEY\","
+    echo "          \"shortIds\": [\"$SHORT_ID\"],"
+    echo "          \"dest\": \"$DEST\","
+    echo "          \"serverNames\": [\"$SERVER_NAME\"]"
+    echo "        }"
+    echo "      },"
+    echo "      \"sniffing\": {"
+    echo "        \"enabled\": true,"
+    echo "        \"destOverride\": [\"http\", \"tls\", \"quic\"],"
+    echo "        \"routeOnly\": true"
+    echo "      }"
+    echo "    }"
+    echo "  ],"
+    echo "  \"outbounds\": ["
+    echo "    {"
+    echo "      \"protocol\": \"freedom\","
+    echo "      \"tag\": \"direct\""
+    echo "    }"
+    echo "  ]"
+    echo "}"
+  } > "$path_server_config"
+
+  # Client config
+  {
+    echo "{"
+    echo "  \"log\": {"
+    echo "    \"loglevel\": \"info\""
+    echo "  },"
+    echo "  \"inbounds\": ["
+    echo "    {"
+    echo "      \"listen\": \"127.0.0.1\","
+    echo "      \"port\": 10800,"
+    echo "      \"protocol\": \"socks\","
+    echo "      \"settings\": {"
+    echo "        \"udp\": true"
+    echo "      },"
+    echo "      \"sniffing\": {"
+    echo "        \"enabled\": true,"
+    echo "        \"destOverride\": [\"http\", \"tls\", \"quic\"],"
+    echo "        \"routeOnly\": true"
+    echo "      }"
+    echo "    }"
+    echo "  ],"
+    echo "  \"outbounds\": ["
+    echo "    {"
+    echo "      \"protocol\": \"vless\","
+    echo "      \"settings\": {"
+    echo "        \"vnext\": ["
+    echo "          {"
+    echo "            \"address\": \"$PUBLIC_IP\","
+    echo "            \"port\": 443,"
+    echo "            \"users\": ["
+    echo "              {"
+    echo "                \"id\": \"$CLIENT_ID\","
+    echo "                \"encryption\": \"none\","
+    echo "                \"flow\": \"xtls-rprx-vision\""
+    echo "              }"
+    echo "            ]"
+    echo "          }"
+    echo "        ]"
+    echo "      },"
+    echo "      \"streamSettings\": {"
+    echo "        \"network\": \"tcp\","
+    echo "        \"security\": \"reality\","
+    echo "        \"realitySettings\": {"
+    echo "          \"publicKey\": \"$PUBLIC_KEY\","
+    echo "          \"shortId\": \"$SHORT_ID\","
+    echo "          \"serverName\": \"$SERVER_NAME\","
+    echo "          \"fingerprint\": \"chrome\""
+    echo "        }"
+    echo "      },"
+    echo "      \"tag\": \"proxy\""
+    echo "    }"
+    echo "  ]"
+    echo "}"
+  } > "$path_client_config"
+}
+
+create_service() {
+  local FSIP DIF iptables_path
+
+  echomsg "$W_CREATING_SYSTEMD_SERVICE" 1
+
+  FSIP=$(dig +short "$SERVER_NAME")
+  DIF=$(ip route | awk '/default/ {print $5}' | head -n1)
+
+  # Path to iptables
+  iptables_path=$(command -v iptables)
+  if [[ $(systemd-detect-virt) == "openvz" ]] && \
+    readlink -f "$(command -v iptables)" | grep -q "nft" && \
+    hash iptables-legacy 2>/dev/null
+  then
+    iptables_path=$(command -v iptables-legacy)
+  fi
+
+  {
+    echo "[Unit]"
+    echo "Description=XRay server ${version}"
+    echo "Documentation=https://github.com/XTLS/Xray-core"
+    echo "After=network.target"
+    echo "Wants=network.target"
+    echo$
+    echo "[Service]"
+    echo "PermissionsStartOnly=true"
+    echo "ExecStartPre=${iptables_path} -I INPUT -p tcp --dport 443 -j ACCEPT"
+    echo "ExecStartPre=${iptables_path} -t nat -A PREROUTING -i ${DIF} -p udp --dport 443 -j DNAT --to-destination ${FSIP}:443"
+    echo "ExecStartPre=${iptables_path} -t nat -A PREROUTING -i ${DIF} -p tcp --dport 80 -j DNAT --to-destination ${FSIP}:80"
+    echo "ExecStart=${path_xray} -c ${path_server_config}"
+    echo "ExecStopPost=${iptables_path} -D INPUT -p tcp --dport 443 -j ACCEPT"
+    echo "ExecStopPost=${iptables_path} -t nat -D PREROUTING -i ${DIF} -p udp --dport 443 -j DNAT --to-destination ${FSIP}:443"
+    echo "ExecStopPost=${iptables_path} -t nat -D PREROUTING -i ${DIF} -p tcp --dport 80 -j DNAT --to-destination ${FSIP}:80"
+    echo "Restart=on-failure"
+    echo "User=xray"
+    echo "LimitNOFILE=51200"
+    echo "CapabilityBoundingSet=CAP_NET_BIND_SERVICE"
+    echo "AmbientCapabilities=CAP_NET_BIND_SERVICE"
+    echo "NoNewPrivileges=true"
+    echo
+    echo "[Install]"
+    echo "WantedBy=multi-user.target"
+  } > "$path_service"
+}
+
+add_user() {
+  echomsg "$W_ADD_USER 'xray'" 1
+  useradd --system --home-dir /nonexistent --no-create-home \
+  --shell /usr/sbin/nologin xray >/dev/null 2>&1 \
+  || exiterr "${W_ERROR}: 'useradd xray'"
+}
+
+activate_xray() {
+  echomsg "$W_LAUNCH_SERVICE" 1
+  systemctl daemon-reload >/dev/null 2>&1
+  systemctl enable --now xrayeb >/dev/null 2>&1
+  if systemctl is-active --quiet xrayeb; then
+    echook "$W_SERVICE_SUCCESS_LAUNCH"
+  else
+    echoerr "$W_LAUNCH_SERVICE_FAILED"
+  fi
+}
+
+press_any_side_to_open_menu() {
+  echomsg "------------------------------------------------"
+  read -n1 -r -p "$W_PRESS_ANY_KEY_TO_OPEN_MENU"
+  select_menu_option
+}
+
+switch_active_service() {
+  systemctl daemon-reload >/dev/null 2>&1
+  if systemctl is-active --quiet xrayeb; then
+    echomsg "$W_STOP_SERVICE" 1
+    { systemctl stop xrayeb && systemctl disable xrayeb; } >/dev/null 2>&1
+    sleep 3
+    if systemctl is-active --quiet xrayeb; then
+      echoerr "$W_SERVICE_STOP_FAILED"
+    else
+      echook "$W_SERVICE_SUCCESS_STOPPED"
+    fi
+  else
+    echomsg "$W_LAUNCH_SERVICE" 1
+    systemctl enable --now xrayeb >/dev/null 2>&1
+    sleep 3
+    if systemctl is-active --quiet xrayeb; then
+      echook "$W_SERVICE_SUCCESS_LAUNCH"
+    else
+      echoerr "$W_LAUNCH_SERVICE_FAILED"
+    fi
+  fi
+  press_any_side_to_open_menu
+}
+
+reload_service() {
+  echomsg "$W_RESTART_SERVICE" 1
+  systemctl daemon-reload >/dev/null 2>&1
+  systemctl reload xrayeb >/dev/null 2>&1
+  sleep 3
+  if systemctl is-active --quiet xrayeb; then
+    echook "$W_SERVICE_SUCCESS_RESTARTED"
+  else
+    echoerr "$W_ERROR_RESTART_SERVICE"
+  fi
+  press_any_side_to_open_menu
+}
+
+show_connect_link() {
+  echo -e "\n$W_LINK_CONNECTION:"
+  echo -e "\033[0;36m$(get_public_ip)@$(gzip -c "$path_client_config" | base64 -w 0)\033[0m"
+  press_any_side_to_open_menu
+}
+
+change_cloaking_domain() {
+  SERVER_NAME=""
+  input_server_name
+  create_configs
+  create_service
+  echomsg "$W_RESTART_SERVICE" 1
+  systemctl daemon-reload >/dev/null 2>&1
+  systemctl reload xrayeb >/dev/null 2>&1
+  echo -e "\n\033[1;32m$W_CLOAKING_DOMAIN_CHANGED\033[0m"
+  echo -e "\n$W_LINK_CONNECTION:"
+  echo -e "\033[0;36m$(get_public_ip)@$(gzip -c "$path_client_config" | base64 -w 0)\033[0m"
+  echomsg "------------------------------------------------"
+  read -n1 -r -p "$W_PRESS_ANY_KEY_TO_OPEN_MENU"
+  select_cloaking_domain_option
+}
+
+select_cloaking_domain_option() {
+  show_header
+  DEST_HOST=$(jq -r '.inbounds[0].streamSettings.realitySettings.dest' "$path_server_config" | cut -d: -f1)
+  echook "\n\033[0;36m$W_CLOAKING_DOMAIN:\033[0m $DEST_HOST"
+  echo -e "$W_SELECT_OPTION:"
+  echo -e "$W_CLOAKING_DOMAIN_OPTIONS"
+  read -rp "$W_CHOICE: " option
+  until [[ "$option" =~ ^[1-2]$ ]]; do
+    echoerr "$W_INCORRECT_OPTION"
+    read -rp "$W_CHOICE: " option
+  done
+  case "$action" in
+    1)
+      change_cloaking_domain
+    ;;
+    2)
+      select_menu_option
+    ;;
+  esac
+}
+
+show_systemctl_status() {
+  systemctl status xrayeb --no-pager -l
+  press_any_side_to_open_menu
+}
+
+show_journalctl_log() {
+  journalctl -u xrayeb -n 50 --no-pager
+  press_any_side_to_open_menu
+}
+
+remove_xray() {
+  (
+    systemctl stop xrayeb
+    systemctl disable xrayeb
+    rm -f "$path_server_config"
+    rm -f "$path_client_config"
+    rm -f "$path_service"
+    rm -f "$path_sysctl_config" 
+    rm -f "$path_script"
+    rm -f "$path_script_link" 
+    rm -rf "$path_xray"
+    rm -rf "$path_xray_dir"
+    systemctl daemon-reload
+    userdel xray
+  ) >/dev/null 2>&1
+}
+
+accept_remove_xray() {
+  echo
+  read -rp "$W_DELETE_APP [y/N]: " remove
+  until [[ "$remove" =~ ^[yYnNдДнН]*$ ]]; do
+    echo "$W_INCORRECT_OPTION"
+    read -rp "$W_DELETE_APP [y/N]: " remove
+  done
+
+  if [[ "$remove" =~ ^[yYдД]$ ]]; then
+    echomsg "$W_DELETE_PROGRAM" 1
+    remove_xray
+    echook "$W_DELETE_PROGRAM_OK"
+    exit 0
+  else
+    select_menu_option
+  fi
+}
+
+install_xray() {
+  clear
+  check_root
+  check_shell
+  check_kernel
+  check_os
+  check_os_ver
+  check_container
+  show_header
+
+  if [[ -f "$path_translation_file" ]]; then
+    cp "$path_translation_file" /opt/.translation.tmp
+  fi
+  remove_xray
+  if [[ -f "/opt/.translation.tmp" ]]; then
+    mkdir -p "$(dirname "$path_translation_file")"
+    mv /opt/.translation.tmp "$path_translation_file"
+  fi
+
+  read -n1 -r -p "$W_PRESS_ANY_KEY_TO_INSTALL"
+
+  install_pkgs
+  check_443port
+  input_server_name
+  download_xray
+  create_configs
+  create_service
+  add_user
+  create_sysctl_config
+  activate_xray
+
+  mv "$(realpath "$0")" "$path_script"
+  chmod +x "$path_script"
+  ln -s "$path_script" "$path_script_link"
+
+  echo -e "\n\033[1;32m$W_INSTALL_COMPLETED\033[0m"
+  show_connect_link
+}
+
+select_menu_option() {
+  clear
+  local menu
+  menu+="XRay server $version\n"
+
+  show_header
+  if systemctl is-active --quiet xrayeb; then
+    menu+="$W_ACTIVE_SERVICE\n"
+    menu+="$W_SELECT_OPTION\n"
+    menu+="$W_STOP\n"
+  else
+    menu+="$W_SERVICE_NOT_ACTIVE\n"
+    menu+="$W_SELECT_OPTION\n"
+    menu+="$W_LAUNCH\n"
+  fi
+
+  menu+="$W_MAIN_MENU"
+  
+  echo -e "$menu"
+
+  read -rp "$W_CHOICE: " option
+  until [[ "$option" =~ ^[1-8]$ ]]; do
+    echoerr "$W_INCORRECT_OPTION"
+    read -rp "$W_CHOICE: " option
+  done
+
+  [[ "$option" =~ ^[1-7]$ ]] && clear
+
+  case "$option" in
+    1)
+      switch_active_service
+    ;;
+    2)
+      reload_service
+    ;;
+    3)
+      show_systemctl_status
+    ;;
+    4)
+      show_connect_link
+    ;;
+    5)
+      change_cloaking_domain
+    ;;
+    6)
+      show_journalctl_log
+    ;;
+    7)
+      accept_remove_xray
+    ;;
+    8)
+      exit 0
+    ;;
+  esac
+}
+
+load_translation
+
+if [[ -f "$path_script" ]]; then
+  select_menu_option
+else
+  install_xray
+fi

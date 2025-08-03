@@ -23,12 +23,14 @@ path_iptables_apply_script="$path_data_dir/iptables/apply.sh"
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 path_sysctl_config="$path_data_dir/sysctl.conf"
 path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
+path_xray_configs_dir="$path_data_dir/xray"
 path_uv_dir="$path_data_dir/astral"
 path_uv_env_file="$path_uv_dir/.env"
 path_uvx="$path_uv_dir/uvx"
 
 ## Links to podman images:
 wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:latest"
+xray_image="docker.io/library/teddysun/xray:latest"
 caddy_image="docker.io/library/caddy:2.10-alpine"
 
 ## Prefix for podman service names, networks, volumes, web interface URLs
@@ -38,7 +40,8 @@ service_prefix="wgeb"
 service_tag=""
 host=""
 email=""
-ss_link=""
+xray_ip=""
+xray_config=""
 port_ui=""
 port_wg=""
 address=""
@@ -196,6 +199,7 @@ remove_install() {
   fi
 
   podman rmi "$wg_easy_image" > /dev/null 2>&1
+  podman rmi "$xray_image" > /dev/null 2>&1
   podman rmi "$caddy_image" > /dev/null 2>&1
 
   if [[ -f "$path_iptables_delete_script" ]]; then
@@ -276,9 +280,9 @@ install_pkgs() {
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get upgrade'"
     (
       apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
-        openssl lsof dnsutils curl idn grep sed nano htop \
+        openssl lsof dnsutils curl idn grep gzip sed nano htop \
       || apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
-        openssl lsof dnsutils curl idn grep sed nano htop
+        openssl lsof dnsutils curl idn grep gzip sed nano htop
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get install'"
 
     # uv https://astral.sh
@@ -539,49 +543,26 @@ input_email() {
   done
 }
 
-input_ss_link() {
+input_xray_link() {
   [[ "$install_mode" = "main" ]] && return
 
-  local ss_clean base64_part ip_port_part public_ip port decoded password method
-
   while true; do
-    echomsg "$W_INPUT_SS_LINK" 1
-    read -rp " > " ss_link
+    echomsg "$W_INPUT_XRAY_LINK" 1
+    read -rp " > " xray_link
     
-    if [ -z "$ss_link" ]; then
+    if [ -z "$xray_link" ]; then
       break
     fi
 
-    [[ "$ss_link" != ss://* ]] && ss_link="ss://${ss_link}"
-
-    ss_clean="${ss_link#ss://}"
-    base64_part="${ss_clean%@*}"
-    ip_port_part="${ss_clean#*@}"
-    public_ip="${ip_port_part%%:*}"
-    port="${ip_port_part##*:}"
-
-    if ! decoded=$(echo "$base64_part" | openssl base64 -d 2>/dev/null); then
-      echoerr "$W_FAILED_DECODE_BASE64"
+    xray_ip="${xray_link%@*}"
+    if ! check_IPv4 "$xray_ip"; then
       continue
     fi
 
-    method="${decoded%%:*}"
-    case "$method" in
-      chacha20-ietf-poly1305|aes-128-gcm|aes-256-gcm)
-        # Everything is okay
-        ;;
-      *)
-        echoerr "$W_UNACCEPTABLE_ENCRYPT_METHOD"
-        continue
-        ;;
-    esac
-
-    if check_IPv4 "$public_ip"; then
-      if ! [[ "$port" =~ ^[0-9]+$ ]] || (( port < 49152 || port > 65535 )); then
-        echoerr "$W_PORT_OUTSIDE_RANGE"
-        continue
-      fi
+    if xray_config=$(echo "${xray_link#*@}" | base64 -d | gzip -d 2>/dev/null); then
       break
+    else
+      echoerr "$W_FAILED_DECODE_BASE64"
     fi
   done
 }
@@ -749,7 +730,7 @@ add_wg_service() {
   local port_wg="${2:-51820}"
   local port_ui="${3:-51821}"
   local address="${4:-10.8.1.x}"
-  local ss_link="${5:-}"
+  local is_proxy="${5:-}"
 
   yq e -i ".services.${service_name} = {
     \"image\": \"${wg_easy_image}\",
@@ -784,17 +765,41 @@ add_wg_service() {
     }
   }" "$path_docker_compose_file"
 
-  if [ -n "$ss_link" ]; then
+  if [ -n "$is_proxy" ]; then
+    local xray_container="xray-$service_name"
+    
+    if ! podman images -q "$xray_image" | grep -q .; then
+      podman pull "$xray_image" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'podman pull $xray_image'"
+    fi
+
+    mkdir -p "$path_xray_configs_dir"
+    local path_xray_config="$path_xray_configs_dir/$xray_container.conf"
+    echo "$xray_config" > "$path_xray_config"
+    xray_config=""
+
     yq e -i "
       .services.${service_name}.devices = [\"/dev/net/tun\"]
     " "$path_docker_compose_file"
 
     yq e -i ".services.${service_name}.environment += {
-        \"WG_DEVICE\": \"sstun\",
-        \"SS_TUN_NAME\": \"sstun\",
-        \"SS_LINK\": \"${ss_link}\"
+        \"WG_DEVICE\": \"tun0\",
+        \"XRAY_IP\": \"${xray_ip}\",
+        \"XRAY_CONTAINER\": \"${xray_container}\"
       }
     " "$path_docker_compose_file"
+
+    yq e -i "
+      .services.${service_name}.depends_on = [\"${xray_container}\"]
+    " "$path_docker_compose_file"
+
+    yq e -i ".services.${xray_container} = {
+      \"image\": \"${xray_image}\",
+      \"container_name\": \"${xray_container}\",
+      \"volumes\": [
+        \"${path_xray_config}:/etc/xray/config.json\",
+      ],
+      \"networks\": [\"${service_prefix}\"]
+    }" "$path_docker_compose_file"
   fi
 
   yq e -i ".volumes += {
@@ -873,7 +878,7 @@ create_wg_install_mode() {
       add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address"
     ;;
     "proxy")
-      add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address" "$ss_link"
+      add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address" "proxy"
     ;;
     *)
       exiterr "$W_UNKNOWN_INSTALL_MODE"
@@ -1083,7 +1088,7 @@ get_env_var_from_service() {
 }
 
 show_services_list() {
-  local service container_status ports status ss_link port_ui address mount_point client_count
+  local service container_status ports status xray_ip port_ui address mount_point client_count
   local output=""
 
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1111,7 +1116,7 @@ show_services_list() {
     output+="\033[0;36m$W_PORTING_PORTS:\033[0m $ports\n"
 
     if [[ "$service" == "${service_prefix}-"* ]]; then
-      ss_link=$(get_env_var_from_service "$service" "SS_LINK" "")
+      xray_ip=$(get_env_var_from_service "$service" "XRAY_IP" "")
       port_ui=$(get_env_var_from_service "$service" "PORT" "-")
       address=$(get_env_var_from_service "$service" "WG_DEFAULT_ADDRESS" "-")
 
@@ -1122,8 +1127,8 @@ show_services_list() {
         client_count="\033[1;31mоvolume not found!\033[0m"
       fi
 
-      if [[ -n "$ss_link" ]]; then
-        output+="\033[0;36m$W_PROXY_MODE:\033[0m shadowsocks -> ${ss_link#*@}\n"
+      if [[ -n "$xray_ip" ]]; then
+        output+="\033[0;36m$W_PROXY_MODE:\033[0m Vless -> ${xray_ip}\n"
       fi
 
       output+="\033[0;36m$W_CLIENTS_SUBNET:\033[0m $address\n"
@@ -1147,7 +1152,7 @@ add_new_wg_service() {
   select_install_mode 1
 
   input_tag
-  input_ss_link
+  input_xray_link
   input_port
   input_address
 
@@ -1156,14 +1161,17 @@ add_new_wg_service() {
   local service_name="$service_prefix-$service_tag"
 
   {
+    if [[ "$(yq e ".services.\"xray-$service_name\"" "$path_docker_compose_file")" != "null" ]]
+    then
+      "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "xray-$service_name"
+    fi
+
     "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "$service_name"
-  } > /dev/null 2>&1
-  
-  {
+
     podman container exists caddy-wgeb && \
     "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate caddy-wgeb
   } > /dev/null 2>&1
-
+  
   wait_for_containers
 
   echo -e "\n\033[1;32m🎉 wg-easy $W_ADDED! \033[0m"
@@ -1182,7 +1190,9 @@ remove_wg_service() {
       return
     fi
 
-    if [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]]; then
+    if [[ "$service_name" == "$service_prefix"* ]] && \
+       [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]];
+    then
       echo -e "$W_DELETE_WG_SETTINGS"
       local msg
       msg="[y/N]: "
@@ -1205,6 +1215,12 @@ remove_wg_service() {
   done
 
   {
+    if [[ "$(yq e ".services.\"xray-$service_name\"" "$path_docker_compose_file")" != "null" ]]
+    then
+      "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "xray-$service_name"
+      yq e -i "del(.services.xray-${service_name})" "$path_docker_compose_file"
+    fi
+
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" 
   } > /dev/null 2>&1
 
@@ -1600,7 +1616,7 @@ install() {
   input_tag
   input_domain
   input_email
-  input_ss_link
+  input_xray_link
   input_port
   input_address
   input_password

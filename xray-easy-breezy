@@ -309,7 +309,7 @@ download_xray() {
   (
     set -e
     mkdir -p "$(dirname "$path_xray")" && \
-    curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache"  -o xray.zip \
+    curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache"  -o xray.zip \
     https://github.com/XTLS/Xray-core/releases/download/${version}/Xray-linux-64.zip && \
     unzip ./xray.zip -d "$path_xray_dir" && \
     chmod +x "$path_xray" && \

@@ -699,7 +699,7 @@ select_menu_option() {
     read -rp "$W_CHOICE: " option
   done
 
-  [[ "$option" =~ ^[1-7]$ ]] && clear
+  [[ "$option" =~ ^[1-8]$ ]] && clear
 
   case "$option" in
     1)
@@ -715,7 +715,7 @@ select_menu_option() {
       show_connect_link
     ;;
     5)
-      change_cloaking_domain
+      select_cloaking_domain_option
     ;;
     6)
       show_journalctl_log

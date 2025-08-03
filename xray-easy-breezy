@@ -351,7 +351,7 @@ create_configs() {
   KEYS=$("$path_xray" x25519)
   PRIVATE_KEY=$(echo "$KEYS" | grep 'Private key' | awk '{print $NF}')
   PUBLIC_KEY=$(echo "$KEYS" | grep 'Public key' | awk '{print $NF}')
-  SHORT_ID=$(openssl rand -base64 8)
+  SHORT_ID=$(openssl rand -hex 3)
   DEST="$SERVER_NAME:443"
   PUBLIC_IP=$(get_public_ip)
 

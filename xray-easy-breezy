@@ -97,7 +97,8 @@ load_translation() {
         >> "$path_translation_file"
     ) || exiterr "Error: 'curl translation'"
   fi
-
+  
+  # shellcheck source=/dev/null
   source "$path_translation_file"
 }
 
@@ -223,7 +224,6 @@ wait_for_apt_unlock() {
     ((waited++))
     if (( waited >= timeout )); then
       exiterr "$W_EXCEEDING_WAIT_TIME ($timeout сек)."
-      return 1
     fi
   done
 }
@@ -246,6 +246,22 @@ install_pkgs() {
       apt-get -yqq install iproute2 iptables openssl lsof dnsutils gzip grep nano htop \
       || apt-get -yqq install iproute2 iptables openssl lsof dnsutils gzip grep nano htop
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get install'"
+
+    # mikefarah yq
+    # https://mikefarah.gitbook.io/yq
+    yq_path=$(command -v yq)
+    if [[ -n "$yq_path" ]]; then
+      if ! yq --version 2>/dev/null | grep -q 'mikefarah'; then
+        rm -f "$yq_path"
+        hash -r 2>/dev/null
+      fi
+    fi
+    if ! command -v yq >/dev/null; then
+      local yq_link="https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64"
+      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" $yq_link \
+        -o /usr/local/bin/yq || exiterr "${W_ERROR}: 'curl yq install'"
+      chmod +x /usr/local/bin/yq
+    fi
   ) & show_spinner $!
 }
 
@@ -579,7 +595,7 @@ select_cloaking_domain_option() {
     echoerr "$W_INCORRECT_OPTION"
     read -rp "$W_CHOICE: " option
   done
-  case "$action" in
+  case "$option" in
     1)
       change_cloaking_domain
     ;;

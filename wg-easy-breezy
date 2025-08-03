@@ -52,6 +52,7 @@ install_mode=""
 load_env() {
   if [ -f "$path_env_file" ]; then
     set -o allexport
+    # shellcheck source=/dev/null
     source "$path_env_file"
     set +o allexport
   fi
@@ -60,6 +61,7 @@ load_env() {
 load_uv_env() {
   if [ -f "$path_uv_env_file" ]; then
     set -o allexport
+    # shellcheck source=/dev/null
     source "$path_uv_env_file"
     set +o allexport
   fi
@@ -136,7 +138,7 @@ load_translation() {
     mkdir -p "$(dirname "$path_env_file")"
     echo "LANG=$translation" > "$path_env_file"
   fi
-
+  # shellcheck source=/dev/null
   source "$path_translation_file"
 }
 
@@ -259,7 +261,6 @@ wait_for_apt_unlock() {
     ((waited++))
     if (( waited >= timeout )); then
       exiterr "$W_EXCEEDING_WAIT_TIME ($timeout sec)."
-      return 1
     fi
   done
 }
@@ -941,7 +942,7 @@ create_sysctl_config () {
 }
 
 create_systemd_unit() {
-  local working_dir path_podman_compose
+  local working_dir
 
   working_dir="$(dirname "$path_docker_compose_file")"
 

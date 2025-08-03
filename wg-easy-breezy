@@ -30,7 +30,7 @@ path_uvx="$path_uv_dir/uvx"
 
 ## Links to podman images:
 wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:latest"
-xray_image="docker.io/library/teddysun/xray:latest"
+xray_image="docker.io/teddysun/xray:latest"
 caddy_image="docker.io/library/caddy:2.10-alpine"
 
 ## Prefix for podman service names, networks, volumes, web interface URLs

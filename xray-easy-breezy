@@ -479,7 +479,7 @@ create_service() {
     echo "Documentation=https://github.com/XTLS/Xray-core"
     echo "After=network.target"
     echo "Wants=network.target"
-    echo$
+    echo
     echo "[Service]"
     echo "PermissionsStartOnly=true"
     echo "ExecStartPre=${iptables_path} -I INPUT -p tcp --dport 443 -j ACCEPT"

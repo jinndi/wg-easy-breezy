@@ -408,7 +408,7 @@ create_configs() {
     echo "  },"
     echo "  \"inbounds\": ["
     echo "    {"
-    echo "      \"listen\": \"127.0.0.1\","
+    echo "      \"listen\": \"0.0.0.0\","
     echo "      \"port\": 10800,"
     echo "      \"protocol\": \"socks\","
     echo "      \"settings\": {"

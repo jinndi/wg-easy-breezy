@@ -797,7 +797,7 @@ add_wg_service() {
       \"image\": \"${xray_image}\",
       \"container_name\": \"${xray_container}\",
       \"volumes\": [
-        \"${path_xray_config}:/etc/xray/config.json\",
+        \"${path_xray_config}:/etc/xray/config.json\"
       ],
       \"networks\": [\"${service_prefix}\"]
     }" "$path_docker_compose_file"

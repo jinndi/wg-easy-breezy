@@ -787,7 +787,7 @@ remove_xray_from_wg_service() {
 
   yq e -i "del(.services.${service_name}.depends_on)" "$path_docker_compose_file"
   {
-    "$path_uvx" podman-compose -f $path_docker_compose_file up -d "$service_name"
+    "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
   } > /dev/null 2>&1
 }
 
@@ -1124,16 +1124,14 @@ show_services_list() {
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
   for service in "${services[@]}"; do
-    container_status=$(podman ps -a --filter "name=${service}" --format "{{.Names}} {{.Status}}" | head -n1)
+    container_status=$(podman ps -a --filter "name=^${service}$" --format "{{.Status}}")
 
     if [[ -z "$container_status" ]]; then
       status="\033[1;34m$W_NOT_LAUNCHED\033[0m"
-    elif [[ "$container_status" == ${service}* ]]; then
-      if [[ "$container_status" =~ Up ]]; then
-        status="\033[1;32m$W_RUNNING\033[0m"
-      else
-        status="\033[1;31m$W_NOT_WORK\033[0m"
-      fi
+    elif [[ "$container_status" =~ ^Up ]]; then
+      status="\033[1;32m$W_RUNNING\033[0m"
+    elif [[ -n "$container_status" ]]; then
+      status="\033[1;31m$W_NOT_WORK\033[0m"
     else
       status="$W_UNKNOWN"
     fi

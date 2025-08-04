@@ -1285,6 +1285,7 @@ change_proxy() {
   [[ -z "$1" ]] && exiterr "change_proxy() service name parameter not passed"
 
   local service_name="${1:-}"
+  local xray_container="xray-$service_name"
   local is_edit="${2:-}"
   install_mode="proxy"
 

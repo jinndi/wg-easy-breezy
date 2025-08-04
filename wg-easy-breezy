@@ -1333,7 +1333,7 @@ proxy_management() {
     if [[ "$service_name" == "$service_prefix"* ]] && \
        [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]];
     then
-      is_proxy=$(get_env_var_from_service "$service_name" "PROXY_IP" "")
+      is_proxy=$(get_env_var_from_service "$service_name" "XRAY_IP" "")
 
       if [[ -z "$is_proxy" ]]; then
         echo -e "$W_SELECT_OPTION"

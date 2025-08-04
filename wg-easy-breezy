@@ -771,6 +771,7 @@ remove_xray_from_wg_service() {
   local xray_container="xray-$service_name"
   {
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$xray_container"
+    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
   } > /dev/null 2>&1
   sleep 2
 
@@ -786,7 +787,7 @@ remove_xray_from_wg_service() {
 
   yq e -i "del(.services.${service_name}.depends_on)" "$path_docker_compose_file"
   {
-    "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
+    "$path_uvx" podman-compose -f $path_docker_compose_file up -d "$service_name"
   } > /dev/null 2>&1
 }
 
@@ -1290,9 +1291,8 @@ change_proxy() {
   install_mode="proxy"
 
   input_xray_link
-  add_xray_to_wg_service "$service_name" 
+  add_xray_to_wg_service "$service_name"
   {
-    "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "xray-$service_name"
     "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
   } > /dev/null 2>&1
   wait_for_containers

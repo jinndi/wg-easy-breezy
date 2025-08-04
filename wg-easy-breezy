@@ -1032,7 +1032,7 @@ wait_for_containers() {
 
       if [[ "$status" == "running" ]]; then
         break
-      elif [[ "$status" == "exited" || "$status" == "stopped" || "$status" == "notfound" ]]; then
+      elif [[ "$status" == "exited" || "$status" == "stopped" || "$status" == "dead" ]]; then
         failed=1
         break
       fi
@@ -1124,16 +1124,15 @@ show_services_list() {
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
   for service in "${services[@]}"; do
-    container_status=$(podman ps -a --filter "name=^${service}$" --format "{{.Status}}")
-
-    if [[ -z "$container_status" ]]; then
+    container_status=$(podman inspect -f '{{.State.Status}}' "$service" 2>/dev/null || echo "notfound")
+    if [[ "$container_status" == "notfound" ]]; then
       status="\033[1;34m$W_NOT_LAUNCHED\033[0m"
-    elif [[ "$container_status" =~ ^Up ]]; then
-      status="\033[1;32m$W_RUNNING\033[0m"
-    elif [[ -n "$container_status" ]]; then
-      status="\033[1;31m$W_NOT_WORK\033[0m"
+    elif [[ "$container_status" == "running" ]]; then
+      status="\033[1;32m$W_RUNNING ($container_status)\033[0m"
+    elif [[ "$container_status" == "exited" || "$container_status" == "stopped" ]]; then
+      status="\033[1;31m$W_NOT_WORK ($container_status)\033[0m"
     else
-      status="$W_UNKNOWN"
+      status="$W_UNKNOWN ($container_status)"
     fi
 
     ports=$(yq -r ".services.\"$service\".ports // [] | join(\", \")" "$path_docker_compose_file")
@@ -1249,10 +1248,11 @@ remove_wg_service() {
   {
     if [[ "$(yq e ".services.\"xray-$service_name\"" "$path_docker_compose_file")" != "null" ]]
     then
+      podman container exists "xray-$service_name" && \
       "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "xray-$service_name"
       yq e -i "del(.services.xray-${service_name})" "$path_docker_compose_file"
     fi
-
+    podman container exists "$service_name" && \
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" 
   } > /dev/null 2>&1
 
@@ -1289,6 +1289,13 @@ change_proxy() {
   install_mode="proxy"
 
   input_xray_link
+  {
+    podman container exists "$xray_container" && \
+    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$xray_container"
+    podman container exists "$service_name" && \
+    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
+  } > /dev/null 2>&1
+
   add_xray_to_wg_service "$service_name"
   {
     "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"

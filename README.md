@@ -21,7 +21,7 @@ Deployment and management of wg-easy containers using Podman, including traffic 
 
 ## Features:
 
-- 💥 Selecting the installation mode for wg-easy: either standard or via a Shadowsocks proxy to another server using tun2socks.
+- 💥 Selection of wg-easy installation mode: standard or via proxy to another server using XRay -> tun2socks.
 
 - ⚡️ Create an XRay VLESS server with XTLS-Reality using the `xray-easy-breezy` script and get the encoded config string to point to in the `wg-easy-breezy` script.
 

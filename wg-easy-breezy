@@ -1123,7 +1123,11 @@ show_services_list() {
 
       if podman volume exists "$service"; then
         mount_point=$(podman volume inspect "$service" --format '{{ .Mountpoint }}')
-        client_count=$(yq '(.clients // {}) | length' "$mount_point/wg0.json")
+        if [[ -f "$mount_point/wg0.json" ]]; then
+          client_count=$(yq '(.clients // {}) | length' "$mount_point/wg0.json")
+        else
+          client_count=0
+        fi
       else
         client_count="\033[1;31mоvolume not found!\033[0m"
       fi

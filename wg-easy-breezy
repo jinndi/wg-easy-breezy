@@ -770,7 +770,9 @@ remove_xray_from_wg_service() {
   local service_name="$1"
   local xray_container="xray-$service_name"
   {
+    podman container exists "$xray_container" && \
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$xray_container"
+    podman container exists "$service_name" && \
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
   } > /dev/null 2>&1
   sleep 2

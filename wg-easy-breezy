@@ -1256,7 +1256,7 @@ remove_wg_service() {
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" 
   } > /dev/null 2>&1
 
-  slep 2
+  sleep 2
 
   local port_wg port_ui
 

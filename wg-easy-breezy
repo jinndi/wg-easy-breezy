@@ -789,7 +789,11 @@ remove_xray_from_wg_service() {
 
   yq e -i "del(.services.${service_name}.depends_on)" "$path_docker_compose_file"
   {
-    "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
+    if ! systemctl is-active --quiet wg-easy-breezy; then
+      systemctl start wg-easy-breezy
+    else
+      "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
+    fi
   } > /dev/null 2>&1
 }
 
@@ -1301,7 +1305,11 @@ change_proxy() {
 
   add_xray_to_wg_service "$service_name"
   {
-    "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
+    if ! systemctl is-active --quiet wg-easy-breezy; then
+      systemctl start wg-easy-breezy
+    else
+      "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
+    fi
   } > /dev/null 2>&1
   wait_for_containers
 

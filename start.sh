@@ -34,8 +34,9 @@ if [ -n "$XRAY_IP" ]; then
   ip route add default dev "$TUN_NAME" metric 50 
 
   echo "[start.sh] Launch tun2socks proxy to $XRAY_IP..."
-  nohup /app/tun2socks -proxy "socks5://$XRAY_CONTAINER:$XRAY_PORT" -interface "$DIF" -device "tun://$TUN_NAME" \
-    -tcp-rcvbuf 1048576 -tcp-sndbuf 1048576 -loglevel "error" > /app/tun2socks.log 2>&1 &
+  nohup /app/tun2socks -proxy "socks5://$XRAY_CONTAINER:$XRAY_PORT" \
+  -interface "$DIF" -device "tun://$TUN_NAME" \
+  -loglevel "error" > /app/tun2socks.log 2>&1 &
 fi
 
 echo "[start.sh] Launch WEB UI server wg-easy..."

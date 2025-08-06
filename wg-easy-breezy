@@ -731,6 +731,10 @@ add_xray_to_wg_service() {
   local xray_container="xray-$service_name"
   local xray_port="10800"
 
+  if [[ $install_mode == "proxy-ss" ]]; then
+    xray_port="10801"
+  fi
+
   if ! podman images -q "$xray_image" | grep -q .; then
     podman pull "$xray_image" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'podman pull $xray_image'"
   fi
@@ -917,8 +921,11 @@ create_wg_install_mode() {
     "main")
       add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address"
     ;;
-    "proxy")
-      add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address" "proxy"
+    "proxy-vless")
+      add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address" "$install_mode"
+    ;;
+    "proxy-ss")
+      add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address" "$install_mode"
     ;;
     *)
       exiterr "$W_UNKNOWN_INSTALL_MODE"
@@ -1470,11 +1477,11 @@ remove_services() {
 
 select_install_mode() {
   local is_menu="${1:-}"
-  local total_items=2
+  local total_items=3
   echo -e "$W_SELECT_INSTALL_MODE"
   if [[ -n "$is_menu" ]]; then
-    echo " 3) $W_RETURN_MENU"
-    total_items=3
+    echo " 4) $W_RETURN_MENU"
+    total_items=4
   fi
 
   read -rp "$W_CHOICE: " mode
@@ -1488,9 +1495,12 @@ select_install_mode() {
       install_mode="main"
     ;;
     2)
-      install_mode="proxy"
+      install_mode="proxy-vless"
     ;;
     3)
+      install_mode="proxy-ss"
+    ;;
+    4)
       select_containers_menu
     ;;
   esac

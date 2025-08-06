@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-Deployment and management of wg-easy containers using Podman, including traffic routing through an XRay VLESS proxy with XTLS-Reality, and configuration of the Caddy web server as a reverse proxy with automatic SSL certificate renewal.
+Deployment and management of wg-easy containers using Podman, including traffic routing through an XRay VLESS proxy with XTLS-Reality / Shadowsocks-2022, and configuration of the Caddy web server as a reverse proxy with automatic SSL certificate renewal.
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@ Deployment and management of wg-easy containers using Podman, including traffic 
 
 - 💥 Selection of wg-easy installation mode: standard or via proxy to another server using XRay -> tun2socks.
 
-- ⚡️ Create an XRay VLESS server with XTLS-Reality using the `xray-easy-breezy` script and get the encoded config string to point to in the `wg-easy-breezy` script.
+- ⚡️ Create an XRay server with VLESS XTLS-Reality + Shadowsocks-2022 using the `xray-easy-breezy` script and get the encoded config string to point to in the `wg-easy-breezy` script.
 
 - 📦 Adding and removing wg-easy containers via the script menu, with all necessary settings applied automatically.
 
@@ -31,7 +31,7 @@ Deployment and management of wg-easy containers using Podman, including traffic 
 
 - 💻 Automatic deployment of the Caddy web server as a reverse proxy with auto-renewing SSL certificate.
 
-- 🔑 Changing the password for the wg-easy web interface(s).
+- 🔑 Changing the password for the wg-easy web interface(s), proxy manager for previously created services.
 
 - 🚀 Optimized network settings on both the server host and within the containers.
 
@@ -58,7 +58,8 @@ Follow the on-screen instructions. You will be prompted to enter the following:
 - **Installation mode**  
   Choose one of the following:
   - Standard
-  - Proxy (XRay VLESS with XTLS-Reality)
+  - Proxy (VLESS-TCP-XTLS-Vision-REALITY)
+  - Proxy (Shadowsocks-2022 blake3-aes-128-gcm)
 
 - **Service tag**  
   Used as a postfix in service names, container names, and web interface URLs.

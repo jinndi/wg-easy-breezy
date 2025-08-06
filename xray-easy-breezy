@@ -536,7 +536,7 @@ create_configs() {
     echo "      },"
     echo "      {"
     echo "        \"type\": \"field\","
-    echo "        \"domain\": [\"geosite:ru\"],"
+    echo "        \"domain\": [\"geosite:private\", \"geosite:category-ru\"],"
     echo "        \"outboundTag\": \"direct\""
     echo "      },"
     echo "      {"

@@ -15,6 +15,7 @@ done
 if [ -n "$XRAY_IP" ]; then
   TUN_NAME="${WG_DEVICE:-tun0}"
   XRAY_CONTAINER="${XRAY_CONTAINER:-xray}"
+  XRAY_PORT="${XRAY_PORT:-10800}"
   DIF=$(ip route | awk '/default/ {print $5}' | head -n1)
   LIP=$(ip -4 addr show "$DIF" | awk '/inet / {print $2}' | cut -d/ -f1)
   MIP=$(ip route | awk '/default via/ {print $3}' | head -n1)
@@ -33,7 +34,7 @@ if [ -n "$XRAY_IP" ]; then
   ip route add default dev "$TUN_NAME" metric 50 
 
   echo "[start.sh] Launch tun2socks proxy to $XRAY_IP..."
-  nohup /app/tun2socks -proxy "socks5://$XRAY_CONTAINER:10800" -interface "$DIF" -device "tun://$TUN_NAME" \
+  nohup /app/tun2socks -proxy "socks5://$XRAY_CONTAINER:$XRAY_PORT" -interface "$DIF" -device "tun://$TUN_NAME" \
     -tcp-rcvbuf 1048576 -tcp-sndbuf 1048576 -loglevel "error" > /app/tun2socks.log 2>&1 &
 fi
 

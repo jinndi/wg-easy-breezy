@@ -1000,7 +1000,7 @@ create_systemd_unit() {
     echo "ExecStop=$path_uvx podman-compose -f $path_docker_compose_file down --timeout 5"
     echo "ExecStopPost=$path_iptables_delete_script"
     echo "Restart=on-failure"
-    echo "RestartSec=10"
+    echo "RestartSec=30"
     echo "LimitNOFILE=51200"
     echo
     echo "[Install]"

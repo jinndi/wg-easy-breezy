@@ -10,10 +10,6 @@
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-## Version XRay
-# https://github.com/XTLS/Xray-core/releases
-version="v25.7.26"
-
 ## Paths:
 path_xray_dir="/opt/xray"
 path_xray="$path_xray_dir/xray"
@@ -24,6 +20,15 @@ path_client_config="$path_xray_dir/config_client.json"
 path_sysctl_config="/etc/sysctl.d/99-xray-easy-breezy.conf"
 path_script="$path_xray_dir/xray-easy-breezy"
 path_script_link="/usr/bin/xrayeb"
+
+## Version XRay
+# https://github.com/XTLS/Xray-core/releases
+version=""
+if [[ -f "$path_xray" ]]; then
+  version="v$("$path_xray" version | awk 'NR==1 {print $2}' | xargs)"
+else
+  version=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
+fi
 
 ## Cloaking domain
 SERVER_NAME=""
@@ -273,6 +278,17 @@ check_443port() {
   return 0
 }
 
+get_random_free_port() {
+  local port
+  while :; do
+    port=$(shuf -i 1024-65535 -n 1)
+    if ! lsof -i :"$port" >/dev/null 2>&1; then
+      echo "$port"
+      return
+    fi
+  done
+}
+
 input_server_name() {
   echo -e "\n$W_INPUT_CLOAKING_DOMAIN\n 1) github.com\n 2) microsoft.com\n 3) samsung.com\n 4) nvidia.com\n 5) amd.com"
 
@@ -341,7 +357,7 @@ create_sysctl_config () {
 }
 
 create_configs() {
-  local CLIENT_ID KEYS PRIVATE_KEY SHORT_ID DEST PUBLIC_IP
+  local CLIENT_ID KEYS PRIVATE_KEY SHORT_ID DEST PUBLIC_IP SS2022_PSK
 
   echomsg "$W_CREATE_CONFIGS" 1
 
@@ -354,6 +370,8 @@ create_configs() {
   SHORT_ID=$(openssl rand -hex 3)
   DEST="$SERVER_NAME:443"
   PUBLIC_IP=$(get_public_ip)
+  SS2022_PSK=$(openssl rand -base64 16)
+  SS2022_PORT=$(get_random_free_port)
 
   # Server config
   {
@@ -389,6 +407,15 @@ create_configs() {
     echo "        \"destOverride\": [\"http\", \"tls\", \"quic\"],"
     echo "        \"routeOnly\": true"
     echo "      }"
+    echo "    },"
+    echo "    {"
+    echo "      \"port\": $SS2022_PORT,"
+    echo "      \"protocol\": \"shadowsocks\","
+    echo "      \"settings\": {"
+    echo "        \"method\": \"2022-blake3-aes-128-gcm\","
+    echo "        \"password\": \"$SS2022_PSK\","
+    echo "        \"network\": \"tcp,udp\""
+    echo "      }"
     echo "    }"
     echo "  ],"
     echo "  \"outbounds\": ["
@@ -411,6 +438,21 @@ create_configs() {
     echo "      \"listen\": \"0.0.0.0\","
     echo "      \"port\": 10800,"
     echo "      \"protocol\": \"socks\","
+    echo "      \"tag\": \"socks-vless\","
+    echo "      \"settings\": {"
+    echo "        \"udp\": true"
+    echo "      },"
+    echo "      \"sniffing\": {"
+    echo "        \"enabled\": true,"
+    echo "        \"destOverride\": [\"http\", \"tls\", \"quic\"],"
+    echo "        \"routeOnly\": true"
+    echo "      }"
+    echo "    },"
+    echo "    {"
+    echo "      \"listen\": \"0.0.0.0\","
+    echo "      \"port\": 10801,"
+    echo "      \"protocol\": \"socks\","
+    echo "      \"tag\": \"socks-ss\","
     echo "      \"settings\": {"
     echo "        \"udp\": true"
     echo "      },"
@@ -424,6 +466,7 @@ create_configs() {
     echo "  \"outbounds\": ["
     echo "    {"
     echo "      \"protocol\": \"vless\","
+    echo "      \"tag\": \"vless-out\","
     echo "      \"settings\": {"
     echo "        \"vnext\": ["
     echo "          {"
@@ -448,12 +491,64 @@ create_configs() {
     echo "          \"serverName\": \"$SERVER_NAME\","
     echo "          \"fingerprint\": \"chrome\""
     echo "        }"
-    echo "      },"
-    echo "      \"tag\": \"proxy\""
+    echo "      }"
+    echo "    },"
+    echo "    {"
+    echo "      \"protocol\": \"shadowsocks\","
+    echo "      \"tag\": \"ss-out\","
+    echo "      \"settings\": {"
+    echo "        \"servers\": ["
+    echo "          {"
+    echo "            \"address\": \"$PUBLIC_IP\","
+    echo "            \"port\": $SS2022_PORT,"
+    echo "            \"method\": \"2022-blake3-aes-128-gcm\","
+    echo "            \"password\": \"$SS2022_PSK\""
+    echo "          }"
+    echo "        ]"
+    echo "      }"
+    echo "    },"
+    echo "    {"
+    echo "      \"protocol\": \"freedom\","
+    echo "      \"tag\": \"direct\","
+    echo "    },"
+    echo "    {"
+    echo "      \"protocol\": \"blackhole\","
+    echo "      \"tag\": \"blocked\""
     echo "    }"
-    echo "  ]"
+    echo "  ],"
+    echo "  \"routing\": {"
+    echo "    \"domainStrategy\": \"AsIs\","
+    echo "    \"rules\": ["
+    echo "      {"
+    echo "        \"type\": \"field\","
+    echo "        \"domain\": [\"geosite:category-ads-all\"],"
+    echo "        \"outboundTag\": \"blocked\""
+    echo "      },"
+    echo "      {"
+    echo "        \"type\": \"field\","
+    echo "        \"inboundTag\": [\"socks-vless\"],"
+    echo "        \"outboundTag\": \"vless-out\""
+    echo "      },"
+    echo "      {"
+    echo "        \"type\": \"field\","
+    echo "        \"inboundTag\": [\"socks-ss\"],"
+    echo "        \"outboundTag\": \"ss-out\""
+    echo "      },"
+    echo "      {"
+    echo "        \"type\": \"field\","
+    echo "        \"domain\": [\"geosite:ru\"],"
+    echo "        \"outboundTag\": \"direct\""
+    echo "      },"
+    echo "      {"
+    echo "        \"type\": \"field\","
+    echo "        \"ip\": [\"geoip:ru\"],"
+    echo "        \"outboundTag\": \"direct\""
+    echo "      }"
+    echo "    ]"
+    echo "  }"
     echo "}"
   } > "$path_client_config"
+
 }
 
 create_service() {
@@ -483,10 +578,14 @@ create_service() {
     echo "[Service]"
     echo "PermissionsStartOnly=true"
     echo "ExecStartPre=${iptables_path} -I INPUT -p tcp --dport 443 -j ACCEPT"
+    echo "ExecStartPre=${iptables_path} -I INPUT -p tcp --dport ${SS2022_PORT} -j ACCEPT"
+    echo "ExecStartPre=${iptables_path} -I INPUT -p udp --dport ${SS2022_PORT} -j ACCEPT"
     echo "ExecStartPre=${iptables_path} -t nat -A PREROUTING -i ${DIF} -p udp --dport 443 -j DNAT --to-destination ${FSIP}:443"
     echo "ExecStartPre=${iptables_path} -t nat -A PREROUTING -i ${DIF} -p tcp --dport 80 -j DNAT --to-destination ${FSIP}:80"
     echo "ExecStart=${path_xray} -c ${path_server_config}"
     echo "ExecStopPost=${iptables_path} -D INPUT -p tcp --dport 443 -j ACCEPT"
+    echo "ExecStopPost=${iptables_path} -D INPUT -p tcp --dport ${SS2022_PORT} -j ACCEPT"
+    echo "ExecStopPost=${iptables_path} -D INPUT -p udp --dport ${SS2022_PORT} -j ACCEPT"
     echo "ExecStopPost=${iptables_path} -t nat -D PREROUTING -i ${DIF} -p udp --dport 443 -j DNAT --to-destination ${FSIP}:443"
     echo "ExecStopPost=${iptables_path} -t nat -D PREROUTING -i ${DIF} -p tcp --dport 80 -j DNAT --to-destination ${FSIP}:80"
     echo "Restart=on-failure"

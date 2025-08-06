@@ -549,10 +549,10 @@ switch_active_service() {
   press_any_side_to_open_menu
 }
 
-reload_service() {
+restart_service() {
   echomsg "$W_RESTART_SERVICE" 1
   systemctl daemon-reload >/dev/null 2>&1
-  systemctl reload xrayeb >/dev/null 2>&1
+  systemctl restart xrayeb >/dev/null 2>&1
   sleep 3
   if systemctl is-active --quiet xrayeb; then
     echook "$W_SERVICE_SUCCESS_RESTARTED"
@@ -575,7 +575,7 @@ change_cloaking_domain() {
   create_service
   echomsg "$W_RESTART_SERVICE" 1
   systemctl daemon-reload >/dev/null 2>&1
-  systemctl reload xrayeb >/dev/null 2>&1
+  systemctl restart xrayeb >/dev/null 2>&1
   echo -e "\n\033[1;32m$W_CLOAKING_DOMAIN_CHANGED\033[0m"
   echo -e "\n$W_LINK_CONNECTION:"
   echo -e "\033[0;36m$(get_public_ip)@$(gzip -c "$path_client_config" | base64 -w 0)\033[0m"
@@ -722,7 +722,7 @@ select_menu_option() {
       switch_active_service
     ;;
     2)
-      reload_service
+      restart_service
     ;;
     3)
       show_systemctl_status

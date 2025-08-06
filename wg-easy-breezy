@@ -1009,7 +1009,7 @@ create_systemd_unit() {
 }
 
 is_all_ok_services() {
-  if [[ ! -e "$path_docker_compose_file" ]]; then
+  if [[ ! -f "$path_docker_compose_file" ]]; then
     return 1
   fi
 

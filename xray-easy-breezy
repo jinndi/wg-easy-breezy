@@ -461,7 +461,7 @@ create_service() {
 
   echomsg "$W_CREATING_SYSTEMD_SERVICE" 1
 
-  FSIP=$(dig + "$SERVER_NAME" | grep -Eo '^[0-9.]+$' | head -n1)
+  FSIP=$(dig +short "$SERVER_NAME" | grep -Eo '^[0-9.]+$' | head -n1)
   DIF=$(ip route | awk '/default/ {print $5}' | head -n1)
 
   # Path to iptables

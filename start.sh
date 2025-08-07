@@ -36,6 +36,7 @@ if [ -n "$XRAY_IP" ]; then
   echo "[start.sh] Launch tun2socks proxy to $XRAY_IP..."
   nohup /app/tun2socks -proxy "socks5://$XRAY_CONTAINER:$XRAY_PORT" \
   -interface "$DIF" -device "tun://$TUN_NAME" \
+  --tcp-sndbuf 131072 --tcp-rcvbuf 131072 --tcp-auto-tuning true \
   -loglevel "error" > /app/tun2socks.log 2>&1 &
 fi
 

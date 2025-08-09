@@ -23,14 +23,13 @@ path_iptables_apply_script="$path_data_dir/iptables/apply.sh"
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 path_sysctl_config="$path_data_dir/sysctl.conf"
 path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
-path_xray_configs_dir="$path_data_dir/xray"
+path_proxy_env_dir="$path_data_dir/xray"
 path_uv_dir="$path_data_dir/astral"
 path_uv_env_file="$path_uv_dir/.env"
 path_uvx="$path_uv_dir/uvx"
 
 ## Links to podman images:
 wg_easy_image="ghcr.io/jinndi/wg-easy-breezy:latest"
-xray_image="ghcr.io/xtls/xray-core:latest"
 caddy_image="docker.io/library/caddy:2.10-alpine"
 
 ## Prefix for podman service names, networks, volumes, web interface URLs
@@ -40,8 +39,7 @@ service_prefix="wgeb"
 service_tag=""
 host=""
 email=""
-xray_ip=""
-xray_config=""
+proxy_env=""
 port_ui=""
 port_wg=""
 address=""
@@ -71,7 +69,7 @@ show_header() {
 echo -e "\033[1;35m"
 cat <<EOF
 ###################################################
-#                 WG-EASY-BREEZY v7               #
+#                 WG-EASY-BREEZY v8               #
 # GitHub:https://github.com/jinndi/wg-easy-breezy #
 ###################################################
 EOF
@@ -200,7 +198,6 @@ remove_install() {
   fi
 
   podman rmi "$wg_easy_image" > /dev/null 2>&1
-  podman rmi "$xray_image" > /dev/null 2>&1
   podman rmi "$caddy_image" > /dev/null 2>&1
 
   if [[ -f "$path_iptables_delete_script" ]]; then
@@ -553,12 +550,7 @@ input_xray_link() {
       break
     fi
 
-    xray_ip="${xray_link%@*}"
-    if ! check_IPv4 "$xray_ip"; then
-      continue
-    fi
-
-    if xray_config=$(echo "${xray_link#*@}" | base64 -d | gzip -d 2>/dev/null); then
+    if proxy_env=$(echo "${xray_link#*@}" | base64 -d | gzip -d 2>/dev/null); then
       break
     else
       echoerr "$W_FAILED_DECODE_BASE64"
@@ -724,75 +716,46 @@ create_iptables_scripts() {
   chmod +x "$path_iptables_apply_script" "$path_iptables_delete_script"
 }
 
-add_xray_to_wg_service() {
-  [[ -z "$1" ]] && exiterr "add_xray_to_wg_service() service name parameter not passed"
+add_proxy_to_wg_service() {
+  [[ -z "$1" ]] && exiterr "add_proxy_to_wg_service() service name parameter not passed"
 
   local service_name="$1"
-  local xray_container="xray-$service_name"
-  local xray_port="10800"
 
-  if [[ $install_mode == "proxy-ss" ]]; then
-    xray_port="10801"
-  fi
+  mkdir -p "$path_proxy_env_dir"
+  local path_proxy_env_file="$path_proxy_env_dir/$service_name.env"
+  echo "$proxy_env" > "$path_proxy_env_file"
+  proxy_env=""
 
-  if ! podman images -q "$xray_image" | grep -q .; then
-    podman pull "$xray_image" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'podman pull $xray_image'"
-  fi
-
-  mkdir -p "$path_xray_configs_dir"
-  local path_xray_config="$path_xray_configs_dir/$xray_container.conf"
-  echo "$xray_config" > "$path_xray_config"
-  xray_config=""
-
-  yq e -i "
-    .services.${service_name}.devices = [\"/dev/net/tun\"]
-  " "$path_docker_compose_file"
+  yq e -i ".services.${service_name}.env_file = \"${path_proxy_env_file}\"" "$path_docker_compose_file"
 
   yq e -i ".services.${service_name}.environment += {
-      \"WG_DEVICE\": \"tun0\",
-      \"XRAY_IP\": \"${xray_ip}\",
-      \"XRAY_CONTAINER\": \"${xray_container}\",
-      \"XRAY_PORT\": \"${xray_port}\"
+      \"WG_DEVICE\": \"tun0\"
     }
   " "$path_docker_compose_file"
 
-  yq e -i "
-    .services.${service_name}.depends_on = [\"${xray_container}\"]
+  yq e -i ".services.${service_name}.devices = [\"/dev/net/tun\"]
   " "$path_docker_compose_file"
-
-  yq e -i ".services.${xray_container} = {
-    \"image\": \"${xray_image}\",
-    \"container_name\": \"${xray_container}\",
-    \"command\": \"run -config /etc/xray/config.json\",
-    \"volumes\": [\"${path_xray_config}:/etc/xray/config.json:ro\"],
-    \"networks\": [\"${service_prefix}\"]
-  }" "$path_docker_compose_file"
 }
 
-remove_xray_from_wg_service() {
-  [[ -z "$1" ]] && exiterr "remove_xray_from_wg_service() service name parameter not passed"
+remove_proxy_from_wg_service() {
+  [[ -z "$1" ]] && exiterr "remove_proxy_from_wg_service() service name parameter not passed"
 
   local service_name="$1"
-  local xray_container="xray-$service_name"
+
   {
-    podman container exists "$xray_container" && \
-    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$xray_container"
     podman container exists "$service_name" && \
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
   } > /dev/null 2>&1
-  sleep 2
+  sleep 1
 
-  rm -f "$path_xray_configs_dir/$xray_container.conf"
+  rm -f "$path_proxy_env_dir/$service_name.env"
 
-  yq e -i "del(.services.${xray_container})" "$path_docker_compose_file"
+  yq e -i "del(.services.${service_name}.env_file)" "$path_docker_compose_file"
+
+  yq e -i "del(.services.${service_name}.environment.WG_DEVICE)" "$path_docker_compose_file"
 
   yq e -i "del(.services.${service_name}.devices)" "$path_docker_compose_file"
 
-  for key in WG_DEVICE XRAY_IP XRAY_CONTAINER; do
-    yq e -i "del(.services.${service_name}.environment.${key})" "$path_docker_compose_file"
-  done
-
-  yq e -i "del(.services.${service_name}.depends_on)" "$path_docker_compose_file"
   {
     if ! systemctl is-active --quiet wg-easy-breezy; then
       systemctl start wg-easy-breezy
@@ -843,7 +806,7 @@ add_wg_service() {
   }" "$path_docker_compose_file"
 
   if [ -n "$is_proxy" ]; then
-    add_xray_to_wg_service "$service_name"
+    add_proxy_to_wg_service "$service_name"
   fi
 
   yq e -i ".volumes += {
@@ -922,9 +885,6 @@ create_wg_install_mode() {
       add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address"
     ;;
     "proxy-vless")
-      add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address" "$install_mode"
-    ;;
-    "proxy-ss")
       add_wg_service "$service_tag" "$port_wg" "$port_ui" "$address" "$install_mode"
     ;;
     *)
@@ -1133,7 +1093,7 @@ get_env_var_from_service() {
 
 show_services_list() {
   local service container_status ports status port_ui address mount_point client_count
-  local xray_ip xray_port xray_proto 
+  local path_proxy_env_file proxy_ip   
   local output=""
 
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1158,11 +1118,6 @@ show_services_list() {
     output+="\033[0;36m$W_PORTING_PORTS:\033[0m $ports\n"
 
     if [[ "$service" == "${service_prefix}-"* ]]; then
-      xray_ip=$(get_env_var_from_service "$service" "XRAY_IP" "")
-      xray_port=$(get_env_var_from_service "$service" "XRAY_PORT" "")
-      xray_proto="Vless Reality"
-      [[ -n "$xray_port" && "$xray_port" == "10801" ]] && xray_proto="Shadowsocks"
-      
       port_ui=$(get_env_var_from_service "$service" "PORT" "-")
       address=$(get_env_var_from_service "$service" "WG_DEFAULT_ADDRESS" "-")
 
@@ -1177,8 +1132,12 @@ show_services_list() {
         client_count="\033[1;31mоvolume not found!\033[0m"
       fi
 
-      if [[ -n "$xray_ip" ]]; then
-        output+="\033[0;36m$W_PROXY_MODE:\033[0m $xray_proto -> ${xray_ip}\n"
+      path_proxy_env_file="$path_proxy_env_dir/$service.env"
+      if [[ -f "$path_proxy_env_file" ]]; then
+        proxy_ip=$(grep -E '^VLESS_IP=' "$path_proxy_env_file" | cut -d '=' -f2-)
+        if [[ -n "$proxy_ip" ]]; then
+          output+="\033[0;36m$W_PROXY_MODE:\033[0m Vless Reality -> ${proxy_ip}\n"
+        fi
       fi
 
       output+="\033[0;36m$W_CLIENTS_SUBNET:\033[0m $address\n"
@@ -1211,11 +1170,6 @@ add_new_wg_service() {
   local service_name="$service_prefix-$service_tag"
 
   {
-    if [[ "$(yq e ".services.\"xray-$service_name\"" "$path_docker_compose_file")" != "null" ]]
-    then
-      "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "xray-$service_name"
-    fi
-
     "$path_uvx" podman-compose -f "$path_docker_compose_file" up -d "$service_name"
 
     podman container exists caddy-wgeb && \
@@ -1265,17 +1219,11 @@ remove_wg_service() {
   done
 
   {
-    if [[ "$(yq e ".services.\"xray-$service_name\"" "$path_docker_compose_file")" != "null" ]]
-    then
-      podman container exists "xray-$service_name" && \
-      "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "xray-$service_name"
-      yq e -i "del(.services.xray-${service_name})" "$path_docker_compose_file"
-    fi
     podman container exists "$service_name" && \
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name" 
   } > /dev/null 2>&1
 
-  sleep 2
+  sleep 1
 
   local port_wg port_ui
 
@@ -1304,19 +1252,16 @@ change_proxy() {
   [[ -z "$1" ]] && exiterr "change_proxy() service name parameter not passed"
 
   local service_name="${1:-}"
-  local xray_container="xray-$service_name"
   local is_edit="${2:-}"
-  install_mode="proxy"
+  install_mode="proxy-vless"
 
   input_xray_link
   {
-    podman container exists "$xray_container" && \
-    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$xray_container"
     podman container exists "$service_name" && \
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
   } > /dev/null 2>&1
 
-  add_xray_to_wg_service "$service_name"
+  add_proxy_to_wg_service "$service_name"
   {
     if ! systemctl is-active --quiet wg-easy-breezy; then
       systemctl start wg-easy-breezy
@@ -1340,57 +1285,15 @@ remove_proxy() {
 
   local service_name="${1:-}"
 
-  remove_xray_from_wg_service "$service_name"
+  remove_proxy_from_wg_service "$service_name"
   wait_for_containers
   echook "$W_PROXY_DELETED!"
 
   press_any_side_to_open_menu "proxy"
 }
 
-change_proto() {
-  [[ -z "$1" ]] && exiterr "change_proto() service name parameter not passed"
-  local service_name current_xray_port xray_port xray_proto_name
-
-  service_name="${1:-}"
-  current_xray_port=$(get_env_var_from_service "$service_name" "XRAY_PORT" "")
-  xray_port="10800"
-  xray_proto_name="VLESS-TCP-XTLS-Vision-REALITY"
-
-
-  [[ -z "$current_xray_port" ]] && echoerr "${W_ERROR}: current XRAY_PORT empty"
-
-  {
-    podman container exists "$service_name" && \
-    "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
-  } > /dev/null 2>&1
-   
-  if [[ "$current_xray_port" == "10800" ]]; then
-    xray_port="10801"
-    xray_proto_name="Shadowsocks-2022 blake3-aes-128-gcm"
-  else
-    xray_port="10800"
-  fi
-
-  yq e -i ".services.${service_name}.environment += {
-    \"XRAY_PORT\": \"${xray_port}\"
-  }
-  " "$path_docker_compose_file"
-
-  {
-    if ! systemctl is-active --quiet wg-easy-breezy; then
-      systemctl start wg-easy-breezy
-    else
-      "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
-    fi
-  } > /dev/null 2>&1
-  wait_for_containers
-
-  echook "$W_PROXY_PROTO_CHANGE -> $xray_proto_name"
-  press_any_side_to_open_menu "proxy"
-}
-
 proxy_management() {
-  local is_proxy proto
+  local is_proxy
 
   while true; do
     echo -e "$W_INPUT_SERVICE_NAME_PROXY"
@@ -1404,9 +1307,7 @@ proxy_management() {
     if [[ "$service_name" == "$service_prefix"* ]] && \
        [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]];
     then
-      is_proxy=$(get_env_var_from_service "$service_name" "XRAY_IP" "")
-
-      if [[ -z "$is_proxy" ]]; then
+      if [[ -f "$path_proxy_env_dir/$service_name.env" ]]; then
         echo -e "$W_SELECT_OPTION"
         echo -e "$W_NO_PROXY_OPTIONS"
         read -rp "$W_CHOICE: " action
@@ -1429,7 +1330,7 @@ proxy_management() {
         echo -e "$W_PROXY_OPTIONS"
         read -rp "$W_CHOICE: " action
 
-        until [[ "$action" =~ ^[1-4]$ ]]; do
+        until [[ "$action" =~ ^[1-3]$ ]]; do
           echoerr "$W_INCORRECT_OPTION"
           read -rp "$W_CHOICE: " action
         done
@@ -1442,9 +1343,6 @@ proxy_management() {
             remove_proxy "$service_name"
           ;;
           3)
-            change_proto "$service_name"
-          ;;
-          4)
             select_containers_menu
           ;;
         esac   
@@ -1477,11 +1375,11 @@ remove_services() {
 
 select_install_mode() {
   local is_menu="${1:-}"
-  local total_items=3
+  local total_items=2
   echo -e "$W_SELECT_INSTALL_MODE"
   if [[ -n "$is_menu" ]]; then
-    echo " 4) $W_RETURN_MENU"
-    total_items=4
+    echo " 3) $W_RETURN_MENU"
+    total_items=3
   fi
 
   read -rp "$W_CHOICE: " mode
@@ -1498,9 +1396,6 @@ select_install_mode() {
       install_mode="proxy-vless"
     ;;
     3)
-      install_mode="proxy-ss"
-    ;;
-    4)
       select_containers_menu
     ;;
   esac

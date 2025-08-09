@@ -12,33 +12,114 @@ done
 
 /sbin/sysctl -p > /dev/null 2>&1
 
-if [ -n "$XRAY_IP" ]; then
-  TUN_NAME="${WG_DEVICE:-tun0}"
-  XRAY_CONTAINER="${XRAY_CONTAINER:-xray}"
-  XRAY_PORT="${XRAY_PORT:-10800}"
-  DIF=$(ip route | awk '/default/ {print $5}' | head -n1)
-  LIP=$(ip -4 addr show "$DIF" | awk '/inet / {print $2}' | cut -d/ -f1)
-  MIP=$(ip route | awk '/default via/ {print $3}' | head -n1)
+if [ -n "$VLESS_IP" ]; then
 
-  echo "[start.sh] Configure $TUN_NAME interface..."
-  ip tuntap add dev "$TUN_NAME" mode tun 2>/dev/null || true
-  ip addr add 192.168.0.33/24 dev "$TUN_NAME"
-  ip link set "$TUN_NAME" up
+LOG_LEVEL="${LOG_LEVEL:-warn}"
+PROXY_DNS="${PROXY_DNS:-1.1.1.1}"
+TUN_STACK="${TUN_STACK:-system}"
 
-  echo "[start.sh] Configure ip routing...."
-  ip route del default dev "$DIF"
-  ip route add default via "$MIP" dev "$DIF" metric 200
-  ip rule add from "$LIP" table lip
-  ip route add default via "$MIP" dev "$DIF" table lip
-  ip route add "$XRAY_IP/32" via "$MIP" dev "$DIF"
-  ip route add default dev "$TUN_NAME" metric 50 
+# vless reality
+VLESS_IP="${VLESS_IP:-}"
+VLESS_PORT="${VLESS_PORT:-443}"
+VLESS_ID="${VLESS_ID:-}"
+VLESS_FLOW="${VLESS_FLOW:-xtls-rprx-vision}"
+VLESS_SNI="${VLESS_SNI:-}"
+VLESS_FINGERPRINT="${VLESS_FINGER_PRINT:-chrome}"
+VLESS_PUBLIC_KEY="${VLESS_PUBLIC_KEY:-}"
+VLESS_SHORT_ID="${VLESS_SHORT_ID:-}"
 
-  echo "[start.sh] Launch tun2socks proxy to $XRAY_IP..."
-  nohup /app/tun2socks -proxy "socks5://$XRAY_CONTAINER:$XRAY_PORT" \
-  -interface "$DIF" -device "tun://$TUN_NAME" \
-  --tcp-sndbuf 2097152 --tcp-rcvbuf 2097152  \
-  -loglevel "error" > /app/tun2socks.log 2>&1 &
+cat << EOF > /app/singbox.json
+{
+  "log": {
+    "level": "${LOG_LEVEL}",
+    "timestamp": false
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "dns-proxy",
+        "type": "tls",
+        "server": "${PROXY_DNS}"
+      }
+    ],
+    "strategy": "prefer_ipv4"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "tun0",
+      "mtu": 1500,
+      "address": "172.18.0.1/30",
+      "auto_route": true,
+      "auto_redirect": true,
+      "strict_route": true,
+      "stack": "${TUN_STACK}"
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "vless-out",
+      "type": "vless",
+      "server": "${VLESS_IP}",
+      "server_port": ${VLESS_PORT},
+      "uuid": "${VLESS_ID}",
+      "flow": "${VLESS_FLOW}",
+      "packet_encoding": "xudp",
+      "tls": {
+        "enabled": true,
+        "insecure": false,
+        "server_name": "${VLESS_SNI}",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "${VLESS_FINGERPRINT}"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": "${VLESS_PUBLIC_KEY}",
+          "short_id": "${VLESS_SHORT_ID}"
+        }
+      }
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-proxy",
+    "final": "vless-out",
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "direct"
+      }
+    ]
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    }
+  }
+}
+EOF
+
+echo "[start.sh] sing-box check cofig"
+sing-box check -c /app/singbox.json --disable-color || {
+  echo "[start.sh] sing-box cofig error" && exit 1
+}
+
+echo "[start.sh] Launch sing-box proxy to $VLESS_IP"
+nohup sing-box run -c /app/singbox.json --disable-color  2>&1 &
 fi
 
-echo "[start.sh] Launch WEB UI server wg-easy..."
+echo "[start.sh] Launch WEB UI server wg-easy"
 exec node /app/server.js

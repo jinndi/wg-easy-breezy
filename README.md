@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-Deployment and management of wg-easy containers using Podman, including traffic routing through an XRay VLESS proxy with XTLS-Reality / Shadowsocks-2022, and configuration of the Caddy web server as a reverse proxy with automatic SSL certificate renewal.
+Deployment and management of wg-easy containers using Podman, including traffic routing through an XRay VLESS proxy with XTLS-Reality, and configuration of the Caddy web server as a reverse proxy with automatic SSL certificate renewal.
 </p>
 
 <p align="center">
@@ -21,9 +21,9 @@ Deployment and management of wg-easy containers using Podman, including traffic 
 
 ## Features:
 
-- 💥 Selection of wg-easy installation mode: standard or via proxy to another server using XRay -> tun2socks.
+- 💥 Selection of the wg-easy installation mode: standard, or via a proxy to the XRay server using sing-box.
 
-- ⚡️ Create an XRay server with VLESS XTLS-Reality + Shadowsocks-2022 using the `xray-easy-breezy` script and get the encoded config string to point to in the `wg-easy-breezy` script.
+- ⚡️ Create an XRay server with VLESS XTLS-Reality using the `xray-easy-breezy` script and get the encoded config string to point to in the `wg-easy-breezy` script.
 
 - 📦 Adding and removing wg-easy containers via the script menu, with all necessary settings applied automatically.
 
@@ -57,9 +57,8 @@ Follow the on-screen instructions. You will be prompted to enter the following:
 
 - **Installation mode**  
   Choose one of the following:
-  - Standard
-  - Proxy (VLESS-TCP-XTLS-Vision-REALITY)
-  - Proxy (Shadowsocks-2022 blake3-aes-128-gcm)
+  - Standard wg-easy
+  - Proxy wg-easy (VLESS-TCP-XTLS-Vision-REALITY)
 
 - **Service tag**  
   Used as a postfix in service names, container names, and web interface URLs.
@@ -105,7 +104,7 @@ The installed server is managed using the `wgeb` command
 ## Links:
 1. [Github wg-easy](https://github.com/wg-easy/wg-easy)
 2. [Github XRay](https://github.com/XTLS/Xray-core)
-3. [Github tun2socks](https://github.com/xjasonlyu/tun2socks)
+3. [Github sing-box](https://github.com/SagerNet/sing-box)
 4. [Github caddy](https://github.com/caddyserver/caddy)
 5. [Cheap and high-quality VPS (just.hosting)](https://just.hosting/?ref=231025 )
 6. [The Best Domain Registrar (namecheap.com)](https://www.namecheap.com)

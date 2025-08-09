@@ -16,7 +16,7 @@ path_xray="$path_xray_dir/xray"
 path_translation_file="$path_xray_dir/translation"
 path_service="/etc/systemd/system/xrayeb.service"
 path_server_config="$path_xray_dir/config.json"
-path_client_config="$path_xray_dir/config_client.json"
+path_client_env_file="$path_xray_dir/client.env"
 path_sysctl_config="/etc/sysctl.d/99-xray-easy-breezy.conf"
 path_script="$path_xray_dir/xray-easy-breezy"
 path_script_link="/usr/bin/xrayeb"
@@ -248,8 +248,8 @@ install_pkgs() {
       apt-get -yqq upgrade || apt-get -yqq upgrade
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get upgrade'"
     (
-      apt-get -yqq install iproute2 iptables openssl lsof dnsutils gzip grep nano htop \
-      || apt-get -yqq install iproute2 iptables openssl lsof dnsutils gzip grep nano htop
+      apt-get -yqq install iproute2 iptables openssl lsof dnsutils unzip gzip grep nano htop \
+      || apt-get -yqq install iproute2 iptables openssl lsof dnsutils unzip gzip grep nano htop
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get install'"
 
     # mikefarah yq
@@ -357,12 +357,12 @@ create_sysctl_config () {
 }
 
 create_configs() {
-  local CLIENT_ID KEYS PRIVATE_KEY SHORT_ID DEST PUBLIC_IP SS2022_PSK
+  local CLIENT_ID KEYS PRIVATE_KEY SHORT_ID DEST PUBLIC_IP
 
   echomsg "$W_CREATE_CONFIGS" 1
 
   mkdir -p "$(dirname "$path_server_config")"
-  mkdir -p "$(dirname "$path_client_config")"
+  mkdir -p "$(dirname "$path_client_env_file")"
   CLIENT_ID=$("$path_xray" uuid)
   KEYS=$("$path_xray" x25519)
   PRIVATE_KEY=$(echo "$KEYS" | grep 'Private key' | awk '{print $NF}')
@@ -370,8 +370,6 @@ create_configs() {
   SHORT_ID=$(openssl rand -hex 3)
   DEST="$SERVER_NAME:443"
   PUBLIC_IP=$(get_public_ip)
-  SS2022_PSK=$(openssl rand -base64 16)
-  SS2022_PORT=$(get_random_free_port)
 
   # Server config
   {
@@ -407,15 +405,6 @@ create_configs() {
     echo "        \"destOverride\": [\"http\", \"tls\", \"quic\"],"
     echo "        \"routeOnly\": true"
     echo "      }"
-    echo "    },"
-    echo "    {"
-    echo "      \"port\": $SS2022_PORT,"
-    echo "      \"protocol\": \"shadowsocks\","
-    echo "      \"settings\": {"
-    echo "        \"method\": \"2022-blake3-aes-128-gcm\","
-    echo "        \"password\": \"$SS2022_PSK\","
-    echo "        \"network\": \"tcp,udp\""
-    echo "      }"
     echo "    }"
     echo "  ],"
     echo "  \"outbounds\": ["
@@ -427,128 +416,14 @@ create_configs() {
     echo "}"
   } > "$path_server_config"
 
-  # Client config
+  # Client env file
   {
-    echo "{"
-    echo "  \"log\": {"
-    echo "    \"loglevel\": \"info\""
-    echo "  },"
-    echo "  \"inbounds\": ["
-    echo "    {"
-    echo "      \"listen\": \"0.0.0.0\","
-    echo "      \"port\": 10800,"
-    echo "      \"protocol\": \"socks\","
-    echo "      \"tag\": \"socks-vless\","
-    echo "      \"settings\": {"
-    echo "        \"udp\": true"
-    echo "      },"
-    echo "      \"sniffing\": {"
-    echo "        \"enabled\": true,"
-    echo "        \"destOverride\": [\"http\", \"tls\", \"quic\"],"
-    echo "        \"routeOnly\": true"
-    echo "      }"
-    echo "    },"
-    echo "    {"
-    echo "      \"listen\": \"0.0.0.0\","
-    echo "      \"port\": 10801,"
-    echo "      \"protocol\": \"socks\","
-    echo "      \"tag\": \"socks-ss\","
-    echo "      \"settings\": {"
-    echo "        \"udp\": true"
-    echo "      },"
-    echo "      \"sniffing\": {"
-    echo "        \"enabled\": true,"
-    echo "        \"destOverride\": [\"http\", \"tls\", \"quic\"],"
-    echo "        \"routeOnly\": true"
-    echo "      }"
-    echo "    }"
-    echo "  ],"
-    echo "  \"outbounds\": ["
-    echo "    {"
-    echo "      \"protocol\": \"vless\","
-    echo "      \"tag\": \"vless-out\","
-    echo "      \"settings\": {"
-    echo "        \"vnext\": ["
-    echo "          {"
-    echo "            \"address\": \"$PUBLIC_IP\","
-    echo "            \"port\": 443,"
-    echo "            \"users\": ["
-    echo "              {"
-    echo "                \"id\": \"$CLIENT_ID\","
-    echo "                \"encryption\": \"none\","
-    echo "                \"flow\": \"xtls-rprx-vision\""
-    echo "              }"
-    echo "            ]"
-    echo "          }"
-    echo "        ]"
-    echo "      },"
-    echo "      \"streamSettings\": {"
-    echo "        \"network\": \"tcp\","
-    echo "        \"security\": \"reality\","
-    echo "        \"realitySettings\": {"
-    echo "          \"publicKey\": \"$PUBLIC_KEY\","
-    echo "          \"shortId\": \"$SHORT_ID\","
-    echo "          \"serverName\": \"$SERVER_NAME\","
-    echo "          \"fingerprint\": \"chrome\""
-    echo "        }"
-    echo "      }"
-    echo "    },"
-    echo "    {"
-    echo "      \"protocol\": \"shadowsocks\","
-    echo "      \"tag\": \"ss-out\","
-    echo "      \"settings\": {"
-    echo "        \"servers\": ["
-    echo "          {"
-    echo "            \"address\": \"$PUBLIC_IP\","
-    echo "            \"port\": $SS2022_PORT,"
-    echo "            \"method\": \"2022-blake3-aes-128-gcm\","
-    echo "            \"password\": \"$SS2022_PSK\""
-    echo "          }"
-    echo "        ]"
-    echo "      }"
-    echo "    },"
-    echo "    {"
-    echo "      \"protocol\": \"freedom\","
-    echo "      \"tag\": \"direct\""
-    echo "    },"
-    echo "    {"
-    echo "      \"protocol\": \"blackhole\","
-    echo "      \"tag\": \"blocked\""
-    echo "    }"
-    echo "  ],"
-    echo "  \"routing\": {"
-    echo "    \"domainStrategy\": \"AsIs\","
-    echo "    \"rules\": ["
-    echo "      {"
-    echo "        \"type\": \"field\","
-    echo "        \"domain\": [\"geosite:category-ads-all\"],"
-    echo "        \"outboundTag\": \"blocked\""
-    echo "      },"
-    echo "      {"
-    echo "        \"type\": \"field\","
-    echo "        \"domain\": [\"geosite:private\", \"geosite:category-ru\"],"
-    echo "        \"outboundTag\": \"direct\""
-    echo "      },"
-    echo "      {"
-    echo "        \"type\": \"field\","
-    echo "        \"ip\": [\"geoip:ru\"],"
-    echo "        \"outboundTag\": \"direct\""
-    echo "      },"
-    echo "      {"
-    echo "        \"type\": \"field\","
-    echo "        \"inboundTag\": [\"socks-vless\"],"
-    echo "        \"outboundTag\": \"vless-out\""
-    echo "      },"
-    echo "      {"
-    echo "        \"type\": \"field\","
-    echo "        \"inboundTag\": [\"socks-ss\"],"
-    echo "        \"outboundTag\": \"ss-out\""
-    echo "      }"
-    echo "    ]"
-    echo "  }"
-    echo "}"
-  } > "$path_client_config"
-
+    echo "VLESS_IP=$PUBLIC_IP"
+    echo "VLESS_ID=$CLIENT_ID"
+    echo "VLESS_SNI=$SERVER_NAME"
+    echo "VLESS_PUBLIC_KEY=$PUBLIC_KEY"
+    echo "VLESS_SHORT_ID=$SHORT_ID"
+  } > "$path_client_env_file"
 }
 
 create_service() {
@@ -578,14 +453,10 @@ create_service() {
     echo "[Service]"
     echo "PermissionsStartOnly=true"
     echo "ExecStartPre=${iptables_path} -I INPUT -p tcp --dport 443 -j ACCEPT"
-    echo "ExecStartPre=${iptables_path} -I INPUT -p tcp --dport ${SS2022_PORT} -j ACCEPT"
-    echo "ExecStartPre=${iptables_path} -I INPUT -p udp --dport ${SS2022_PORT} -j ACCEPT"
     echo "ExecStartPre=${iptables_path} -t nat -A PREROUTING -i ${DIF} -p udp --dport 443 -j DNAT --to-destination ${FSIP}:443"
     echo "ExecStartPre=${iptables_path} -t nat -A PREROUTING -i ${DIF} -p tcp --dport 80 -j DNAT --to-destination ${FSIP}:80"
     echo "ExecStart=${path_xray} -c ${path_server_config}"
     echo "ExecStopPost=${iptables_path} -D INPUT -p tcp --dport 443 -j ACCEPT"
-    echo "ExecStopPost=${iptables_path} -D INPUT -p tcp --dport ${SS2022_PORT} -j ACCEPT"
-    echo "ExecStopPost=${iptables_path} -D INPUT -p udp --dport ${SS2022_PORT} -j ACCEPT"
     echo "ExecStopPost=${iptables_path} -t nat -D PREROUTING -i ${DIF} -p udp --dport 443 -j DNAT --to-destination ${FSIP}:443"
     echo "ExecStopPost=${iptables_path} -t nat -D PREROUTING -i ${DIF} -p tcp --dport 80 -j DNAT --to-destination ${FSIP}:80"
     echo "Restart=on-failure"
@@ -663,7 +534,7 @@ restart_service() {
 
 show_connect_link() {
   echo -e "\n$W_LINK_CONNECTION:"
-  echo -e "\033[0;36m$(get_public_ip)@$(gzip -c "$path_client_config" | base64 -w 0)\033[0m"
+  echo -e "\033[0;36m$(gzip -c "$path_client_env_file" | base64 -w 0)\033[0m"
   press_any_side_to_open_menu
 }
 
@@ -677,7 +548,7 @@ change_cloaking_domain() {
   systemctl restart xrayeb >/dev/null 2>&1
   echo -e "\n\033[1;32m$W_CLOAKING_DOMAIN_CHANGED\033[0m"
   echo -e "\n$W_LINK_CONNECTION:"
-  echo -e "\033[0;36m$(get_public_ip)@$(gzip -c "$path_client_config" | base64 -w 0)\033[0m"
+  echo -e "\033[0;36m$(gzip -c "$path_client_env_file" | base64 -w 0)\033[0m"
   echomsg "------------------------------------------------"
   read -n1 -r -p "$W_PRESS_ANY_KEY_TO_OPEN_MENU"
   select_cloaking_domain_option
@@ -719,7 +590,7 @@ remove_xray() {
     systemctl stop xrayeb
     systemctl disable xrayeb
     rm -f "$path_server_config"
-    rm -f "$path_client_config"
+    rm -f "$path_client_env_file"
     rm -f "$path_service"
     rm -f "$path_sysctl_config" 
     rm -f "$path_script"

@@ -8,7 +8,7 @@ FROM ghcr.io/wg-easy/wg-easy:14
 LABEL org.opencontainers.image.title="wg-easy-breezy" \
     org.opencontainers.image.description="wg-easy v14 mod" \
     org.opencontainers.image.authors="Jinndi <alncores@gmail.com>" \
-    org.opencontainers.image.version="8"
+    org.opencontainers.image.version="7"
 
 WORKDIR /app
 

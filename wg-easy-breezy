@@ -69,7 +69,7 @@ show_header() {
 echo -e "\033[1;35m"
 cat <<EOF
 ###################################################
-#                 WG-EASY-BREEZY v8               #
+#                 WG-EASY-BREEZY v7               #
 # GitHub:https://github.com/jinndi/wg-easy-breezy #
 ###################################################
 EOF

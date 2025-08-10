@@ -155,7 +155,8 @@ mergeconf() {
   tmpout=$(mktemp 2>/dev/null)
 
   if ! sing-box merge "$tmpout" \
-    -c "$PATH_SINGBOX_CONFIG" -c "$patch_file" >/dev/null; 
+    -c "$PATH_SINGBOX_CONFIG" -c "$patch_file" \
+    >/dev/null 2>&1; 
   then
     echo "[start.sh] sing-box merge config error"
     rm -f "$patch_file" "$tmpout"

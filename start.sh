@@ -152,7 +152,7 @@ EOF
 mergeconf() {
   local patch_file="$1"
   local tmpout
-  tmpout=$(mktemp)
+  tmpout=$(mktemp 2>/dev/null)
 
   if ! sing-box merge "$tmpout" \
     -c "$PATH_SINGBOX_CONFIG" -c "$patch_file" >/dev/null; 
@@ -215,7 +215,7 @@ add_all_rule_sets() {
   echo "[start.sh] sing-box add rules"
 
   local tmpfile
-  tmpfile=$(mktemp)
+  tmpfile=$(mktemp 2>/dev/null)
 
   local first_rule=true
   local first_rs=true

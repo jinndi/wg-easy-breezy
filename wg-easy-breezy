@@ -1152,7 +1152,7 @@ show_services_list() {
           output+="\033[0;36m$W_PROXY_MODE:\033[0m Vless Reality -> ${proxy_ip}\n"
         fi
         if [[ -n "$geosite_rules" ]]; then
-          output+="\033[0;36m$W_GEOSITE_BYPASS:\033[0m ${geoip_rules}\n"
+          output+="\033[0;36m$W_GEOSITE_BYPASS:\033[0m ${geosite_rules}\n"
         fi
         if [[ -n "$geoip_rules" ]]; then
           output+="\033[0;36m$W_GEOIP_BYPASS:\033[0m ${geoip_rules}\n"
@@ -1313,7 +1313,7 @@ change_geo_rules() {
   local service_name="${1:-}"
   local geosite_rules geoip_rules
 
-  echo -e "$W_SELECT_GEOSITE_OPTION"
+  echomsg "$W_SELECT_GEOSITE_OPTION:" 1
   echo -e "$W_GEOSITE_OPTIONS"
   read -rp " > " geosite
 
@@ -1340,7 +1340,7 @@ change_geo_rules() {
     ;;
   esac
 
-  echo -e "$W_SELECT_GEOIP_OPTION:"
+  echomsg "$W_SELECT_GEOIP_OPTION:" 1
   echo -e "$W_GEOIP_OPTIONS"
   read -rp " > " geoip
 
@@ -1422,7 +1422,7 @@ proxy_management() {
     if [[ "$service_name" == "$service_prefix"* ]] && \
        [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]];
     then
-      if [[ -f "$path_proxy_env_dir/$service_name.env" ]]; then
+      if [[ ! -f "$path_proxy_env_dir/$service_name.env" ]]; then
         echo -e "$W_SELECT_OPTION"
         echo -e "$W_NO_PROXY_OPTIONS"
         read -rp "$W_CHOICE: " action

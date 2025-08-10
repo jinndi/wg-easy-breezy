@@ -6,7 +6,7 @@ for module in tcp_hybla tcp_bbr; do
   if modprobe -q "$module"; then
     echo "[start.sh] Module $module loaded"
   else
-    echo "[start.sh] Module loading error $module"
+    echo "[start.sh] Module $module loading error"
   fi
 done
 
@@ -14,11 +14,24 @@ done
 
 if [ -n "$VLESS_IP" ]; then
 
-LOG_LEVEL="${LOG_LEVEL:-warn}"
-PROXY_DNS="${PROXY_DNS:-1.1.1.1}"
-TUN_STACK="${TUN_STACK:-system}"
+# Paths
+PATH_SINGBOX_CONFIG="/app/singbox.json"
+PATH_SINGBOX_LOG="/app/singbox.log"
 
-# vless reality
+# sing-box
+SB_LOG_LEVEL="${SB_LOG_LEVEL:-warn}"
+SB_DNS_PROXY="${SB_DNS_PROXY:-1.1.1.1}"
+SB_TUN_STACK="${SB_TUN_STACK:-system}"
+
+## Do not use proxy for specified rules
+# GEOSITE https://github.com/SagerNet/sing-geosite/tree/rule-set
+# Example: category-ru,cn,speedtest
+SB_GEOSITE_BYPASS="${SB_GEOSITE_BYPASS:-}"
+# GEOIP https://github.com/SagerNet/sing-geoip/tree/rule-set
+# Example: ru,by,cn,ir
+SB_GEOIP_BYPASS="${SB_GEOIP_BYPASS:-}"
+
+# VLESS Reality
 VLESS_IP="${VLESS_IP:-}"
 VLESS_PORT="${VLESS_PORT:-443}"
 VLESS_ID="${VLESS_ID:-}"
@@ -28,21 +41,26 @@ VLESS_FINGERPRINT="${VLESS_FINGER_PRINT:-chrome}"
 VLESS_PUBLIC_KEY="${VLESS_PUBLIC_KEY:-}"
 VLESS_SHORT_ID="${VLESS_SHORT_ID:-}"
 
-cat << EOF > /app/singbox.json
+cat << EOF > "$PATH_SINGBOX_CONFIG"
 {
   "log": {
-    "level": "${LOG_LEVEL}",
-    "timestamp": false
+    "level": "${SB_LOG_LEVEL}",
+    "timestamp": true
   },
   "dns": {
     "servers": [
       {
         "tag": "dns-proxy",
         "type": "tls",
-        "server": "${PROXY_DNS}"
+        "server": "${SB_DNS_PROXY}"
+      },
+      {
+        "tag": "dns-local",
+        "type": "local",
+        "detour": "direct-out"
       }
     ],
-    "strategy": "prefer_ipv4"
+    "strategy": "ipv4_only"
   },
   "inbounds": [
     {
@@ -54,7 +72,8 @@ cat << EOF > /app/singbox.json
       "auto_route": true,
       "auto_redirect": true,
       "strict_route": true,
-      "stack": "${TUN_STACK}"
+      "stack": "${SB_TUN_STACK}",
+      "sniff": true
     }
   ],
   "outbounds": [
@@ -82,14 +101,15 @@ cat << EOF > /app/singbox.json
       }
     },
     {
-      "type": "direct",
-      "tag": "direct"
+      "tag": "direct-out",
+      "type": "direct"
+    },
+    {
+      "tag": "block-out",
+      "type": "block"
     }
   ],
   "route": {
-    "auto_detect_interface": true,
-    "default_domain_resolver": "dns-proxy",
-    "final": "vless-out",
     "rules": [
       {
         "action": "sniff"
@@ -100,25 +120,143 @@ cat << EOF > /app/singbox.json
       },
       {
         "ip_is_private": true,
-        "outbound": "direct"
+        "outbound": "direct-out"
+      },
+      {
+        "rule_set": "geosite-ads",
+        "outbound": "block-out"
       }
-    ]
+    ],
+    "rule_set": [
+      {
+        "tag": "geosite-ads",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+        "download_detour": "vless-out",
+        "update_interval": "1d"
+      }
+    ],
+    "final": "vless-out",
+    "auto_detect_interface": true
   },
   "experimental": {
     "cache_file": {
-      "enabled": true
+      "enabled": true,
+      "path": "/etc/wireguard/singbox.db"
     }
   }
 }
 EOF
 
+mergeconf() {
+  local patch_file="$1"
+  local tmpout
+  tmpout=$(mktemp)
+
+  if ! sing-box merge "$tmpout" \
+    -c "$PATH_SINGBOX_CONFIG" -c "$patch_file" >/dev/null; 
+  then
+    echo "[start.sh] sing-box merge config error"
+    rm -f "$patch_file" "$tmpout"
+    exit 1
+  fi
+
+  mv "$tmpout" "$PATH_SINGBOX_CONFIG"
+  rm -f "$patch_file"
+}
+
+gen_rules() {
+  local type="$1" # geosite or geoip
+  local list="$2"
+  local -n first_rule_ref="$3"
+  local -n first_rs_ref="$4"
+
+  IFS=',' read -ra entries <<< "$list"
+  for entry in "${entries[@]}"; do
+    if [ "$first_rule_ref" = true ]; then
+      first_rule_ref=false
+    else
+      echo ","
+    fi
+    echo -n "{\"rule_set\":\"${type}-${entry}\",\"outbound\":\"direct-out\"}"
+  done
+}
+
+gen_rule_sets() {
+  local type="$1" # geosite or geoip
+  local list="$2"
+  local -n first_rule_ref="$3"
+  local -n first_rs_ref="$4"
+
+  IFS=',' read -ra entries <<< "$list"
+  for entry in "${entries[@]}"; do
+    if [ "$first_rs_ref" = true ]; then
+      first_rs_ref=false
+    else
+      echo ","
+    fi
+    local base_url
+    if [ "$type" = "geosite" ]; then
+      base_url="https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-${entry}.srs"
+    else
+      base_url="https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-${entry}.srs"
+    fi
+
+    echo -n "{\"tag\":\"${type}-${entry}\",\"type\":\"remote\",\"format\":\"binary\",\"url\":\"${base_url}\",\"download_detour\":\"vless-out\",\"update_interval\":\"1d\"}"
+  done
+}
+
+add_all_rule_sets() {
+  if [ -z "$SB_GEOSITE_BYPASS" ] && [ -z "$SB_GEOIP_BYPASS" ]; then
+    return
+  fi
+
+  echo "[start.sh] sing-box add rules"
+
+  local tmpfile
+  tmpfile=$(mktemp)
+
+  local first_rule=true
+  local first_rs=true
+
+  {
+    echo '{"route":{"rules":['
+
+    [ -n "$SB_GEOSITE_BYPASS" ] && gen_rules geosite "$SB_GEOSITE_BYPASS" first_rule first_rs
+    [ -n "$SB_GEOIP_BYPASS" ] && gen_rules geoip "$SB_GEOIP_BYPASS" first_rule first_rs
+
+    echo '],"rule_set":['
+
+    # shellcheck disable=SC2034
+    first_rule=true
+    # shellcheck disable=SC2034
+    first_rs=true
+
+    [ -n "$SB_GEOSITE_BYPASS" ] && gen_rule_sets geosite "$SB_GEOSITE_BYPASS" first_rule first_rs
+    [ -n "$SB_GEOIP_BYPASS" ] && gen_rule_sets geoip "$SB_GEOIP_BYPASS" first_rule first_rs
+
+    echo ']}}'
+  } > "$tmpfile"
+
+  mergeconf "$tmpfile"
+}
+ 
+add_all_rule_sets
+
 echo "[start.sh] sing-box check cofig"
-sing-box check -c /app/singbox.json --disable-color || {
-  echo "[start.sh] sing-box cofig error" && exit 1
+sing-box check -c "$PATH_SINGBOX_CONFIG" >/dev/null || {
+  echo "[start.sh] sing-box config syntax error" && exit 1
+}
+
+echo "[start.sh] sing-box format cofig"
+sing-box format -w -c "$PATH_SINGBOX_CONFIG" >/dev/null || {
+  echo "[start.sh] sing-box config formatting error" && exit 1
 }
 
 echo "[start.sh] Launch sing-box proxy to $VLESS_IP"
-nohup sing-box run -c /app/singbox.json --disable-color  2>&1 &
+nohup sing-box run -c "$PATH_SINGBOX_CONFIG" \
+  --disable-color > "$PATH_SINGBOX_LOG" 2>&1 &
 fi
 
 echo "[start.sh] Launch WEB UI server wg-easy"

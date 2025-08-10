@@ -593,7 +593,7 @@ input_address() {
         fi
       done < <(yq -r '.services | keys[]' "$path_docker_compose_file")
 
-      if [[ "$address" == "192.168.100.x" ]]; then
+      if [[ "$address" == "192.168.100.x" || "$address" == "172.18.0.x" ]]; then
         echoerr "$W_SUBNET_BUSY"
         conflict=1
       fi
@@ -723,7 +723,19 @@ add_proxy_to_wg_service() {
 
   mkdir -p "$path_proxy_env_dir"
   local path_proxy_env_file="$path_proxy_env_dir/$service_name.env"
-  echo "$proxy_env" > "$path_proxy_env_file"
+
+  {
+    echo "SB_LOG_LEVEL=warn"
+    echo "SB_DNS_PROXY=1.1.1.1"
+    echo "SB_TUN_STACK=system"
+    echo "SB_GEOSITE_BYPASS="
+    echo "SB_GEOIP_BYPASS="
+    echo "VLESS_PORT=443"
+    echo "VLESS_FLOW=xtls-rprx-vision"
+    echo "VLESS_FINGERPRINT=chrome"
+  } > "$path_proxy_env_file"
+
+  echo "$proxy_env" >> "$path_proxy_env_file"
   proxy_env=""
 
   yq e -i ".services.${service_name}.env_file = \"${path_proxy_env_file}\"" "$path_docker_compose_file"
@@ -738,8 +750,6 @@ add_proxy_to_wg_service() {
 }
 
 remove_proxy_from_wg_service() {
-  [[ -z "$1" ]] && exiterr "remove_proxy_from_wg_service() service name parameter not passed"
-
   local service_name="$1"
 
   {
@@ -1093,7 +1103,7 @@ get_env_var_from_service() {
 
 show_services_list() {
   local service container_status ports status port_ui address mount_point client_count
-  local path_proxy_env_file proxy_ip   
+  local path_proxy_env_file proxy_ip geosite_rules geoip_rules
   local output=""
 
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1135,8 +1145,17 @@ show_services_list() {
       path_proxy_env_file="$path_proxy_env_dir/$service.env"
       if [[ -f "$path_proxy_env_file" ]]; then
         proxy_ip=$(grep -E '^VLESS_IP=' "$path_proxy_env_file" | cut -d '=' -f2-)
+        geosite_rules=$(grep -E '^SB_GEOSITE_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
+        geoip_rules=$(grep -E '^SB_GEOIP_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
+
         if [[ -n "$proxy_ip" ]]; then
           output+="\033[0;36m$W_PROXY_MODE:\033[0m Vless Reality -> ${proxy_ip}\n"
+        fi
+        if [[ -n "$geosite_rules" ]]; then
+          output+="\033[0;36m$W_GEOSITE_BYPASS:\033[0m ${geoip_rules}\n"
+        fi
+        if [[ -n "$geoip_rules" ]]; then
+          output+="\033[0;36m$W_GEOIP_BYPASS:\033[0m ${geoip_rules}\n"
         fi
       fi
 
@@ -1249,8 +1268,6 @@ remove_wg_service() {
 }
 
 change_proxy() {
-  [[ -z "$1" ]] && exiterr "change_proxy() service name parameter not passed"
-
   local service_name="${1:-}"
   local is_edit="${2:-}"
   install_mode="proxy-vless"
@@ -1260,8 +1277,10 @@ change_proxy() {
     podman container exists "$service_name" && \
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
   } > /dev/null 2>&1
+  sleep 1
 
   add_proxy_to_wg_service "$service_name"
+
   {
     if ! systemctl is-active --quiet wg-easy-breezy; then
       systemctl start wg-easy-breezy
@@ -1281,8 +1300,6 @@ change_proxy() {
 }
 
 remove_proxy() {
-  [[ -z "$1" ]] && exiterr "remove_proxy() service name parameter not passed"
-
   local service_name="${1:-}"
 
   remove_proxy_from_wg_service "$service_name"
@@ -1290,6 +1307,104 @@ remove_proxy() {
   echook "$W_PROXY_DELETED!"
 
   press_any_side_to_open_menu "proxy"
+}
+
+change_geo_rules() {
+  local service_name="${1:-}"
+  local geosite_rules geoip_rules
+
+  echo -e "$W_SELECT_GEOSITE_OPTION"
+  echo -e "$W_GEOSITE_OPTIONS"
+  read -rp " > " geosite
+
+  until [[ -z "$geosite" || "$geosite" =~ ^[1-4]$ || "$geosite" =~ ^[a-z0-9][a-z0-9!@-,]{1,}$ ]]; do
+    echoerr "$W_INCORRECT_OPTION"
+    read -rp " > " geosite
+  done
+
+  case "$geosite" in
+    1)
+      geosite_rules="category-ru"
+    ;;
+    2)
+      geosite_rules="cn"
+    ;;
+    3)
+      geosite_rules="category-ir"
+    ;;
+    4)
+      geosite_rules=""
+    ;;
+    *)
+      geosite_rules="$geosite"
+    ;;
+  esac
+
+  echo -e "$W_SELECT_GEOIP_OPTION:"
+  echo -e "$W_GEOIP_OPTIONS"
+  read -rp " > " geoip
+
+  until [[ -z "$geoip" || "$geoip" =~ ^[1-4]$ || "$geoip" =~ ^([a-z]{2})(,[a-z]{2})*$ ]]; do
+    echoerr "$W_INCORRECT_OPTION"
+    read -rp " > " geoip
+  done
+
+  case "$geoip" in
+    1)
+      geoip_rules="ru"
+    ;;
+    2)
+      geoip_rules="cn"
+    ;;
+    3)
+      geoip_rules="ir"
+    ;;
+    4)
+      geoip_rules=""
+    ;;
+    *)
+      geoip_rules="$geoip"
+    ;;
+  esac
+
+  if [[ -n "$geosite" || -n "$geoip" ]]; then
+    {
+      podman container exists "$service_name" && \
+      "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 "$service_name"
+    } > /dev/null 2>&1
+    sleep 1
+
+    local path_proxy_env_file="$path_proxy_env_dir/$service_name.env"
+
+    if [[ -n "$geosite" ]]; then
+      if grep -q '^SB_GEOSITE_BYPASS' "$path_proxy_env_file"; then
+        sed -i "s/^SB_GEOSITE_BYPASS.*/SB_GEOSITE_BYPASS=$geosite_rules/" "$path_proxy_env_file"
+      else
+        echo "SB_GEOSITE_BYPASS=$geosite_rules" >> "$path_proxy_env_file"
+      fi
+    fi
+
+    if [[ -n "$geoip" ]]; then
+      if grep -q '^SB_GEOIP_BYPASS' "$path_proxy_env_file"; then
+        sed -i "s/^SB_GEOIP_BYPASS.*/SB_GEOIP_BYPASS=$geoip_rules/" "$path_proxy_env_file"
+      else
+        echo "SB_GEOIP_BYPASS=$geoip_rules" >> "$path_proxy_env_file"
+      fi
+    fi
+
+    {
+      if ! systemctl is-active --quiet wg-easy-breezy; then
+        systemctl start wg-easy-breezy
+      else
+        "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
+      fi
+    } > /dev/null 2>&1
+    wait_for_containers
+    echook "$W_GEO_SETTINGS_APPLY"
+    press_any_side_to_open_menu "proxy"
+  else
+    proxy_management
+  fi
 }
 
 proxy_management() {
@@ -1330,7 +1445,7 @@ proxy_management() {
         echo -e "$W_PROXY_OPTIONS"
         read -rp "$W_CHOICE: " action
 
-        until [[ "$action" =~ ^[1-3]$ ]]; do
+        until [[ "$action" =~ ^[1-4]$ ]]; do
           echoerr "$W_INCORRECT_OPTION"
           read -rp "$W_CHOICE: " action
         done
@@ -1343,6 +1458,9 @@ proxy_management() {
             remove_proxy "$service_name"
           ;;
           3)
+            change_geo_rules "$service_name"
+          ;;   
+          4)
             select_containers_menu
           ;;
         esac   

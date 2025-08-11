@@ -51,14 +51,12 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       {
         "tag": "dns-proxy",
         "type": "tls",
-        "server": "${DNS_PROXY}",
-        "detour": "proxy"
+        "server": "${DNS_PROXY}"
       },
       {
         "tag": "dns-direct",
         "type": "tls",
-        "server": "${DNS_DIRECT}",
-        "detour": "direct"
+        "server": "${DNS_DIRECT}"
       }
     ],
     "rules": [     

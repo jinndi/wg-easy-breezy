@@ -10,7 +10,7 @@ for module in tcp_hybla tcp_bbr; do
   fi
 done
 
-/sbin/sysctl -p > /dev/null 2>&1
+/sbin/sysctl -p >/dev/null 2>&1
 
 if [ -n "$VLESS_IP" ]; then
 
@@ -245,12 +245,12 @@ add_all_rule_sets() {
 add_all_rule_sets
 
 echo "[start.sh] sing-box check config"
-sing-box check -c "$PATH_SINGBOX_CONFIG" >/dev/null || {
+sing-box check -c "$PATH_SINGBOX_CONFIG" >/dev/null 2>&1 || {
   echo "[start.sh] sing-box config syntax error" && exit 1
 }
 
 echo "[start.sh] sing-box format config"
-sing-box format -w -c "$PATH_SINGBOX_CONFIG" >/dev/null || {
+sing-box format -w -c "$PATH_SINGBOX_CONFIG" >/dev/null 2>&1 || {
   echo "[start.sh] sing-box config formatting error" && exit 1
 }
 

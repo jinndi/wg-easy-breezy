@@ -14,24 +14,23 @@ done
 
 if [ -n "$VLESS_IP" ]; then
 
-# Paths
 PATH_SINGBOX_CONFIG="/app/singbox.json"
 PATH_SINGBOX_LOG="/app/singbox.log"
 
-# sing-box
-SB_LOG_LEVEL="${SB_LOG_LEVEL:-warn}"
-SB_DNS_PROXY="${SB_DNS_PROXY:-1.1.1.1}"
-SB_TUN_STACK="${SB_TUN_STACK:-system}"
+LOG_LEVEL="${LOG_LEVEL:-warn}"
 
-## Do not use proxy for specified rules
+DNS_PROXY="${DNS_PROXY:-1.1.1.1}"
+DNS_DIRECT="${DNS_DIRECT:-77.88.8.8}"
+
+## Rules for bypassing proxies
 # GEOSITE https://github.com/SagerNet/sing-geosite/tree/rule-set
 # Example: category-ru,cn,speedtest
-SB_GEOSITE_BYPASS="${SB_GEOSITE_BYPASS:-}"
+GEOSITE_BYPASS="${GEOSITE_BYPASS:-}"
 # GEOIP https://github.com/SagerNet/sing-geoip/tree/rule-set
 # Example: ru,by,cn,ir
-SB_GEOIP_BYPASS="${SB_GEOIP_BYPASS:-}"
+GEOIP_BYPASS="${GEOIP_BYPASS:-}"
 
-# VLESS Reality
+## VLESS Reality
 VLESS_IP="${VLESS_IP:-}"
 VLESS_PORT="${VLESS_PORT:-443}"
 VLESS_ID="${VLESS_ID:-}"
@@ -44,7 +43,7 @@ VLESS_SHORT_ID="${VLESS_SHORT_ID:-}"
 cat << EOF > "$PATH_SINGBOX_CONFIG"
 {
   "log": {
-    "level": "${SB_LOG_LEVEL}",
+    "level": "${LOG_LEVEL}",
     "timestamp": true
   },
   "dns": {
@@ -52,13 +51,20 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       {
         "tag": "dns-proxy",
         "type": "tls",
-        "server": "${SB_DNS_PROXY}",
-        "detour": "vless-out"
+        "server": "${DNS_PROXY}",
+        "detour": "proxy"
       },
       {
-        "tag": "dns-local",
-        "type": "local",
-        "detour": "direct-out"
+        "tag": "dns-direct",
+        "type": "tls",
+        "server": "${DNS_DIRECT}",
+        "detour": "direct"
+      }
+    ],
+    "rules": [     
+      {
+        "rule_set": "category-ads-all",
+        "action": "reject"
       }
     ],
     "strategy": "prefer_ipv4"
@@ -73,19 +79,18 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       "auto_route": true,
       "auto_redirect": true,
       "strict_route": true,
-      "stack": "${SB_TUN_STACK}"
+      "stack": "system"
     }
   ],
   "outbounds": [
     {
-      "tag": "vless-out",
+      "tag": "proxy",
       "type": "vless",
       "server": "${VLESS_IP}",
       "server_port": ${VLESS_PORT},
       "uuid": "${VLESS_ID}",
       "flow": "${VLESS_FLOW}",
       "packet_encoding": "xudp",
-      "domain_resolver": "dns-proxy",
       "tls": {
         "enabled": true,
         "insecure": false,
@@ -102,9 +107,8 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       }
     },
     {
-      "tag": "direct-out",
-      "type": "direct",
-      "domain_resolver": "dns-local"
+      "tag": "direct",
+      "type": "direct"
     }
   ],
   "route": {
@@ -118,11 +122,7 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       },
       {
         "ip_is_private": true,
-        "outbound": "direct-out"
-      },
-      {
-        "rule_set": "category-ads-all",
-        "action": "reject"
+        "outbound": "direct"
       }
     ],
     "rule_set": [
@@ -131,11 +131,11 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
         "type": "remote",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
-        "download_detour": "vless-out",
+        "download_detour": "proxy",
         "update_interval": "1d"
       }
     ],
-    "final": "vless-out",
+    "final": "proxy",
     "auto_detect_interface": true,
     "default_domain_resolver": "dns-proxy"
   },
@@ -167,48 +167,61 @@ mergeconf() {
 }
 
 gen_rules() {
-  local type="$1" # geosite or geoip
-  local list="$2"
-  local -n first_rule_ref="$3"
-  local -n first_rs_ref="$4"
+  local type="$1" # dns or route
+  local prefix="$2" # geosite or geoip
+  local list="$3"
+  local -n first_rule_ref="$4"
+
+  local output=""
 
   IFS=',' read -ra entries <<< "$list"
-  for entry in "${entries[@]}"; do
+  for rule in "${entries[@]}"; do
+    if [ "$first_rule_ref" = true ]; then
+      first_rule_ref=false
+    else
+      output+=","
+    fi
+
+    output+="{\"rule_set\":\"${prefix}-${rule}\","
+
+    case "$type" in
+      "dns")
+        output+='"server":"dns-direct"}'
+      ;;
+      "route")
+        output+='"outbound":"direct"}'
+      ;;
+    esac 
+  done
+
+  echo -n "$output"
+}
+
+gen_rule_sets() {
+  local prefix="$1" # geosite or geoip
+  local list="$2"
+  local -n first_rule_ref="$3"
+
+  IFS=',' read -ra entries <<< "$list"
+  for rule in "${entries[@]}"; do
     if [ "$first_rule_ref" = true ]; then
       first_rule_ref=false
     else
       echo ","
     fi
-    echo -n "{\"rule_set\":\"${type}-${entry}\",\"outbound\":\"direct-out\"}"
-  done
-}
-
-gen_rule_sets() {
-  local type="$1" # geosite or geoip
-  local list="$2"
-  local -n first_rule_ref="$3"
-  local -n first_rs_ref="$4"
-
-  IFS=',' read -ra entries <<< "$list"
-  for entry in "${entries[@]}"; do
-    if [ "$first_rs_ref" = true ]; then
-      first_rs_ref=false
-    else
-      echo ","
-    fi
     local base_url
-    if [ "$type" = "geosite" ]; then
-      base_url="https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-${entry}.srs"
+    if [ "$prefix" = "geosite" ]; then
+      base_url="https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-${rule}.srs"
     else
-      base_url="https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-${entry}.srs"
+      base_url="https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-${rule}.srs"
     fi
 
-    echo -n "{\"tag\":\"${type}-${entry}\",\"type\":\"remote\",\"format\":\"binary\",\"url\":\"${base_url}\",\"download_detour\":\"vless-out\",\"update_interval\":\"1d\"}"
+    echo -n "{\"tag\":\"${prefix}-${rule}\",\"type\":\"remote\",\"format\":\"binary\",\"url\":\"${base_url}\",\"download_detour\":\"proxy\",\"update_interval\":\"1d\"}"
   done
 }
 
 add_all_rule_sets() {
-  if [ -z "$SB_GEOSITE_BYPASS" ] && [ -z "$SB_GEOIP_BYPASS" ]; then
+  if [ -z "$GEOSITE_BYPASS" ] && [ -z "$GEOIP_BYPASS" ]; then
     return
   fi
 
@@ -218,23 +231,30 @@ add_all_rule_sets() {
   tmpfile=$(mktemp 2>/dev/null)
 
   local first_rule=true
-  local first_rs=true
 
   {
-    echo '{"route":{"rules":['
+    echo '{"dns":{"rules":['
 
-    [ -n "$SB_GEOSITE_BYPASS" ] && gen_rules geosite "$SB_GEOSITE_BYPASS" first_rule first_rs
-    [ -n "$SB_GEOIP_BYPASS" ] && gen_rules geoip "$SB_GEOIP_BYPASS" first_rule first_rs
+    [ -n "$GEOSITE_BYPASS" ] && gen_rules dns geosite "$GEOSITE_BYPASS" first_rule
+    [ -n "$GEOIP_BYPASS" ] && gen_rules dns geoip "$GEOIP_BYPASS" first_rule
+
+    echo ']},'
+
+    # shellcheck disable=SC2034
+    first_rule=true
+
+    echo '"route":{"rules":['
+
+    [ -n "$GEOSITE_BYPASS" ] && gen_rules route geosite "$GEOSITE_BYPASS" first_rule
+    [ -n "$GEOIP_BYPASS" ] && gen_rules route geoip "$GEOIP_BYPASS" first_rule
 
     echo '],"rule_set":['
 
     # shellcheck disable=SC2034
     first_rule=true
-    # shellcheck disable=SC2034
-    first_rs=true
 
-    [ -n "$SB_GEOSITE_BYPASS" ] && gen_rule_sets geosite "$SB_GEOSITE_BYPASS" first_rule first_rs
-    [ -n "$SB_GEOIP_BYPASS" ] && gen_rule_sets geoip "$SB_GEOIP_BYPASS" first_rule first_rs
+    [ -n "$GEOSITE_BYPASS" ] && gen_rule_sets geosite "$GEOSITE_BYPASS" first_rule
+    [ -n "$GEOIP_BYPASS" ] && gen_rule_sets geoip "$GEOIP_BYPASS" first_rule
 
     echo ']}}'
   } > "$tmpfile"

@@ -722,11 +722,11 @@ add_proxy_to_wg_service() {
   local path_proxy_env_file="$path_proxy_env_dir/$service_name.env"
 
   {
-    echo "SB_LOG_LEVEL=warn"
-    echo "SB_DNS_PROXY=1.1.1.1"
-    echo "SB_TUN_STACK=system"
-    echo "SB_GEOSITE_BYPASS="
-    echo "SB_GEOIP_BYPASS="
+    echo "LOG_LEVEL=warn"
+    echo "DNS_PROXY=1.1.1.1"
+    echo "DNS_DIRECT=77.88.8.8"
+    echo "GEOSITE_BYPASS="
+    echo "GEOIP_BYPASS="
     echo "VLESS_PORT=443"
     echo "VLESS_FLOW=xtls-rprx-vision"
     echo "VLESS_FINGERPRINT=chrome"
@@ -1323,7 +1323,7 @@ change_geo_rules() {
       geosite_rules="category-ru"
     ;;
     2)
-      geosite_rules="cn"
+      geosite_rules="geolocation-cn"
     ;;
     3)
       geosite_rules="category-ir"

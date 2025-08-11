@@ -1141,8 +1141,8 @@ show_services_list() {
       path_proxy_env_file="$path_proxy_env_dir/$service.env"
       if [[ -f "$path_proxy_env_file" ]]; then
         proxy_ip=$(grep -E '^VLESS_IP=' "$path_proxy_env_file" | cut -d '=' -f2-)
-        geosite_rules=$(grep -E '^SB_GEOSITE_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
-        geoip_rules=$(grep -E '^SB_GEOIP_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
+        geosite_rules=$(grep -E '^GEOSITE_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
+        geoip_rules=$(grep -E '^GEOIP_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
 
         if [[ -n "$proxy_ip" ]]; then
           output+="\033[0;36m$W_PROXY_MODE:\033[0m Vless Reality -> ${proxy_ip}\n"
@@ -1373,18 +1373,18 @@ change_geo_rules() {
     local path_proxy_env_file="$path_proxy_env_dir/$service_name.env"
 
     if [[ -n "$geosite" ]]; then
-      if grep -q '^SB_GEOSITE_BYPASS' "$path_proxy_env_file"; then
-        sed -i "s/^SB_GEOSITE_BYPASS.*/SB_GEOSITE_BYPASS=$geosite_rules/" "$path_proxy_env_file"
+      if grep -q '^GEOSITE_BYPASS' "$path_proxy_env_file"; then
+        sed -i "s/^GEOSITE_BYPASS.*/GEOSITE_BYPASS=$geosite_rules/" "$path_proxy_env_file"
       else
-        echo "SB_GEOSITE_BYPASS=$geosite_rules" >> "$path_proxy_env_file"
+        echo "GEOSITE_BYPASS=$geosite_rules" >> "$path_proxy_env_file"
       fi
     fi
 
     if [[ -n "$geoip" ]]; then
-      if grep -q '^SB_GEOIP_BYPASS' "$path_proxy_env_file"; then
-        sed -i "s/^SB_GEOIP_BYPASS.*/SB_GEOIP_BYPASS=$geoip_rules/" "$path_proxy_env_file"
+      if grep -q '^GEOIP_BYPASS' "$path_proxy_env_file"; then
+        sed -i "s/^GEOIP_BYPASS.*/GEOIP_BYPASS=$geoip_rules/" "$path_proxy_env_file"
       else
-        echo "SB_GEOIP_BYPASS=$geoip_rules" >> "$path_proxy_env_file"
+        echo "GEOIP_BYPASS=$geoip_rules" >> "$path_proxy_env_file"
       fi
     fi
 

@@ -85,6 +85,7 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       "uuid": "${VLESS_ID}",
       "flow": "${VLESS_FLOW}",
       "packet_encoding": "xudp",
+      "domain_resolver": "dns-proxy",
       "tls": {
         "enabled": true,
         "insecure": false,
@@ -102,7 +103,8 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
     },
     {
       "tag": "direct-out",
-      "type": "direct"
+      "type": "direct",
+      "domain_resolver": "dns-local"
     }
   ],
   "route": {

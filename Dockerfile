@@ -1,5 +1,5 @@
 # https://github.com/SagerNet/sing-box/releases
-ARG SINGBOX_VERSION="v1.12.0"
+ARG SINGBOX_VERSION="v1.12.1"
 
 FROM ghcr.io/sagernet/sing-box:${SINGBOX_VERSION} AS sing-box
 

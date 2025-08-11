@@ -11,18 +11,18 @@ export DEBIAN_FRONTEND=noninteractive
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 ## Paths:
-path_data_dir="/opt/wg-easy-breezy"
+path_data_dir="/opt/wgeb"
 path_script="$path_data_dir/wg-easy-breezy"
 path_script_link="/usr/bin/wgeb"
 path_translation_file="$path_data_dir/translation"
 path_docker_compose_file="$path_data_dir/services.yml"
 path_env_file="$path_data_dir/.env"
-path_systemd_unit_file="/etc/systemd/system/wg-easy-breezy.service"
+path_systemd_unit_file="/etc/systemd/system/wgeb.service"
 path_caddyfile="$path_data_dir/Caddyfile"
 path_iptables_apply_script="$path_data_dir/iptables/apply.sh"
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 path_sysctl_config="$path_data_dir/sysctl.conf"
-path_sysctl_config_link="/etc/sysctl.d/99-wg-easy-breezy.conf"
+path_sysctl_config_link="/etc/sysctl.d/99-wgeb.conf"
 path_proxy_env_dir="$path_data_dir/xray"
 path_uv_dir="$path_data_dir/astral"
 path_uv_env_file="$path_uv_dir/.env"
@@ -124,11 +124,9 @@ load_translation() {
     touch "$path_translation_file"
     
     (
-      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation" \
+      curl -fsSL "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation?t=$(date +%s)" \
         -o "$path_translation_file"
-      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/wg-easy-breezy/$translation" \
+      curl -fsSL "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/wg-easy-breezy/$translation?t=$(date +%s)" \
         >> "$path_translation_file"
     ) || exiterr "Error: 'curl translation'"
 
@@ -192,7 +190,7 @@ remove_install() {
     echomsg "$W_DELETE_PROGRAM" 1
   fi
 
-  systemctl disable --now wg-easy-breezy > /dev/null 2>&1
+  systemctl disable --now wgeb > /dev/null 2>&1
   if [[ -e "$path_docker_compose_file" ]]; then
     "$path_uvx" podman-compose -f "$path_docker_compose_file" down -t 0 > /dev/null 2>&1
   fi
@@ -277,9 +275,9 @@ install_pkgs() {
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get upgrade'"
     (
       apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
-        openssl lsof dnsutils curl idn grep gzip sed nano htop \
+        openssl lsof dnsutils idn grep gzip sed nano htop \
       || apt-get -yqq install podman netavark aardvark-dns iproute2 iptables \
-        openssl lsof dnsutils curl idn grep gzip sed nano htop
+        openssl lsof dnsutils idn grep gzip sed nano htop
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get install'"
 
     # uv https://astral.sh
@@ -316,8 +314,7 @@ install_pkgs() {
       fi
     fi
     if ! command -v yq >/dev/null; then
-      local yq_link="https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64"
-      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" $yq_link \
+      curl -fsSL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64?t=$(date +%s)" \
         -o /usr/local/bin/yq || exiterr "${W_ERROR}: 'curl yq install'"
       chmod +x /usr/local/bin/yq
     fi
@@ -767,8 +764,8 @@ remove_proxy_from_wg_service() {
   yq e -i "del(.services.${service_name}.devices)" "$path_docker_compose_file"
 
   {
-    if ! systemctl is-active --quiet wg-easy-breezy; then
-      systemctl start wg-easy-breezy
+    if ! systemctl is-active --quiet wgeb; then
+      systemctl start wgeb
     else
       "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
     fi
@@ -937,8 +934,7 @@ create_sysctl_config () {
   mkdir -p "$(dirname "$path_sysctl_config")"
   mkdir -p "$(dirname "$path_sysctl_config_link")"
   
-  curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-    https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf \
+  curl -fsSL "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf?t=$(date +%s)" \
     -o "$path_sysctl_config" || exiterr "${W_ERROR}: 'curl sysctl.conf'"
 
   if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
@@ -995,7 +991,7 @@ is_all_ok_services() {
     return 1
   fi
 
-  if ! systemctl is-active --quiet wg-easy-breezy; then
+  if ! systemctl is-active --quiet wgeb; then
     return 1
   fi
 
@@ -1041,10 +1037,10 @@ wait_for_containers() {
 start_services() {
   echomsg "$W_LAUNCH_SERVICE" 1
 
-  systemctl enable --now wg-easy-breezy > /dev/null 2>&1
+  systemctl enable --now wgeb > /dev/null 2>&1
   wait_for_containers
 
-  if ! systemctl is-active --quiet wg-easy-breezy; then
+  if ! systemctl is-active --quiet wgeb; then
     echoerr "$W_LAUNCH_SERVICE_FAILED"
   else
     echook "$W_SERVICE_SUCCESS_LAUNCH"
@@ -1055,9 +1051,9 @@ stop_services() {
   echomsg "$W_STOP_SERVICE" 1
 
   if [[ -f "$path_docker_compose_file" ]]; then
-    systemctl disable --now wg-easy-breezy > /dev/null 2>&1
+    systemctl disable --now wgeb > /dev/null 2>&1
     sleep 5
-    if systemctl is-active --quiet wg-easy-breezy; then
+    if systemctl is-active --quiet wgeb; then
       echoerr "$W_SERVICE_STOP_FAILED"
     else
     echook "$W_SERVICE_SUCCESS_STOPPED"
@@ -1080,8 +1076,8 @@ switch_active_services() {
 restart_services() {
   echomsg "$W_RESTART_SERVICE" 1
 
-  systemctl stop wg-easy-breezy > /dev/null 2>&1
-  systemctl start wg-easy-breezy > /dev/null 2>&1
+  systemctl stop wgeb > /dev/null 2>&1
+  systemctl start wgeb > /dev/null 2>&1
   wait_for_containers
 
   if is_all_ok_services; then
@@ -1282,8 +1278,8 @@ change_proxy() {
   add_proxy_to_wg_service "$service_name"
 
   {
-    if ! systemctl is-active --quiet wg-easy-breezy; then
-      systemctl start wg-easy-breezy
+    if ! systemctl is-active --quiet wgeb; then
+      systemctl start wgeb
     else
       "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
     fi
@@ -1393,8 +1389,8 @@ change_geo_rules() {
     fi
 
     {
-      if ! systemctl is-active --quiet wg-easy-breezy; then
-        systemctl start wg-easy-breezy
+      if ! systemctl is-active --quiet wgeb; then
+        systemctl start wgeb
       else
         "$path_uvx" podman-compose -f $path_docker_compose_file up -d --force-recreate "$service_name"
       fi
@@ -1525,7 +1521,7 @@ add_domain() {
   if [[ "$is_domain" ]]; then
     add_caddy_service
 
-    systemctl restart wg-easy-breezy > /dev/null 2>&1
+    systemctl restart wgeb > /dev/null 2>&1
     wait_for_containers
 
     echook "$W_DOMAIN_ADDED_AND_ACTIVATED"
@@ -1549,7 +1545,7 @@ change_domain() {
       if check_domain "$host"; then
         echomsg "$W_APPLY_DOMAIN '$host'" 1
 
-        systemctl stop wg-easy-breezy > /dev/null 2>&1
+        systemctl stop wgeb > /dev/null 2>&1
 
         if grep -q '^WG_HOST=' "$path_env_file"; then
           sed -i "s/^WG_HOST=.*/WG_HOST=$host/" "$path_env_file"
@@ -1563,7 +1559,7 @@ change_domain() {
           sed -i "1i $host" "$path_caddyfile"
         fi
 
-        systemctl start wg-easy-breezy > /dev/null 2>&1
+        systemctl start wgeb > /dev/null 2>&1
 
         echook "$W_DOMAIN_NAME_CHANGED"
         break
@@ -1590,7 +1586,7 @@ remove_domain() {
 
     echomsg "$W_DELETE_DOMAIN_NAME" 1
 
-    systemctl stop wg-easy-breezy > /dev/null 2>&1
+    systemctl stop wgeb > /dev/null 2>&1
 
     yq e -i "del(.services.${service_name})" "$path_docker_compose_file" > /dev/null 2>&1
     yq e -i "del(.volumes.${service_name}-data)" "$path_docker_compose_file" > /dev/null 2>&1
@@ -1607,7 +1603,7 @@ remove_domain() {
       echo "WG_HOST=$host" >> "$path_env_file"
     fi
 
-    systemctl start wg-easy-breezy > /dev/null 2>&1
+    systemctl start wgeb > /dev/null 2>&1
     wait_for_containers
 
     echook "$W_DOMAIN_NAME_DELETED"
@@ -1680,7 +1676,7 @@ select_domain_option() {
 change_password() {
   input_password
 
-  systemctl restart wg-easy-breezy > /dev/null 2>&1
+  systemctl restart wgeb > /dev/null 2>&1
   wait_for_containers
 
   press_any_side_to_open_menu
@@ -1729,7 +1725,7 @@ select_containers_menu() {
 }
 
 show_systemctl_status() {
-  systemctl status wg-easy-breezy --no-pager -l
+  systemctl status wgeb --no-pager -l
   press_any_side_to_open_menu
 }
 

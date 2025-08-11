@@ -52,7 +52,8 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       {
         "tag": "dns-proxy",
         "type": "tls",
-        "server": "${SB_DNS_PROXY}"
+        "server": "${SB_DNS_PROXY}",
+        "detour": "vless-out"
       },
       {
         "tag": "dns-local",
@@ -60,20 +61,19 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
         "detour": "direct-out"
       }
     ],
-    "strategy": "ipv4_only"
+    "strategy": "prefer_ipv4"
   },
   "inbounds": [
     {
-      "type": "tun",
       "tag": "tun-in",
+      "type": "tun",
       "interface_name": "tun0",
       "mtu": 1500,
       "address": "172.18.0.1/30",
       "auto_route": true,
       "auto_redirect": true,
       "strict_route": true,
-      "stack": "${SB_TUN_STACK}",
-      "sniff": true
+      "stack": "${SB_TUN_STACK}"
     }
   ],
   "outbounds": [
@@ -103,10 +103,6 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
     {
       "tag": "direct-out",
       "type": "direct"
-    },
-    {
-      "tag": "block-out",
-      "type": "block"
     }
   ],
   "route": {
@@ -123,13 +119,13 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
         "outbound": "direct-out"
       },
       {
-        "rule_set": "geosite-ads",
-        "outbound": "block-out"
+        "rule_set": "category-ads-all",
+        "action": "reject"
       }
     ],
     "rule_set": [
       {
-        "tag": "geosite-ads",
+        "tag": "category-ads-all",
         "type": "remote",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
@@ -213,7 +209,7 @@ add_all_rule_sets() {
     return
   fi
 
-  echo "[start.sh] sing-box add rules"
+  echo "[start.sh] sing-box add route rules"
 
   local tmpfile
   tmpfile=$(mktemp 2>/dev/null)
@@ -245,12 +241,12 @@ add_all_rule_sets() {
  
 add_all_rule_sets
 
-echo "[start.sh] sing-box check cofig"
+echo "[start.sh] sing-box check config"
 sing-box check -c "$PATH_SINGBOX_CONFIG" >/dev/null || {
   echo "[start.sh] sing-box config syntax error" && exit 1
 }
 
-echo "[start.sh] sing-box format cofig"
+echo "[start.sh] sing-box format config"
 sing-box format -w -c "$PATH_SINGBOX_CONFIG" >/dev/null || {
   echo "[start.sh] sing-box config formatting error" && exit 1
 }

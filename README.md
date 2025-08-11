@@ -37,15 +37,15 @@ Deployment and management of wg-easy containers using Podman, including traffic 
 
 ## Requirements:
 
-1. A VPS server with at least 1 GB of RAM, running Linux (Ubuntu 24.04+ or Debian 12+), with an IPv4 address and a kernel version ≥ 6. (You’ll need two servers if you want to deploy the Shadowsocks server separately.)
-2. Access and execution via SSH as the root user.
+1. A VPS server with minimal specifications: at least 1 GB of RAM, running Linux Ubuntu 24.04+ or Debian 12+ OS, with an IPv4 address and kernel version 6+. (Two servers are required if you need XRay for proxying with a free port 443 on it)
+2. Operation and startup via SSH as the root user.
 
 ## Installation:
 
 From under ssh, install the main script `wg-easy-breezy`
 
 ```
-curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
+curl -fsSLO "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy?t=$(date +%s)" && bash wg-easy-breezy
 ```
 
 Follow the on-screen instructions. You will be prompted to enter the following:
@@ -76,9 +76,9 @@ Follow the on-screen instructions. You will be prompted to enter the following:
   You can obtain it by installing `xray-easy-breezy` on another server commander:
 
   ```
-  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/xray-easy-breezy && bash xray-easy-breezy
+  curl -fsSLO "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/xray-easy-breezy?t=$(date +%s)" && bash xray-easy-breezy
   ```
-  Installation directory: `/opt/xray/`
+  Installation directory: `/opt/xrayeb/`
   
   The installed server is managed using the `xrayeb` command
 
@@ -95,7 +95,7 @@ Follow the on-screen instructions. You will be prompted to enter the following:
 
 After the installation is complete, you will receive a link to the web interface.
 
-Installation directory: `/opt/wg-easy-breezy/`
+Installation directory: `/opt/wgeb/`
 
 The installed server is managed using the `wgeb` command
 

@@ -11,13 +11,13 @@ export DEBIAN_FRONTEND=noninteractive
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 ## Paths:
-path_xray_dir="/opt/xray"
+path_xray_dir="/opt/xrayeb"
 path_xray="$path_xray_dir/xray"
 path_translation_file="$path_xray_dir/translation"
 path_service="/etc/systemd/system/xrayeb.service"
 path_server_config="$path_xray_dir/config.json"
 path_client_env_file="$path_xray_dir/client.env"
-path_sysctl_config="/etc/sysctl.d/99-xray-easy-breezy.conf"
+path_sysctl_config="/etc/sysctl.d/99-xrayeb.conf"
 path_script="$path_xray_dir/xray-easy-breezy"
 path_script_link="/usr/bin/xrayeb"
 
@@ -94,11 +94,9 @@ load_translation() {
     
     (
       set -e
-      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation" \
+      curl -fsSL "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/general/$translation?t=$(date +%s)" \
         -o "$path_translation_file"
-      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
-        "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/xray-easy-breezy/$translation" \
+      curl -fsSL "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/locales/xray-easy-breezy/$translation?t=$(date +%s)" \
         >> "$path_translation_file"
     ) || exiterr "Error: 'curl translation'"
   fi
@@ -228,7 +226,7 @@ wait_for_apt_unlock() {
     [ "$waited" = 0 ] && echomsg "$W_APT_WAITING" 1
     ((waited++))
     if (( waited >= timeout )); then
-      exiterr "$W_EXCEEDING_WAIT_TIME ($timeout сек)."
+      exiterr "$W_EXCEEDING_WAIT_TIME ($timeout s.)."
     fi
   done
 }
@@ -251,22 +249,6 @@ install_pkgs() {
       apt-get -yqq install iproute2 iptables openssl lsof dnsutils unzip gzip grep nano htop \
       || apt-get -yqq install iproute2 iptables openssl lsof dnsutils unzip gzip grep nano htop
     ) > /dev/null 2>&1 || exiterr "${W_ERROR}: 'apt-get install'"
-
-    # mikefarah yq
-    # https://mikefarah.gitbook.io/yq
-    yq_path=$(command -v yq)
-    if [[ -n "$yq_path" ]]; then
-      if ! yq --version 2>/dev/null | grep -q 'mikefarah'; then
-        rm -f "$yq_path"
-        hash -r 2>/dev/null
-      fi
-    fi
-    if ! command -v yq >/dev/null; then
-      local yq_link="https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64"
-      curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" $yq_link \
-        -o /usr/local/bin/yq || exiterr "${W_ERROR}: 'curl yq install'"
-      chmod +x /usr/local/bin/yq
-    fi
   ) & show_spinner $!
 }
 
@@ -325,8 +307,7 @@ download_xray() {
   (
     set -e
     mkdir -p "$(dirname "$path_xray")" && \
-    curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache"  -o xray.zip \
-    "https://github.com/XTLS/Xray-core/releases/download/${version}/Xray-linux-64.zip" && \
+    curl -fsSL -o xray.zip "https://github.com/XTLS/Xray-core/releases/download/${version}/Xray-linux-64.zip" && \
     unzip ./xray.zip -d "$path_xray_dir" && \
     chmod +x "$path_xray" && \
     rm ./xray.zip
@@ -338,8 +319,7 @@ create_sysctl_config () {
 
   mkdir -p "$(dirname "$path_sysctl_config")"
 
-  link_sysctl_config="https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf"
-  curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "$link_sysctl_config" \
+  curl -fsSL "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/sysctl.conf?t=$(date +%s)" \
       -o "$path_sysctl_config" > /dev/null 2>&1 || exiterr "${W_ERROR}: 'curl sysctl.conf'"
 
   if modprobe -q tcp_bbr && [ -f /proc/sys/net/ipv4/tcp_congestion_control ]
@@ -556,7 +536,7 @@ change_cloaking_domain() {
 
 select_cloaking_domain_option() {
   show_header
-  DEST_HOST=$(jq -r '.inbounds[0].streamSettings.realitySettings.dest' "$path_server_config" | cut -d: -f1)
+  DEST_HOST=$(grep -E '^VLESS_SNI=' "$path_client_env_file" | cut -d '=' -f2-)
   echook "\n\033[0;36m$W_CLOAKING_DOMAIN:\033[0m $DEST_HOST"
   echo -e "$W_SELECT_OPTION:"
   echo -e "$W_CLOAKING_DOMAIN_OPTIONS"

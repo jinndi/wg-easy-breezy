@@ -37,7 +37,7 @@
 
 ## Требования:
 
-1. VPS-сервер с минимальными характеристиками: от 1 ГБ оперативной памяти, с установленной ОС Linux Ubuntu 24.04+ или Debian 12+, с IPv4-адресом и ядром версии 6 или выше. (Понадобится два сервера, если вы хотите развернуть Shadowsocks отдельно на другом сервере.)
+1. VPS-сервер с минимальными характеристиками: от 1 ГБ оперативной памяти, с установленной ОС Linux Ubuntu 24.04+ или Debian 12+, с IPv4-адресом и ядром версии 6+. (Два сервера, если нужен XRay для прокси c свободным 443 портом на нем)
 2. Работа и запуск через SSH от имени пользователя root.
 
 ## Установка:
@@ -45,7 +45,7 @@
 Из под ssh выполните установку основного скрипта `wg-easy-breezy`
 
 ```
-curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy && bash wg-easy-breezy
+curl -fsSLO "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/wg-easy-breezy?t=$(date +%s)" && bash wg-easy-breezy
 ```
 
 Следуйте инструкциям на экране. В процессе будут запрашиваться следующие данные:
@@ -76,9 +76,9 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
   Получить её можно, установив `xray-easy-breezy` на другом сервере коммандой:
 
   ```
-  curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/xray-easy-breezy && bash xray-easy-breezy
+  curl -fsSLO "https://raw.githubusercontent.com/jinndi/wg-easy-breezy/main/xray-easy-breezy?t=$(date +%s)" && bash xray-easy-breezy
   ```
-  Директория установки: `/opt/xray/`
+  Директория установки: `/opt/xrayeb/`
   
   Управление установленным сервером осуществляется по комманде `xrayeb`
 
@@ -95,7 +95,7 @@ curl -fsSLO -H "Cache-Control: no-cache" -H "Pragma: no-cache" https://raw.githu
 
 После завершения установки вы получите ссылку на веб интерфейс
 
-Директория установки: `/opt/wg-easy-breezy/`
+Директория установки: `/opt/wgeb/`
 
 Управление установленным сервером осуществляется по комманде `wgeb`
 

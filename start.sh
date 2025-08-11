@@ -136,7 +136,8 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
       }
     ],
     "final": "vless-out",
-    "auto_detect_interface": true
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-proxy"
   },
   "experimental": {
     "cache_file": {

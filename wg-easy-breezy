@@ -740,7 +740,7 @@ add_proxy_to_wg_service() {
   echo "$proxy_env" >> "$path_proxy_env_file"
   proxy_env=""
 
-  touch "$mount_point/exclude_bypass.domains"
+  touch "$(dirname "$path_proxy_env_file")/exclude_bypass.domains"
 
   yq e -i ".services.${service_name}.devices = [\"/dev/net/tun\"]
   " "$path_docker_compose_file"

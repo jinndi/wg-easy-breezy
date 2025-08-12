@@ -1,22 +1,36 @@
 #!/bin/bash
+# shellcheck source=/dev/null
 
 set -e
 
+log(){
+  echo "$(date -u '+%Y-%m-%dT%H:%M:%S.%3NZ') [start.sh] $1"
+}
+
 for module in tcp_hybla tcp_bbr; do
   if modprobe -q "$module"; then
-    echo "[start.sh] Module $module loaded"
+    log "Module $module loaded"
   else
-    echo "[start.sh] Module $module loading error"
+    log "Module $module loading error"
   fi
 done
 
-/sbin/sysctl -p >/dev/null 2>&1
+/sbin/sysctl -p >/dev/null 2>&1 && log "Sysctl configuration applied"
+
+SINGBOX_ENV=/etc/wireguard/proxy.env
+
+if [ -f "$SINGBOX_ENV" ]; then 
+  source "$SINGBOX_ENV" && log "Proxy env loaded"
+fi
 
 if [ -n "$VLESS_IP" ]; then
 
-PATH_SINGBOX_CONFIG="/app/singbox.json"
-PATH_SINGBOX_LOG="/app/singbox.log"
-PATH_EXCLUDE_DOMAINS_BYPASS="/app/exclude_bypass.domains"
+PATH_SINGBOX_CONFIG="/etc/wireguard/singbox.json"
+PATH_SINGBOX_LOG="/etc/wireguard/singbox.log"
+PATH_SINGBOX_CACHE="/etc/wireguard/singbox.db"
+PATH_EXCLUDE_DOMAINS_BYPASS="/etc/wireguard/exclude_bypass.domains"
+
+TUN_NAME="tun0"
 
 LOG_LEVEL="${LOG_LEVEL:-warn}"
 
@@ -88,7 +102,7 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
     {
       "tag": "tun-in",
       "type": "tun",
-      "interface_name": "tun0",
+      "interface_name": "$TUN_NAME",
       "mtu": 1500,
       "address": "172.18.0.1/30",
       "auto_route": true,
@@ -152,7 +166,7 @@ cat << EOF > "$PATH_SINGBOX_CONFIG"
   "experimental": {
     "cache_file": {
       "enabled": true,
-      "path": "/etc/wireguard/singbox.db"
+      "path": "${PATH_SINGBOX_CACHE}"
     }
   }
 }
@@ -167,7 +181,7 @@ mergeconf() {
     -c "$PATH_SINGBOX_CONFIG" -c "$patch_file" \
     >/dev/null 2>&1; 
   then
-    echo "[start.sh] sing-box merge config error"
+    log "sing-box merge config error"
     rm -f "$patch_file" "$tmpout"
     exit 1
   fi
@@ -181,7 +195,7 @@ add_all_rule_sets() {
     return
   fi
 
-  echo "[start.sh] sing-box add route rules"
+  log "sing-box add route rules"
 
   local tmpfile
   tmpfile=$(mktemp 2>/dev/null)
@@ -210,20 +224,23 @@ add_all_rule_sets() {
 
 add_all_rule_sets
 
-echo "[start.sh] sing-box check config"
+log "sing-box check config"
 sing-box check -c "$PATH_SINGBOX_CONFIG" >/dev/null 2>&1 || {
-  echo "[start.sh] sing-box config syntax error" && exit 1
+  log "sing-box config syntax error" && exit 1
 }
 
-echo "[start.sh] sing-box format config"
+log "sing-box format config"
 sing-box format -w -c "$PATH_SINGBOX_CONFIG" >/dev/null 2>&1 || {
-  echo "[start.sh] sing-box config formatting error" && exit 1
+  log "sing-box config formatting error" && exit 1
 }
 
-echo "[start.sh] Launch sing-box proxy to $VLESS_IP"
+log "Launch sing-box proxy to $VLESS_IP"
 nohup sing-box run -c "$PATH_SINGBOX_CONFIG" \
   --disable-color > "$PATH_SINGBOX_LOG" 2>&1 &
+
+export WG_DEVICE="$TUN_NAME"
+
 fi
 
-echo "[start.sh] Launch WEB UI server wg-easy"
+log "Launch WEB UI server wg-easy"
 exec node /app/server.js

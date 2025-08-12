@@ -23,7 +23,6 @@ path_iptables_apply_script="$path_data_dir/iptables/apply.sh"
 path_iptables_delete_script="$path_data_dir/iptables/delete.sh"
 path_sysctl_config="$path_data_dir/sysctl.conf"
 path_sysctl_config_link="/etc/sysctl.d/99-wgeb.conf"
-path_proxy_env_dir="$path_data_dir/xray"
 path_uv_dir="$path_data_dir/astral"
 path_uv_env_file="$path_uv_dir/.env"
 path_uvx="$path_uv_dir/uvx"
@@ -713,14 +712,21 @@ create_iptables_scripts() {
   chmod +x "$path_iptables_apply_script" "$path_iptables_delete_script"
 }
 
-add_proxy_to_wg_service() {
-  [[ -z "$1" ]] && exiterr "add_proxy_to_wg_service() service name parameter not passed"
+get_proxy_env_file() {
+  local service_name="$1" mount_point 
+  mount_point=$(podman volume inspect "$service_name" --format '{{ .Mountpoint }}')
+  echo "$mount_point/proxy.env"
+}
 
+add_proxy_to_wg_service() {
   local service_name="$1"
 
-  mkdir -p "$path_proxy_env_dir"
-  local path_proxy_env_file="$path_proxy_env_dir/$service_name.env"
+  podman volume exists "$service_name" || podman volume create "${service_name}" > /dev/null 2>&1 \
+    || exiterr "${W_ERROR}: 'podman volume create $service_name'"
 
+  local path_proxy_env_file
+  path_proxy_env_file="$(get_proxy_env_file "$service_name")"
+    
   {
     echo "LOG_LEVEL=warn"
     echo "DNS_PROXY=1.1.1.1"
@@ -731,16 +737,10 @@ add_proxy_to_wg_service() {
     echo "VLESS_FLOW=xtls-rprx-vision"
     echo "VLESS_FINGERPRINT=chrome"
   } > "$path_proxy_env_file"
-
   echo "$proxy_env" >> "$path_proxy_env_file"
   proxy_env=""
 
-  yq e -i ".services.${service_name}.env_file = \"${path_proxy_env_file}\"" "$path_docker_compose_file"
-
-  yq e -i ".services.${service_name}.environment += {
-      \"WG_DEVICE\": \"tun0\"
-    }
-  " "$path_docker_compose_file"
+  touch "$mount_point/exclude_bypass.domains"
 
   yq e -i ".services.${service_name}.devices = [\"/dev/net/tun\"]
   " "$path_docker_compose_file"
@@ -755,11 +755,9 @@ remove_proxy_from_wg_service() {
   } > /dev/null 2>&1
   sleep 1
 
-  rm -f "$path_proxy_env_dir/$service_name.env"
-
-  yq e -i "del(.services.${service_name}.env_file)" "$path_docker_compose_file"
-
-  yq e -i "del(.services.${service_name}.environment.WG_DEVICE)" "$path_docker_compose_file"
+  local path_proxy_env_file
+  path_proxy_env_file="$(get_proxy_env_file "$service_name")"
+  rm -f "$path_proxy_env_file"
 
   yq e -i "del(.services.${service_name}.devices)" "$path_docker_compose_file"
 
@@ -812,13 +810,13 @@ add_wg_service() {
     }
   }" "$path_docker_compose_file"
 
-  if [ -n "$is_proxy" ]; then
-    add_proxy_to_wg_service "$service_name"
-  fi
-
   yq e -i ".volumes += {
     \"${service_name}\": { \"name\": \"${service_name}\" }
   }" "$path_docker_compose_file"
+
+  if [ -n "$is_proxy" ]; then
+    add_proxy_to_wg_service "$service_name"
+  fi
 
   add_iptables_rule "$port_wg" "udp"
   add_iptables_rule "$port_ui" "tcp"
@@ -1099,7 +1097,7 @@ get_env_var_from_service() {
 
 show_services_list() {
   local service container_status ports status port_ui address mount_point client_count
-  local path_proxy_env_file proxy_ip geosite_rules geoip_rules
+  local eb_domains_count proxy_ip geosite_rules geoip_rules
   local output=""
 
   mapfile -t services < <(yq -r '.services | keys[]' "$path_docker_compose_file")
@@ -1129,35 +1127,29 @@ show_services_list() {
 
       if podman volume exists "$service"; then
         mount_point=$(podman volume inspect "$service" --format '{{ .Mountpoint }}')
-        if [[ -f "$mount_point/wg0.json" ]]; then
-          client_count=$(yq '(.clients // {}) | length' "$mount_point/wg0.json")
-        else
-          client_count=0
+        
+        [[ -f "$mount_point/wg0.json" ]] && \
+          client_count=$(yq '(.clients // {}) | length' "$mount_point/wg0.json") || client_count=0
+
+        if [[ -f "$mount_point/proxy.env" ]]; then
+          proxy_ip=$(grep -E '^VLESS_IP=' "$mount_point/proxy.env" | cut -d '=' -f2-)
+          geosite_rules=$(grep -E '^GEOSITE_BYPASS=' "$mount_point/proxy.env" | cut -d '=' -f2-)
+          geoip_rules=$(grep -E '^GEOIP_BYPASS=' "$mount_point/proxy.env" | cut -d '=' -f2-)
         fi
+
+        [[ -f "$mount_point/exclude_bypass.domains" ]] && \
+          eb_domains_count=$(grep -cve '^\s*$' "$mount_point/exclude_bypass.domains")
       else
         client_count="\033[1;31mоvolume not found!\033[0m"
       fi
 
-      path_proxy_env_file="$path_proxy_env_dir/$service.env"
-      if [[ -f "$path_proxy_env_file" ]]; then
-        proxy_ip=$(grep -E '^VLESS_IP=' "$path_proxy_env_file" | cut -d '=' -f2-)
-        geosite_rules=$(grep -E '^GEOSITE_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
-        geoip_rules=$(grep -E '^GEOIP_BYPASS=' "$path_proxy_env_file" | cut -d '=' -f2-)
-
-        if [[ -n "$proxy_ip" ]]; then
-          output+="\033[0;36m$W_PROXY_MODE:\033[0m Vless Reality -> ${proxy_ip}\n"
-        fi
-        if [[ -n "$geosite_rules" ]]; then
-          output+="\033[0;36m$W_GEOSITE_BYPASS:\033[0m ${geosite_rules}\n"
-        fi
-        if [[ -n "$geoip_rules" ]]; then
-          output+="\033[0;36m$W_GEOIP_BYPASS:\033[0m ${geoip_rules}\n"
-        fi
-      fi
-
       output+="\033[0;36m$W_CLIENTS_SUBNET:\033[0m $address\n"
-
       output+="\033[0;36m$W_CLIENTS_COUNT:\033[0m $client_count\n"
+      [[ -n "$proxy_ip" ]] && output+="\033[0;36m$W_PROXY_MODE:\033[0m Vless Reality -> ${proxy_ip}\n"
+      [[ -n "$geosite_rules" ]] && output+="\033[0;36m$W_GEOSITE_BYPASS:\033[0m ${geosite_rules}\n"
+      [[ -n "$geoip_rules" ]] && output+="\033[0;36m$W_GEOIP_BYPASS:\033[0m ${geoip_rules}\n"
+      [[ -n "$geosite_rules" ||  -n "$geoip_rules" ]] && [[ -n "$eb_domains_count" ]] && \
+        output+="\033[0;36m$W_EB_DOMAINS_COUNT:\033[0m ${eb_domains_count}\n"
 
       if [[ -f "$path_caddyfile" ]]; then
         output+="\033[0;36m$W_WEB_INTERFACE:\033[0m https://${WG_HOST}/${service}/\n"
@@ -1370,7 +1362,8 @@ change_geo_rules() {
     } > /dev/null 2>&1
     sleep 1
 
-    local path_proxy_env_file="$path_proxy_env_dir/$service_name.env"
+    local path_proxy_env_file
+    path_proxy_env_file="$(get_proxy_env_file "$service_name")"
 
     if [[ -n "$geosite" ]]; then
       if grep -q '^GEOSITE_BYPASS' "$path_proxy_env_file"; then
@@ -1418,7 +1411,10 @@ proxy_management() {
     if [[ "$service_name" == "$service_prefix"* ]] && \
        [[ "$(yq e ".services.\"$service_name\"" "$path_docker_compose_file")" != "null" ]];
     then
-      if [[ ! -f "$path_proxy_env_dir/$service_name.env" ]]; then
+      local path_proxy_env_file
+      path_proxy_env_file="$(get_proxy_env_file "$service_name")"
+
+      if [[ ! -f "$path_proxy_env_file" ]]; then
         echo -e "$W_SELECT_OPTION"
         echo -e "$W_NO_PROXY_OPTIONS"
         read -rp "$W_CHOICE: " action

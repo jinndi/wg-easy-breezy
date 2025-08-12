@@ -212,11 +212,11 @@ add_all_rule_sets() {
   GEO_BYPASS_FORMAT="\"${GEO_BYPASS_LIST//,/\",\"}\""
 
   {
-    echo "{\"dns\":{\"rules\":[{\"rule_set\":\[${GEO_BYPASS_FORMAT}],\"server\":\"dns-direct\"}]},"
+    echo "{\"dns\":{\"rules\":[{\"rule_set\":[${GEO_BYPASS_FORMAT}],\"server\":\"dns-direct\"}]},"
     echo '"route":{"rules":['
     [ -n "$EXCLUDE_DOMAINS_BYPASS" ] && echo "{\"domain_keyword\":[${EXCLUDE_DOMAINS_BYPASS}],\"outbound\": \"proxy\"},"
-    echo "{\"rule_set\":\[${GEO_BYPASS_FORMAT}],\"outbound\":\"direct\"}],"
-    echo "\"rule_set\":['$(gen_rule_sets "$GEO_BYPASS_LIST")]}}"
+    echo "{\"rule_set\":[${GEO_BYPASS_FORMAT}],\"outbound\":\"direct\"}],"
+    echo "\"rule_set\":[$(gen_rule_sets "$GEO_BYPASS_LIST")]}}"
   } > "$tmpfile"
 
   mergeconf "$tmpfile"

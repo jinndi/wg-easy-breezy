@@ -206,9 +206,9 @@ add_all_rule_sets() {
   EXCLUDE_DOMAINS_BYPASS=$(grep -v '^[[:space:]]*$' "$PATH_EXCLUDE_DOMAINS_BYPASS" | paste -sd,) && \
   [ -n "$EXCLUDE_DOMAINS_BYPASS" ] && EXCLUDE_DOMAINS_BYPASS="\"${EXCLUDE_DOMAINS_BYPASS//,/\",\"}\"" 
 
-  [ -n "$GEOSITE_BYPASS" ] && GEOSITE_BYPASS="${GEOSITE_BYPASS//,/\,geosite-},"
-  [ -n "$GEOIP_BYPASS" ] && GEOIP_BYPASS="${GEOIP_BYPASS//,/\,geoip-}"
-  GEO_BYPASS_LIST="${GEOSITE_BYPASS}${GEOIP_BYPASS}"
+  [ -n "$GEOSITE_BYPASS" ] && GEOSITE_BYPASS="geosite-${GEOSITE_BYPASS//,/\,geosite-}"
+  [ -n "$GEOIP_BYPASS" ] && GEOIP_BYPASS="geoip-${GEOIP_BYPASS//,/\,geoip-}"
+  GEO_BYPASS_LIST="${GEOSITE_BYPASS},${GEOIP_BYPASS}"
   GEO_BYPASS_FORMAT="\"${GEO_BYPASS_LIST//,/\",\"}\""
 
   {
